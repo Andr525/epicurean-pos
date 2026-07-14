@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#3B2314">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Epicurean POS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js"></script>
+<style>
+:root {
+  --bg: #0f0f14;
+  --surface: #1a1a24;
+  --surface-2: #24243a;
+  --border: #2a2a40;
+  --primary: #B87333;
+  --primary-light: #D4956A;
+  --primary-glow: rgba(184,115,51,0.15);
+  --success: #4ade80;
+  --warning: #fb923c;
+  --danger: #f87171;
+  --info: #60a5fa;
+  --text: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow: 0 4px 20px rgba(0,0,0,0.3);
+  --font: 'Inter', -apple-system, sans-serif;
+  --ease: cubic-bezier(0.23, 1, 0.32, 1);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html,body { height:100%; overflow:hidden; }
+body { font-family:var(--font); color:var(--text); background:var(--bg); -webkit-font-smoothing:antialiased; }
+
+/* Screens */
+.screen { display:none; height:100vh; flex-direction:column; }
+.screen.active { display:flex; }
+
+/* LOGIN */
+#login-screen {
+  align-items:center; justify-content:center; text-align:center; padding:2rem;
+  background:linear-gradient(160deg, #1a1020 0%, var(--bg) 100%);
+}
+#login-screen h1 { font-size:1.6rem; font-weight:700; margin-bottom:0.3rem; }
+#login-screen .subtitle { color:var(--primary-light); font-size:0.85rem; margin-bottom:2rem; }
+.pin-display { display:flex; gap:12px; justify-content:center; margin-bottom:2rem; }
+.pin-dot { width:16px; height:16px; border-radius:50%; background:var(--border); transition:all 0.16s var(--ease); }
+.pin-dot.filled { background:var(--primary); box-shadow:0 0 8px rgba(184,115,51,0.5); }
+.numpad { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; max-width:260px; }
+.numpad-btn {
+  width:60px; height:60px; border-radius:50%; border:1px solid var(--border);
+  background:var(--surface); color:var(--text); font-size:1.3rem; font-weight:500;
+  cursor:pointer; transition:all 0.12s var(--ease);
+  display:flex; align-items:center; justify-content:center;
+}
+.numpad-btn:active { transform:scale(0.9); background:var(--primary-glow); border-color:var(--primary); }
+.numpad-btn.action { font-size:0.8rem; color:var(--text-secondary); }
+#pin-error { color:var(--danger); font-size:0.8rem; margin-top:1rem; min-height:1.2rem; }
+
+/* APP SHELL */
+.app-header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0.8rem 1rem; background:var(--surface); border-bottom:1px solid var(--border); flex-shrink:0;
+}
+.app-header .user-info { font-weight:600; font-size:0.9rem; }
+.app-header .user-role { font-size:0.7rem; color:var(--text-muted); }
+.app-header .logout-btn {
+  background:none; border:1px solid var(--border); color:var(--text-secondary);
+  padding:0.4rem 0.8rem; border-radius:var(--radius-sm); font-size:0.75rem; cursor:pointer;
+}
+
+.app-nav {
+  display:flex; background:var(--surface); border-top:1px solid var(--border);
+  flex-shrink:0; position:relative; z-index:10;
+}
+.nav-btn {
+  flex:1; padding:0.6rem 0.3rem; text-align:center; border:none; background:none;
+  color:var(--text-muted); cursor:pointer; transition:all 0.2s var(--ease); position:relative;
+}
+.nav-btn .nav-icon { font-size:1.3rem; display:block; margin-bottom:0.15rem; }
+.nav-btn .nav-label { font-size:0.65rem; font-weight:500; }
+.nav-btn.active { color:var(--primary); }
+.nav-btn.active::after {
+  content:''; position:absolute; top:0; left:20%; right:20%;
+  height:2px; background:var(--primary); border-radius:0 0 2px 2px;
+}
+.nav-badge {
+  position:absolute; top:4px; right:calc(50% - 16px); background:var(--danger); color:#fff;
+  font-size:0.6rem; width:16px; height:16px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center; font-weight:700;
+}
+
+.app-content { flex:1; overflow-y:auto; padding:1rem; }
+
+/* TABLES */
+.table-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:0.8rem; }
+.table-card {
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+  padding:1rem; text-align:center; cursor:pointer; transition:all 0.16s var(--ease);
+}
+.table-card:active { transform:scale(0.96); }
+.table-card .table-num { font-size:1.4rem; font-weight:700; margin-bottom:0.2rem; }
+.table-card .table-status { font-size:0.7rem; color:var(--text-muted); }
+.table-card.has-call { border-color:var(--danger); animation:callPulse 1.5s infinite; }
+@keyframes callPulse { 0%,100%{box-shadow:0 0 0 0 rgba(248,113,113,0.3)} 50%{box-shadow:0 0 0 6px rgba(248,113,113,0)} }
+.table-card.has-order { border-color:var(--primary); }
+
+/* ORDER */
+.order-section h3 { font-size:0.9rem; font-weight:600; margin-bottom:0.8rem; color:var(--text-secondary); }
+.cat-pills { display:flex; gap:0.4rem; overflow-x:auto; margin-bottom:1rem; padding-bottom:0.5rem; scrollbar-width:none; }
+.cat-pills::-webkit-scrollbar { display:none; }
+.cat-pill {
+  padding:0.4rem 0.8rem; border-radius:20px; border:1px solid var(--border);
+  background:var(--surface); color:var(--text-secondary); font-size:0.75rem; font-weight:500;
+  white-space:nowrap; cursor:pointer; transition:all 0.16s var(--ease);
+}
+.cat-pill.active { background:var(--primary-glow); border-color:var(--primary); color:var(--primary-light); }
+
+.menu-item-row {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0.7rem 0; border-bottom:1px solid var(--border); cursor:pointer;
+  transition:background 0.1s;
+}
+.menu-item-row:active { background:var(--primary-glow); }
+.menu-item-row .item-info .item-name { font-size:0.85rem; font-weight:500; }
+.menu-item-row .item-info .item-meta { font-size:0.7rem; color:var(--text-muted); margin-top:0.1rem; }
+.menu-item-row .item-price { font-weight:600; color:var(--primary-light); font-size:0.9rem; }
+
+.order-summary {
+  margin-top:1rem; padding-top:1rem; border-top:2px solid var(--border);
+}
+.order-line {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0.5rem 0; border-bottom:1px solid var(--border);
+}
+.order-line .remove-btn { background:none; border:none; color:var(--danger); cursor:pointer; font-size:1rem; }
+.send-btn {
+  width:100%; margin-top:1rem; padding:0.9rem; border:none; border-radius:var(--radius);
+  background:var(--success); color:var(--bg); font-size:0.9rem; font-weight:700;
+  cursor:pointer; transition:all 0.16s var(--ease);
+}
+.send-btn:active { transform:scale(0.97); }
+.send-btn:disabled { opacity:0.4; cursor:not-allowed; }
+
+/* MESSAGES */
+.msg-list { display:flex; flex-direction:column; gap:0.5rem; min-height:200px; margin-bottom:1rem; }
+.msg-bubble {
+  max-width:80%; padding:0.6rem 1rem; border-radius:var(--radius); font-size:0.82rem; line-height:1.4;
+}
+.msg-bubble.from-server { background:var(--primary-glow); border:1px solid var(--primary); align-self:flex-end; }
+.msg-bubble.from-guest { background:var(--surface-2); align-self:flex-start; }
+.msg-input-row { display:flex; gap:0.5rem; }
+.msg-input-row input {
+  flex:1; padding:0.7rem; border:1px solid var(--border); border-radius:var(--radius);
+  background:var(--surface); color:var(--text); font-size:0.85rem;
+}
+.msg-input-row button {
+  padding:0.7rem 1.2rem; border:none; border-radius:var(--radius);
+  background:var(--primary); color:#fff; font-weight:600; cursor:pointer;
+}
+
+/* HISTORY */
+.history-card {
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+  padding:1rem; margin-bottom:0.8rem;
+}
+.history-card .hdr { display:flex; justify-content:space-between; margin-bottom:0.4rem; }
+.history-card .items-list { font-size:0.8rem; color:var(--text-secondary); }
+.status-badge {
+  font-size:0.65rem; padding:0.15rem 0.5rem; border-radius:8px; font-weight:600;
+}
+.status-badge.new { background:rgba(251,146,60,0.15); color:var(--warning); }
+.status-badge.cleared { background:rgba(74,222,128,0.15); color:var(--success); }
+
+/* Toast */
+.toast {
+  position:fixed; top:1rem; left:50%; transform:translateX(-50%) translateY(-100%);
+  background:var(--surface-2); color:var(--text); padding:0.8rem 1.5rem;
+  border-radius:var(--radius); font-size:0.85rem; font-weight:500; border:1px solid var(--border);
+  box-shadow:var(--shadow); z-index:9999; opacity:0; transition:all 0.3s var(--ease);
+}
+.toast.show { transform:translateX(-50%) translateY(0); opacity:1; }
+
+/* Call alert overlay */
+.call-alert {
+  position:fixed; inset:0; background:rgba(0,0,0,0.8); display:none;
+  align-items:center; justify-content:center; z-index:9999; padding:2rem;
+}
+.call-alert.show { display:flex; }
+.call-alert-card {
+  background:var(--surface); border:2px solid var(--danger); border-radius:var(--radius);
+  padding:2rem; text-align:center; max-width:300px; width:100; animation:shake 0.5s;
+}
+@keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }
+.call-alert-card h2 { color:var(--danger); margin-bottom:0.5rem; }
+.call-alert-card .ack-btn {
+  margin-top:1rem; padding:0.8rem 2rem; border:none; border-radius:var(--radius);
+  background:var(--primary); color:#fff; font-weight:600; cursor:pointer; font-size:0.9rem;
+}
+
+@media (max-width:380px) { .table-grid { grid-template-columns:repeat(2,1fr); } }
+</style>
+</head>
+<body>
+
+<div id="toast" class="toast"></div>
+<div id="call-alert" class="call-alert">
+  <div class="call-alert-card">
+    <h2>🔔 TABLE CALLING</h2>
+    <p id="call-alert-table" style="font-size:1.2rem;font-weight:700;margin:0.5rem 0;">Table 3</p>
+    <p style="color:var(--text-muted);font-size:0.8rem;">Customer needs assistance</p>
+    <button class="ack-btn" onclick="acknowledgeCall()">Got it — On my way</button>
+  </div>
+</div>
+
+<!-- LOGIN SCREEN -->
+<div id="login-screen" class="screen active">
+  <h1>Epicurean POS</h1>
+  <p class="subtitle">Enter your 4-digit code</p>
+  <div class="pin-display" id="pin-display">
+    <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
+  </div>
+  <div class="numpad" id="numpad"></div>
+  <p id="pin-error"></p>
+</div>
+
+<!-- APP SCREEN -->
+<div id="app-screen" class="screen">
+  <div class="app-header">
+    <div>
+      <div class="user-info" id="user-name">Server</div>
+      <div class="user-role" id="user-role">Food Master</div>
+    </div>
+    <button class="logout-btn" onclick="logout()">Sign Out</button>
+  </div>
+  <div class="app-content" id="app-content"></div>
+  <div class="app-nav">
+    <button class="nav-btn active" data-tab="tables" onclick="switchTab('tables')">
+      <span class="nav-icon">🪑</span><span class="nav-label">Tables</span>
+    </button>
+    <button class="nav-btn" data-tab="order" onclick="switchTab('order')">
+      <span class="nav-icon">📝</span><span class="nav-label">Order</span>
+    </button>
+    <button class="nav-btn" data-tab="messages" onclick="switchTab('messages')" style="position:relative;">
+      <span class="nav-icon">💬</span><span class="nav-label">Messages</span>
+      <span class="nav-badge hidden" id="msg-badge">0</span>
+    </button>
+    <button class="nav-btn" data-tab="history" onclick="switchTab('history')">
+      <span class="nav-icon">📋</span><span class="nav-label">History</span>
+    </button>
+  </div>
+</div>
+
+<script>
+// ─── Firebase ───────────────────────────────────────────────────
+var firebaseConfig = {
+  apiKey: "AIzaSyAvg9x8kmKmZjcu62D2Jb4jpO57ArC657Y",
+  authDomain: "epicurean-house-at-the-choc-st.firebaseapp.com",
+  projectId: "epicurean-house-at-the-choc-st",
+  storageBucket: "epicurean-house-at-the-choc-st.firebasestorage.app",
+  messagingSenderId: "320703681087",
+  appId: "1:320703681087:web:04f7c9a17637388a039e8a"
+};
+var fbApp=null, fbDb=null, fbReady=false;
+try { fbApp=firebase.initializeApp(firebaseConfig); fbDb=firebase.firestore(); fbReady=true; } catch(e){ console.warn('Firebase:',e); }
+
+// ─── State ──────────────────────────────────────────────────────
+var STATE = {
+  currentServer: null,
+  selectedTable: 1,
+  menuItems: [],
+  menuCategories: [],
+  orders: [],
+  calls: [],
+  messages: [],
+  currentOrder: [],
+  activeTab: 'tables',
+  orderCat: null
+};
+
+var SEED_CATEGORIES = [
+  {id:'small-plates',name:'Small Plates'},{id:'ceviche',name:'Ceviche'},
+  {id:'soups-salads',name:'Soups & Salads'},{id:'entrees',name:'Entrées'},
+  {id:'sides',name:'Sides'},{id:'desserts',name:'Desserts'},
+  {id:'kids',name:'Kids'},{id:'brunch',name:'Brunch'},
+  {id:'cocktails',name:'Cocktails'},{id:'beer',name:'Beer'},
+  {id:'spirits',name:'Spirits'},{id:'wine',name:'Wine'}
+];
+
+var SEED_ITEMS = [
+  {id:'i1',code:'SP01',name:'Tuna Tartare',price:16,category:'small-plates',station:'Cold/Garde Manger',cookTime:8,modifiers:[]},
+  {id:'i2',code:'CE01',name:'Peruvian Ceviche',price:18,category:'ceviche',station:'Cold/Garde Manger',cookTime:5,modifiers:[]},
+  {id:'i3',code:'CE02',name:'Shrimp Ceviche',price:19,category:'ceviche',station:'Cold/Garde Manger',cookTime:5,modifiers:[]},
+  {id:'i4',code:'EN01',name:'Wagyu Ribeye',price:58,category:'entrees',station:'Grill',cookTime:18,modifiers:[{group:'Temperature',options:['R','MR','M']}]},
+  {id:'i5',code:'EN02',name:'Pan-Seared Salmon',price:34,category:'entrees',station:'Sauté',cookTime:14,modifiers:[{group:'Temperature',options:['MR','M']}]},
+  {id:'i6',code:'DE01',name:'Chocolate Studio Torte',price:14,category:'desserts',station:'Pastry',cookTime:3,modifiers:[]},
+  {id:'i7',code:'DE02',name:'Crème Brûlée',price:12,category:'desserts',station:'Pastry',cookTime:2,modifiers:[]},
+  {id:'i8',code:'CK01',name:'Pisco Sour',price:14,category:'cocktails',station:'Bar',cookTime:3,modifiers:[]},
+  {id:'i9',code:'CK02',name:'Chocolate Old Fashioned',price:16,category:'cocktails',station:'Bar',cookTime:3,modifiers:[]},
+  {id:'i10',code:'BE01',name:'Local Lager',price:8,category:'beer',station:'Bar',cookTime:1,modifiers:[]},
+  {id:'i11',code:'WN01',name:'Malbec Reserva',price:52,category:'wine',station:'Bar',cookTime:1,modifiers:[{group:'Pour',options:['Glass $14','Bottle $52']}]},
+  {id:'i12',code:'WN02',name:'Chardonnay',price:44,category:'wine',station:'Bar',cookTime:1,modifiers:[{group:'Pour',options:['Glass $12','Bottle $44']}]},
+  {id:'i13',code:'SS01',name:'Soup of the Day',price:10,category:'soups-salads',station:'Sauté',cookTime:5,modifiers:[]},
+  {id:'i14',code:'SD01',name:'Truffle Fries',price:12,category:'sides',station:'Fry',cookTime:6,modifiers:[]}
+];
+
+var SEED_STAFF = [
+  {code:'3001',name:'Andre Mendoza',role:'Food Master'},
+  {code:'3002',name:'Paco Arias',role:'Food Master'},
+  {code:'4001',name:'Edwin Perez',role:'Front of House'},
+  {code:'5001',name:'General Manager',role:'Manager'}
+];
+
+// ─── Helpers ────────────────────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+function toast(msg) {
+  var t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),3000);
+}
+function genId() { return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+
+// ─── Firebase load ──────────────────────────────────────────────
+function loadData() {
+  if (!fbReady) { STATE.menuCategories=SEED_CATEGORIES; STATE.menuItems=SEED_ITEMS; return; }
+
+  fbDb.collection('config').doc('menu_categories').get().then(doc=>{
+    STATE.menuCategories = (doc.exists&&doc.data().items) ? doc.data().items.filter(c=>c.visible!==false) : SEED_CATEGORIES;
+  }).catch(()=>{ STATE.menuCategories=SEED_CATEGORIES; });
+
+  fbDb.collection('config').doc('menu_items').get().then(doc=>{
+    STATE.menuItems = (doc.exists&&doc.data().items) ? doc.data().items : SEED_ITEMS;
+  }).catch(()=>{ STATE.menuItems=SEED_ITEMS; });
+
+  fbDb.collection('calls').onSnapshot(snap=>{
+    var prev = STATE.calls.length;
+    STATE.calls=[]; snap.forEach(d=>STATE.calls.push({id:d.id,...d.data()}));
+    var active = STATE.calls.filter(c=>c.status==='active');
+    if (active.length > 0 && STATE.currentServer) showCallAlert(active[0]);
+    if (STATE.activeTab==='tables') renderTables();
+  });
+
+  fbDb.collection('orders').onSnapshot(snap=>{
+    STATE.orders=[]; snap.forEach(d=>STATE.orders.push({id:d.id,...d.data()}));
+    if (STATE.activeTab==='tables') renderTables();
+    if (STATE.activeTab==='history') renderHistory();
+  });
+
+  fbDb.collection('messages').onSnapshot(snap=>{
+    STATE.messages=[]; snap.forEach(d=>STATE.messages.push({id:d.id,...d.data()}));
+    if (STATE.activeTab==='messages') renderMessages();
+    updateMsgBadge();
+  });
+}
+
+// ─── Login ──────────────────────────────────────────────────────
+var pin = '';
+function buildNumpad() {
+  var pad=document.getElementById('numpad');
+  [1,2,3,4,5,6,7,8,9,'⌫',0,'→'].forEach(k=>{
+    var btn=document.createElement('button');
+    btn.className='numpad-btn'+(typeof k==='string'?' action':'');
+    btn.textContent=k;
+    btn.onclick=()=>pinKey(k);
+    pad.appendChild(btn);
+  });
+}
+function pinKey(k) {
+  if (k==='⌫') pin=pin.slice(0,-1);
+  else if (k==='→') attemptLogin();
+  else if (pin.length<4) pin+=k;
+  updateDots();
+  if (pin.length===4) setTimeout(attemptLogin,200);
+}
+function updateDots() {
+  document.querySelectorAll('#pin-display .pin-dot').forEach((d,i)=>d.classList.toggle('filled',i<pin.length));
+}
+function attemptLogin() {
+  var staff=SEED_STAFF.find(s=>s.code===pin);
+  if (!staff) { document.getElementById('pin-error').textContent='Invalid code'; pin=''; updateDots(); return; }
+  document.getElementById('pin-error').textContent='';
+  STATE.currentServer=staff;
+  document.getElementById('user-name').textContent=staff.name;
+  document.getElementById('user-role').textContent=staff.role;
+  showScreen('app-screen');
+  switchTab('tables');
+}
+function logout() { STATE.currentServer=null; pin=''; updateDots(); showScreen('login-screen'); }
+
+// ─── Tabs ───────────────────────────────────────────────────────
+function switchTab(tab) {
+  STATE.activeTab=tab;
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
+  var c=document.getElementById('app-content');
+  if (tab==='tables') renderTables();
+  else if (tab==='order') renderOrder();
+  else if (tab==='messages') renderMessages();
+  else if (tab==='history') renderHistory();
+}
+
+// ─── Tables ─────────────────────────────────────────────────────
+function renderTables() {
+  var c=document.getElementById('app-content');
+  var html='<div class="table-grid">';
+  for (var i=1;i<=20;i++) {
+    var hasCall=STATE.calls.some(cl=>cl.table===i&&cl.status==='active');
+    var hasOrder=STATE.orders.some(o=>o.table===i&&o.status!=='cleared');
+    var cls='table-card'+(hasCall?' has-call':'')+(hasOrder?' has-order':'');
+    html+='<div class="'+cls+'" onclick="selectTable('+i+')">'+
+      '<div class="table-num">'+i+'</div>'+
+      '<div class="table-status">'+(hasCall?'🔔 CALLING':hasOrder?'Active':'Open')+'</div>'+
+    '</div>';
+  }
+  html+='</div>';
+  c.innerHTML=html;
+}
+function selectTable(t) {
+  STATE.selectedTable=t;
+  // Acknowledge any call on this table
+  if (fbReady) {
+    STATE.calls.filter(cl=>cl.table===t&&cl.status==='active').forEach(cl=>{
+      fbDb.collection('calls').doc(cl.id).update({status:'acknowledged'});
+    });
+  }
+  switchTab('order');
+}
+
+// ─── Order ──────────────────────────────────────────────────────
+function renderOrder() {
+  var c=document.getElementById('app-content');
+  var cats=STATE.menuCategories.length?STATE.menuCategories:SEED_CATEGORIES;
+  var items=STATE.menuItems.length?STATE.menuItems:SEED_ITEMS;
+  if (!STATE.orderCat) STATE.orderCat=cats[0].id;
+
+  var html='<div class="order-section">';
+  html+='<h3>Table '+STATE.selectedTable+' — New Order</h3>';
+  html+='<div class="cat-pills">';
+  cats.forEach(cat=>{
+    html+='<div class="cat-pill'+(cat.id===STATE.orderCat?' active':'')+'" onclick="filterCat(\''+cat.id+'\')">'+cat.name+'</div>';
+  });
+  html+='</div>';
+
+  var filtered=items.filter(i=>i.category===STATE.orderCat);
+  html+='<div id="menu-items-list">';
+  filtered.forEach(item=>{
+    html+='<div class="menu-item-row" onclick="addItem(\''+item.id+'\')">'+
+      '<div class="item-info"><div class="item-name">'+item.name+'</div>'+
+      '<div class="item-meta">'+item.station+' · '+item.cookTime+'min</div></div>'+
+      '<div class="item-price">$'+item.price.toFixed(2)+'</div>'+
+    '</div>';
+  });
+  html+='</div>';
+
+  // Current order
+  html+='<div class="order-summary"><h3>Current Order ('+STATE.currentOrder.length+' items)</h3>';
+  if (!STATE.currentOrder.length) html+='<p style="color:var(--text-muted);font-size:0.8rem;padding:0.5rem 0;">Tap items above to add</p>';
+  else {
+    STATE.currentOrder.forEach((item,idx)=>{
+      html+='<div class="order-line"><span style="font-size:0.85rem;">'+item.name+(item.selectedMod?' <span style="color:var(--warning);font-size:0.7rem;">('+item.selectedMod+')</span>':'')+'</span>'+
+        '<button class="remove-btn" onclick="removeItem('+idx+')">✕</button></div>';
+    });
+    var total=STATE.currentOrder.reduce((s,i)=>s+i.price,0);
+    html+='<div style="display:flex;justify-content:space-between;padding:0.5rem 0;font-weight:700;border-top:1px solid var(--border);margin-top:0.5rem;">'+
+      '<span>Total</span><span style="color:var(--primary-light);">$'+total.toFixed(2)+'</span></div>';
+  }
+  html+='<button class="send-btn" onclick="sendOrder()"'+(STATE.currentOrder.length?'':' disabled')+'>🔥 Send to Kitchen</button>';
+  html+='</div></div>';
+  c.innerHTML=html;
+}
+
+function filterCat(catId) {
+  STATE.orderCat=catId;
+  renderOrder();
+}
+
+function addItem(itemId) {
+  var items=STATE.menuItems.length?STATE.menuItems:SEED_ITEMS;
+  var item=items.find(i=>i.id===itemId);
+  if (!item) return;
+  // If item has modifiers, prompt
+  if (item.modifiers&&item.modifiers.length) {
+    var mod=item.modifiers[0];
+    var choice=prompt(mod.group+'?\n'+mod.options.join(', '));
+    STATE.currentOrder.push({...item, selectedMod:choice||mod.options[0]});
+  } else {
+    STATE.currentOrder.push({...item, selectedMod:null});
+  }
+  toast('+ '+item.name);
+  renderOrder();
+}
+
+function removeItem(idx) { STATE.currentOrder.splice(idx,1); renderOrder(); }
+
+function sendOrder() {
+  if (!STATE.currentOrder.length) return;
+  var order = {
+    table: STATE.selectedTable,
+    server: STATE.currentServer?STATE.currentServer.name:'Unknown',
+    items: STATE.currentOrder.map(i=>({id:i.id,name:i.name,station:i.station,cookTime:i.cookTime,modifiers:i.modifiers||[],selectedMod:i.selectedMod})),
+    status:'new',
+    sentAt:Date.now(),
+    clearedAt:null
+  };
+  if (fbReady) fbDb.collection('orders').add(order);
+  else STATE.orders.push({id:genId(),...order});
+  toast('✓ Order sent to kitchen!');
+  STATE.currentOrder=[];
+  renderOrder();
+}
+
+// ─── Messages ───────────────────────────────────────────────────
+function renderMessages() {
+  var c=document.getElementById('app-content');
+  var msgs=STATE.messages.filter(m=>m.table===STATE.selectedTable).sort((a,b)=>a.time-b.time);
+  var html='<h3 style="font-size:0.9rem;font-weight:600;color:var(--text-secondary);margin-bottom:1rem;">Messages — Table '+STATE.selectedTable+'</h3>';
+  html+='<div class="msg-list">';
+  msgs.forEach(m=>{
+    html+='<div class="msg-bubble '+(m.from==='server'?'from-server':'from-guest')+'">'+m.text+'</div>';
+  });
+  html+='</div>';
+  html+='<div class="msg-input-row"><input id="msg-input" type="text" placeholder="Message to table…"><button onclick="sendMsg()">Send</button></div>';
+  c.innerHTML=html;
+}
+function sendMsg() {
+  var input=document.getElementById('msg-input');
+  if (!input||!input.value.trim()) return;
+  var msg={table:STATE.selectedTable,from:'server',text:input.value.trim(),time:Date.now()};
+  if (fbReady) fbDb.collection('messages').add(msg);
+  input.value=''; toast('Message sent');
+}
+function updateMsgBadge() {
+  var unread=STATE.messages.filter(m=>m.from==='guest'&&Date.now()-m.time<60000).length;
+  var badge=document.getElementById('msg-badge');
+  if (unread>0) { badge.textContent=unread; badge.classList.remove('hidden'); }
+  else badge.classList.add('hidden');
+}
+
+// ─── History ────────────────────────────────────────────────────
+function renderHistory() {
+  var c=document.getElementById('app-content');
+  var orders=STATE.orders.filter(o=>o.server===(STATE.currentServer?STATE.currentServer.name:'')).sort((a,b)=>b.sentAt-a.sentAt);
+  var html='<h3 style="font-size:0.9rem;font-weight:600;color:var(--text-secondary);margin-bottom:1rem;">Order History</h3>';
+  if (!orders.length) { c.innerHTML=html+'<p style="color:var(--text-muted);">No orders yet.</p>'; return; }
+  orders.forEach(o=>{
+    var elapsed=Math.round((Date.now()-o.sentAt)/60000);
+    html+='<div class="history-card"><div class="hdr"><strong>Table '+o.table+'</strong>'+
+      '<span class="status-badge '+(o.status==='cleared'?'cleared':'new')+'">'+o.status+'</span></div>'+
+      '<div class="items-list">'+o.items.map(i=>i.name).join(', ')+'</div>'+
+      '<div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.3rem;">'+elapsed+'m ago</div></div>';
+  });
+  c.innerHTML=html;
+}
+
+// ─── Call Alert ─────────────────────────────────────────────────
+var alertedCallId=null;
+function showCallAlert(call) {
+  if (alertedCallId===call.id) return;
+  alertedCallId=call.id;
+  document.getElementById('call-alert-table').textContent='Table '+call.table;
+  document.getElementById('call-alert').classList.add('show');
+  if (navigator.vibrate) navigator.vibrate([300,100,300,100,300]);
+  // Play a beep
+  try { var ctx=new(window.AudioContext||window.webkitAudioContext)(); var osc=ctx.createOscillator(); osc.type='sine'; osc.frequency.value=880; osc.connect(ctx.destination); osc.start(); setTimeout(()=>osc.stop(),300); } catch(e){}
+}
+function acknowledgeCall() {
+  document.getElementById('call-alert').classList.remove('show');
+  if (fbReady&&alertedCallId) fbDb.collection('calls').doc(alertedCallId).update({status:'acknowledged'});
+  alertedCallId=null;
+}
+
+// ─── Init ───────────────────────────────────────────────────────
+function init() {
+  buildNumpad();
+  loadData();
+}
+document.addEventListener('DOMContentLoaded', init);
+
+// Service Worker registration for PWA
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+</script>
+</body>
+</html>
