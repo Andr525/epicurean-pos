@@ -14,6 +14,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js"></script>
+<script src="https://sandbox.web.squarecdn.com/v1/square.js"></script>
 <style>
 :root {
   --bg: #0f0f14;
@@ -97,6 +98,7 @@ body { font-family:var(--font); color:var(--text); background:var(--bg); -webkit
   font-size:0.6rem; width:16px; height:16px; border-radius:50%;
   display:flex; align-items:center; justify-content:center; font-weight:700;
 }
+.hidden { display:none!important; }
 
 .app-content { flex:1; overflow-y:auto; padding:1rem; }
 
@@ -150,6 +152,69 @@ body { font-family:var(--font); color:var(--text); background:var(--bg); -webkit
 .send-btn:active { transform:scale(0.97); }
 .send-btn:disabled { opacity:0.4; cursor:not-allowed; }
 
+/* PAYMENT */
+.pay-btn {
+  width:100%; margin-top:0.8rem; padding:0.9rem; border:none; border-radius:var(--radius);
+  background:var(--info); color:#fff; font-size:0.9rem; font-weight:700;
+  cursor:pointer; transition:all 0.16s var(--ease);
+}
+.pay-btn:active { transform:scale(0.97); }
+.pay-btn:disabled { opacity:0.4; cursor:not-allowed; }
+
+/* Payment Modal */
+.payment-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,0.85); display:none;
+  align-items:center; justify-content:center; z-index:9999; padding:1rem;
+}
+.payment-overlay.show { display:flex; }
+.payment-card {
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+  padding:1.5rem; width:100%; max-width:380px; max-height:90vh; overflow-y:auto;
+}
+.payment-card h2 { font-size:1.1rem; font-weight:700; margin-bottom:0.3rem; }
+.payment-card .pay-subtitle { color:var(--text-muted); font-size:0.8rem; margin-bottom:1.2rem; }
+.payment-card .pay-total { font-size:1.8rem; font-weight:700; color:var(--primary-light); margin-bottom:1.5rem; text-align:center; }
+.payment-card .pay-items { font-size:0.8rem; color:var(--text-secondary); margin-bottom:1rem; padding:0.8rem; background:var(--surface-2); border-radius:var(--radius-sm); }
+.payment-card .pay-items div { padding:0.2rem 0; display:flex; justify-content:space-between; }
+
+.tip-section { margin-bottom:1.2rem; }
+.tip-section label { font-size:0.8rem; color:var(--text-secondary); display:block; margin-bottom:0.5rem; }
+.tip-buttons { display:flex; gap:0.5rem; flex-wrap:wrap; }
+.tip-btn {
+  padding:0.5rem 1rem; border:1px solid var(--border); border-radius:var(--radius-sm);
+  background:var(--surface-2); color:var(--text); font-size:0.8rem; cursor:pointer;
+  transition:all 0.16s var(--ease);
+}
+.tip-btn.active { border-color:var(--primary); background:var(--primary-glow); color:var(--primary-light); }
+.tip-custom { width:80px; padding:0.5rem; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--surface-2); color:var(--text); font-size:0.8rem; text-align:center; }
+
+#sq-card-container {
+  min-height:50px; margin-bottom:1rem; padding:0.8rem;
+  background:var(--surface-2); border-radius:var(--radius-sm); border:1px solid var(--border);
+}
+.sq-input-label { font-size:0.75rem; color:var(--text-secondary); margin-bottom:0.4rem; display:block; }
+
+.charge-btn {
+  width:100%; padding:1rem; border:none; border-radius:var(--radius);
+  background:linear-gradient(135deg, #4ade80, #22c55e); color:#000; font-size:1rem; font-weight:700;
+  cursor:pointer; transition:all 0.16s var(--ease);
+}
+.charge-btn:active { transform:scale(0.97); }
+.charge-btn:disabled { opacity:0.5; cursor:not-allowed; }
+
+.cancel-pay-btn {
+  width:100%; margin-top:0.8rem; padding:0.7rem; border:1px solid var(--border);
+  border-radius:var(--radius); background:none; color:var(--text-secondary);
+  font-size:0.85rem; cursor:pointer;
+}
+
+.payment-success {
+  text-align:center; padding:2rem 1rem;
+}
+.payment-success .check-icon { font-size:3rem; margin-bottom:0.8rem; }
+.payment-success h3 { color:var(--success); margin-bottom:0.5rem; }
+.payment-success p { color:var(--text-secondary); font-size:0.85rem; }
+
 /* MESSAGES */
 .msg-list { display:flex; flex-direction:column; gap:0.5rem; min-height:200px; margin-bottom:1rem; }
 .msg-bubble {
@@ -179,6 +244,7 @@ body { font-family:var(--font); color:var(--text); background:var(--bg); -webkit
 }
 .status-badge.new { background:rgba(251,146,60,0.15); color:var(--warning); }
 .status-badge.cleared { background:rgba(74,222,128,0.15); color:var(--success); }
+.status-badge.paid { background:rgba(96,165,250,0.15); color:var(--info); }
 
 /* Toast */
 .toast {
@@ -197,7 +263,7 @@ body { font-family:var(--font); color:var(--text); background:var(--bg); -webkit
 .call-alert.show { display:flex; }
 .call-alert-card {
   background:var(--surface); border:2px solid var(--danger); border-radius:var(--radius);
-  padding:2rem; text-align:center; max-width:300px; width:100; animation:shake 0.5s;
+  padding:2rem; text-align:center; max-width:300px; width:100%; animation:shake 0.5s;
 }
 @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }
 .call-alert-card h2 { color:var(--danger); margin-bottom:0.5rem; }
@@ -219,6 +285,11 @@ body { font-family:var(--font); color:var(--text); background:var(--bg); -webkit
     <p style="color:var(--text-muted);font-size:0.8rem;">Customer needs assistance</p>
     <button class="ack-btn" onclick="acknowledgeCall()">Got it — On my way</button>
   </div>
+</div>
+
+<!-- PAYMENT OVERLAY -->
+<div id="payment-overlay" class="payment-overlay">
+  <div class="payment-card" id="payment-card"></div>
 </div>
 
 <!-- LOGIN SCREEN -->
@@ -260,6 +331,12 @@ body { font-family:var(--font); color:var(--text); background:var(--bg); -webkit
 </div>
 
 <script>
+// ─── Square Config ─────────────────────────────────────────────
+var SQUARE_APP_ID = 'sandbox-sq0idb-wKcjD8vOYIKLyvtV7Zo6hQ';
+var SQUARE_LOCATION_ID = 'L2SMR9TKW98PT';
+var squarePayments = null;
+var squareCard = null;
+
 // ─── Firebase ───────────────────────────────────────────────────
 var firebaseConfig = {
   apiKey: "AIzaSyAvg9x8kmKmZjcu62D2Jb4jpO57ArC657Y",
@@ -283,7 +360,9 @@ var STATE = {
   messages: [],
   currentOrder: [],
   activeTab: 'tables',
-  orderCat: null
+  orderCat: null,
+  tipPercent: 18,
+  customTip: 0
 };
 
 var SEED_CATEGORIES = [
@@ -343,7 +422,6 @@ function loadData() {
   }).catch(()=>{ STATE.menuItems=SEED_ITEMS; });
 
   fbDb.collection('calls').onSnapshot(snap=>{
-    var prev = STATE.calls.length;
     STATE.calls=[]; snap.forEach(d=>STATE.calls.push({id:d.id,...d.data()}));
     var active = STATE.calls.filter(c=>c.status==='active');
     if (active.length > 0 && STATE.currentServer) showCallAlert(active[0]);
@@ -351,8 +429,13 @@ function loadData() {
   });
 
   fbDb.collection('orders').onSnapshot(snap=>{
-    STATE.orders=[]; snap.forEach(d=>STATE.orders.push({id:d.id,...d.data()}));
+    var fbOrders=[]; snap.forEach(d=>fbOrders.push({id:d.id,...d.data()}));
+    // Merge: keep locally-pushed orders that haven't appeared in Firebase yet
+    var localOnly=(STATE._localOrders||[]).filter(lo=>!fbOrders.some(fo=>fo.sentAt===lo.sentAt&&fo.table===lo.table));
+    STATE._localOrders=localOnly;
+    STATE.orders=fbOrders.concat(localOnly);
     if (STATE.activeTab==='tables') renderTables();
+    if (STATE.activeTab==='order') renderOrder();
     if (STATE.activeTab==='history') renderHistory();
   });
 
@@ -394,6 +477,7 @@ function attemptLogin() {
   document.getElementById('user-role').textContent=staff.role;
   showScreen('app-screen');
   switchTab('tables');
+  initSquare();
 }
 function logout() { STATE.currentServer=null; pin=''; updateDots(); showScreen('login-screen'); }
 
@@ -401,7 +485,6 @@ function logout() { STATE.currentServer=null; pin=''; updateDots(); showScreen('
 function switchTab(tab) {
   STATE.activeTab=tab;
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
-  var c=document.getElementById('app-content');
   if (tab==='tables') renderTables();
   else if (tab==='order') renderOrder();
   else if (tab==='messages') renderMessages();
@@ -414,7 +497,7 @@ function renderTables() {
   var html='<div class="table-grid">';
   for (var i=1;i<=20;i++) {
     var hasCall=STATE.calls.some(cl=>cl.table===i&&cl.status==='active');
-    var hasOrder=STATE.orders.some(o=>o.table===i&&o.status!=='cleared');
+    var hasOrder=STATE.orders.some(o=>o.table===i&&o.status!=='cleared'&&o.status!=='paid');
     var cls='table-card'+(hasCall?' has-call':'')+(hasOrder?' has-order':'');
     html+='<div class="'+cls+'" onclick="selectTable('+i+')">'+
       '<div class="table-num">'+i+'</div>'+
@@ -426,7 +509,6 @@ function renderTables() {
 }
 function selectTable(t) {
   STATE.selectedTable=t;
-  // Acknowledge any call on this table
   if (fbReady) {
     STATE.calls.filter(cl=>cl.table===t&&cl.status==='active').forEach(cl=>{
       fbDb.collection('calls').doc(cl.id).update({status:'acknowledged'});
@@ -474,6 +556,16 @@ function renderOrder() {
       '<span>Total</span><span style="color:var(--primary-light);">$'+total.toFixed(2)+'</span></div>';
   }
   html+='<button class="send-btn" onclick="sendOrder()"'+(STATE.currentOrder.length?'':' disabled')+'>🔥 Send to Kitchen</button>';
+
+  // Show Charge button for active orders on this table
+  var tableOrders=STATE.orders.filter(o=>o.table===STATE.selectedTable&&o.status==='new');
+  if (tableOrders.length) {
+    var orderTotal=tableOrders.reduce((s,o)=>s+o.items.reduce((ss,i)=>{
+      var found=(STATE.menuItems.length?STATE.menuItems:SEED_ITEMS).find(mi=>mi.id===i.id);
+      return ss+(found?found.price:0);
+    },0),0);
+    html+='<button class="pay-btn" onclick="openPayment('+orderTotal+')">💳 Charge Table — $'+orderTotal.toFixed(2)+'</button>';
+  }
   html+='</div></div>';
   c.innerHTML=html;
 }
@@ -487,7 +579,6 @@ function addItem(itemId) {
   var items=STATE.menuItems.length?STATE.menuItems:SEED_ITEMS;
   var item=items.find(i=>i.id===itemId);
   if (!item) return;
-  // If item has modifiers, prompt
   if (item.modifiers&&item.modifiers.length) {
     var mod=item.modifiers[0];
     var choice=prompt(mod.group+'?\n'+mod.options.join(', '));
@@ -511,10 +602,175 @@ function sendOrder() {
     sentAt:Date.now(),
     clearedAt:null
   };
+  var localOrder={id:genId(),...order};
+  STATE.orders.push(localOrder);
+  if (!STATE._localOrders) STATE._localOrders=[];
+  STATE._localOrders.push(localOrder);
   if (fbReady) fbDb.collection('orders').add(order);
-  else STATE.orders.push({id:genId(),...order});
   toast('✓ Order sent to kitchen!');
   STATE.currentOrder=[];
+  renderOrder();
+}
+
+// ─── Square Payment ─────────────────────────────────────────────
+async function initSquare() {
+  if (squarePayments) return;
+  try {
+    squarePayments = await Square.payments(SQUARE_APP_ID, SQUARE_LOCATION_ID);
+  } catch(e) {
+    console.warn('Square init:', e);
+  }
+}
+
+function openPayment(subtotal) {
+  STATE.tipPercent = 18;
+  STATE.customTip = 0;
+  var tip = Math.round(subtotal * STATE.tipPercent) / 100;
+  var total = subtotal + tip;
+
+  var tableOrders = STATE.orders.filter(o=>o.table===STATE.selectedTable&&o.status==='new');
+  var itemsList = tableOrders.reduce((arr,o)=>arr.concat(o.items),[]);
+
+  var html = '<h2>💳 Payment</h2>';
+  html += '<p class="pay-subtitle">Table '+STATE.selectedTable+' — '+STATE.currentServer.name+'</p>';
+
+  // Items breakdown
+  html += '<div class="pay-items">';
+  itemsList.forEach(i=>{
+    var found=(STATE.menuItems.length?STATE.menuItems:SEED_ITEMS).find(mi=>mi.id===i.id);
+    html += '<div><span>'+i.name+'</span><span>$'+(found?found.price.toFixed(2):'0.00')+'</span></div>';
+  });
+  html += '<div style="border-top:1px solid var(--border);margin-top:0.4rem;padding-top:0.4rem;font-weight:600;"><span>Subtotal</span><span>$'+subtotal.toFixed(2)+'</span></div>';
+  html += '</div>';
+
+  // Tip selection
+  html += '<div class="tip-section"><label>Add Tip</label><div class="tip-buttons">';
+  [15,18,20,25].forEach(pct=>{
+    html += '<button class="tip-btn'+(pct===STATE.tipPercent?' active':'')+'" onclick="setTip('+pct+','+subtotal+')">'+pct+'%</button>';
+  });
+  html += '<input class="tip-custom" type="number" placeholder="$" onchange="setCustomTip(this.value,'+subtotal+')">';
+  html += '</div></div>';
+
+  // Total
+  html += '<div class="pay-total" id="pay-total-display">$'+total.toFixed(2)+'</div>';
+
+  // Card input
+  html += '<label class="sq-input-label">Card Details</label>';
+  html += '<div id="sq-card-container"></div>';
+
+  // Charge button
+  html += '<button class="charge-btn" id="charge-btn" onclick="processPayment('+subtotal+')">Charge $'+total.toFixed(2)+'</button>';
+  html += '<button class="cancel-pay-btn" onclick="closePayment()">Cancel</button>';
+
+  document.getElementById('payment-card').innerHTML = html;
+  document.getElementById('payment-overlay').classList.add('show');
+
+  // Attach Square card form
+  attachCardForm();
+}
+
+async function attachCardForm() {
+  if (!squarePayments) {
+    document.getElementById('sq-card-container').innerHTML = '<p style="color:var(--warning);font-size:0.8rem;">Square is loading… If this persists, check your connection.</p>';
+    await initSquare();
+    if (!squarePayments) return;
+  }
+  try {
+    if (squareCard) { await squareCard.destroy(); squareCard=null; }
+    squareCard = await squarePayments.card();
+    await squareCard.attach('#sq-card-container');
+  } catch(e) {
+    console.warn('Card attach:', e);
+    document.getElementById('sq-card-container').innerHTML = '<p style="color:var(--danger);font-size:0.8rem;">Could not load card form. Error: '+e.message+'</p>';
+  }
+}
+
+function setTip(pct, subtotal) {
+  STATE.tipPercent = pct;
+  STATE.customTip = 0;
+  var tip = Math.round(subtotal * pct) / 100;
+  var total = subtotal + tip;
+  document.getElementById('pay-total-display').textContent = '$'+total.toFixed(2);
+  var chargeBtn = document.getElementById('charge-btn');
+  chargeBtn.textContent = 'Charge $'+total.toFixed(2);
+  chargeBtn.setAttribute('onclick','processPayment('+subtotal+')');
+  // Update active state
+  document.querySelectorAll('.tip-btn').forEach(b=>b.classList.remove('active'));
+  event.target.classList.add('active');
+}
+
+function setCustomTip(val, subtotal) {
+  var tipAmt = parseFloat(val) || 0;
+  STATE.customTip = tipAmt;
+  STATE.tipPercent = 0;
+  var total = subtotal + tipAmt;
+  document.getElementById('pay-total-display').textContent = '$'+total.toFixed(2);
+  var chargeBtn = document.getElementById('charge-btn');
+  chargeBtn.textContent = 'Charge $'+total.toFixed(2);
+  chargeBtn.setAttribute('onclick','processPayment('+subtotal+')');
+  document.querySelectorAll('.tip-btn').forEach(b=>b.classList.remove('active'));
+}
+
+async function processPayment(subtotal) {
+  var chargeBtn = document.getElementById('charge-btn');
+  chargeBtn.disabled = true;
+  chargeBtn.textContent = 'Processing…';
+
+  var tip = STATE.customTip || (Math.round(subtotal * STATE.tipPercent) / 100);
+  var totalCents = Math.round((subtotal + tip) * 100);
+
+  try {
+    if (!squareCard) throw new Error('Card form not ready');
+    var tokenResult = await squareCard.tokenize();
+    if (tokenResult.status !== 'OK') throw new Error(tokenResult.errors?tokenResult.errors[0].message:'Tokenization failed');
+
+    // In production, you'd send this token to your server to create a payment.
+    // For sandbox testing, we simulate a successful payment.
+    var paymentData = {
+      token: tokenResult.token,
+      amount: totalCents,
+      currency: 'USD',
+      table: STATE.selectedTable,
+      server: STATE.currentServer?STATE.currentServer.name:'Unknown',
+      tip: Math.round(tip*100),
+      subtotal: Math.round(subtotal*100),
+      timestamp: Date.now()
+    };
+
+    // Save payment record to Firebase
+    if (fbReady) {
+      await fbDb.collection('payments').add(paymentData);
+      // Mark orders as paid
+      var tableOrders = STATE.orders.filter(o=>o.table===STATE.selectedTable&&o.status==='new');
+      for (var o of tableOrders) {
+        await fbDb.collection('orders').doc(o.id).update({status:'paid', paidAt:Date.now()});
+      }
+    }
+
+    // Show success
+    showPaymentSuccess(subtotal + tip);
+
+  } catch(e) {
+    chargeBtn.disabled = false;
+    chargeBtn.textContent = 'Charge $'+(subtotal+tip).toFixed(2);
+    toast('⚠ Payment failed: '+e.message);
+  }
+}
+
+function showPaymentSuccess(total) {
+  var html = '<div class="payment-success">';
+  html += '<div class="check-icon">✅</div>';
+  html += '<h3>Payment Successful!</h3>';
+  html += '<p>$'+total.toFixed(2)+' charged to card</p>';
+  html += '<p style="margin-top:0.5rem;">Table '+STATE.selectedTable+' — '+STATE.currentServer.name+'</p>';
+  html += '<button class="charge-btn" style="margin-top:1.5rem;" onclick="closePayment()">Done</button>';
+  html += '</div>';
+  document.getElementById('payment-card').innerHTML = html;
+}
+
+function closePayment() {
+  document.getElementById('payment-overlay').classList.remove('show');
+  if (squareCard) { squareCard.destroy().catch(()=>{}); squareCard=null; }
   renderOrder();
 }
 
@@ -553,8 +809,9 @@ function renderHistory() {
   if (!orders.length) { c.innerHTML=html+'<p style="color:var(--text-muted);">No orders yet.</p>'; return; }
   orders.forEach(o=>{
     var elapsed=Math.round((Date.now()-o.sentAt)/60000);
+    var statusCls = o.status==='paid'?'paid':o.status==='cleared'?'cleared':'new';
     html+='<div class="history-card"><div class="hdr"><strong>Table '+o.table+'</strong>'+
-      '<span class="status-badge '+(o.status==='cleared'?'cleared':'new')+'">'+o.status+'</span></div>'+
+      '<span class="status-badge '+statusCls+'">'+o.status+'</span></div>'+
       '<div class="items-list">'+o.items.map(i=>i.name).join(', ')+'</div>'+
       '<div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.3rem;">'+elapsed+'m ago</div></div>';
   });
@@ -569,7 +826,6 @@ function showCallAlert(call) {
   document.getElementById('call-alert-table').textContent='Table '+call.table;
   document.getElementById('call-alert').classList.add('show');
   if (navigator.vibrate) navigator.vibrate([300,100,300,100,300]);
-  // Play a beep
   try { var ctx=new(window.AudioContext||window.webkitAudioContext)(); var osc=ctx.createOscillator(); osc.type='sine'; osc.frequency.value=880; osc.connect(ctx.destination); osc.start(); setTimeout(()=>osc.stop(),300); } catch(e){}
 }
 function acknowledgeCall() {
