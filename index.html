@@ -66,6 +66,33 @@ body { font-family:var(--font); color:var(--text); background:var(--bg); -webkit
 .numpad-btn.action { font-size:0.8rem; color:var(--text-secondary); }
 #pin-error { color:var(--danger); font-size:0.8rem; margin-top:1rem; min-height:1.2rem; }
 
+/* Tasting & Prix Fixe */
+.tasting-pill { background:linear-gradient(135deg,rgba(184,115,51,0.3),rgba(212,149,106,0.2)) !important; border-color:var(--primary) !important; }
+.tasting-section-label { font-size:0.75rem; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:var(--primary-light); padding:0.5rem 0; }
+.tasting-row { border-left:3px solid var(--primary); }
+.pairing-row { border-left:3px solid #a78bfa; opacity:0.85; }
+.tasting-progress { margin-top:1rem; border-top:1px solid var(--border); padding-top:0.8rem; }
+.tp-card { background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:0.8rem; margin-bottom:0.5rem; }
+.tp-name { font-weight:600; font-size:0.85rem; color:var(--primary-light); }
+.tp-progress { font-size:0.75rem; color:var(--text-secondary); margin:0.3rem 0; }
+.tp-done { font-size:0.75rem; color:var(--success); }
+.fire-btn { width:100%; padding:0.6rem; border:none; border-radius:var(--radius-sm); background:linear-gradient(135deg,#dc2626,#ea580c); color:white; font-weight:600; font-size:0.8rem; cursor:pointer; margin-top:0.4rem; transition:transform 0.12s var(--ease); }
+.fire-btn:active { transform:scale(0.97); }
+/* Prix Fixe Selector Overlay */
+#pf-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.8); display:none; align-items:center; justify-content:center; z-index:200; padding:1rem; }
+#pf-overlay.show { display:flex; }
+.pf-selector { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:1.5rem; max-width:420px; width:100%; max-height:80vh; overflow-y:auto; }
+.pf-selector h3 { font-size:1.1rem; font-weight:700; margin-bottom:0.3rem; }
+.pf-sel-sub { font-size:0.8rem; color:var(--text-secondary); margin-bottom:1rem; }
+.pf-course-select { margin-bottom:1rem; }
+.pf-course-select label:first-child { font-weight:600; font-size:0.85rem; display:block; margin-bottom:0.4rem; color:var(--primary-light); }
+.pf-options { display:flex; flex-direction:column; gap:0.4rem; }
+.pf-opt-label { display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; padding:0.5rem 0.8rem; border:1px solid var(--border); border-radius:var(--radius-sm); cursor:pointer; transition:all 0.12s var(--ease); }
+.pf-opt-label:has(input:checked) { border-color:var(--primary); background:var(--primary-glow); }
+.pf-opt-label input { accent-color:var(--primary); }
+.pf-upcharge { color:var(--warning); font-weight:600; font-size:0.75rem; }
+.pf-sel-actions { display:flex; gap:0.5rem; margin-top:1.2rem; }
+
 /* APP SHELL */
 .app-header {
   display:flex; align-items:center; justify-content:space-between;
@@ -135,6 +162,11 @@ body { font-family:var(--font); color:var(--text); background:var(--bg); -webkit
 .menu-item-row .item-info .item-name { font-size:0.85rem; font-weight:500; }
 .menu-item-row .item-info .item-meta { font-size:0.7rem; color:var(--text-muted); margin-top:0.1rem; }
 .menu-item-row .item-price { font-weight:600; color:var(--primary-light); font-size:0.9rem; }
+.menu-item-row .item-info .item-desc-toggle { font-size:0.65rem; color:var(--primary-light); margin-top:0.15rem; cursor:pointer; opacity:0.7; }
+.menu-item-row .item-info .item-desc-toggle:hover { opacity:1; }
+.item-desc-expanded { font-size:0.75rem; color:var(--text-muted); padding:0.3rem 0 0.5rem 0; line-height:1.4; border-bottom:1px solid var(--border); background:rgba(255,255,255,0.02); padding-left:0.5rem; margin-bottom:0.3rem; }
+.item-desc-expanded .desc-allergens { color:#e74c3c; font-size:0.65rem; margin-top:0.2rem; }
+.item-desc-expanded .desc-dietary { color:#27ae60; font-size:0.65rem; margin-top:0.1rem; }
 
 .order-summary {
   margin-top:1rem; padding-top:1rem; border-top:2px solid var(--border);
@@ -292,6 +324,9 @@ body { font-family:var(--font); color:var(--text); background:var(--bg); -webkit
   <div class="payment-card" id="payment-card"></div>
 </div>
 
+<!-- PRIX FIXE SELECTOR OVERLAY -->
+<div id="pf-overlay"></div>
+
 <!-- LOGIN SCREEN -->
 <div id="login-screen" class="screen active">
   <h1>Epicurean POS</h1>
@@ -355,6 +390,8 @@ var STATE = {
   selectedTable: 1,
   menuItems: [],
   menuCategories: [],
+  tastingMenus: [],
+  prixFixeMenus: [],
   orders: [],
   calls: [],
   messages: [],
@@ -362,7 +399,9 @@ var STATE = {
   activeTab: 'tables',
   orderCat: null,
   tipPercent: 18,
-  customTip: 0
+  customTip: 0,
+  activeTastingOrders: [], // tracks course-by-course firing
+  _expandedItems: {}
 };
 
 var SEED_CATEGORIES = [
@@ -375,20 +414,20 @@ var SEED_CATEGORIES = [
 ];
 
 var SEED_ITEMS = [
-  {id:'i1',code:'SP01',name:'Tuna Tartare',price:16,category:'small-plates',station:'Cold/Garde Manger',cookTime:8,modifiers:[]},
-  {id:'i2',code:'CE01',name:'Peruvian Ceviche',price:18,category:'ceviche',station:'Cold/Garde Manger',cookTime:5,modifiers:[]},
-  {id:'i3',code:'CE02',name:'Shrimp Ceviche',price:19,category:'ceviche',station:'Cold/Garde Manger',cookTime:5,modifiers:[]},
-  {id:'i4',code:'EN01',name:'Wagyu Ribeye',price:58,category:'entrees',station:'Grill',cookTime:18,modifiers:[{group:'Temperature',options:['R','MR','M']}]},
-  {id:'i5',code:'EN02',name:'Pan-Seared Salmon',price:34,category:'entrees',station:'Sauté',cookTime:14,modifiers:[{group:'Temperature',options:['MR','M']}]},
-  {id:'i6',code:'DE01',name:'Chocolate Studio Torte',price:14,category:'desserts',station:'Pastry',cookTime:3,modifiers:[]},
-  {id:'i7',code:'DE02',name:'Crème Brûlée',price:12,category:'desserts',station:'Pastry',cookTime:2,modifiers:[]},
-  {id:'i8',code:'CK01',name:'Pisco Sour',price:14,category:'cocktails',station:'Bar',cookTime:3,modifiers:[]},
-  {id:'i9',code:'CK02',name:'Chocolate Old Fashioned',price:16,category:'cocktails',station:'Bar',cookTime:3,modifiers:[]},
-  {id:'i10',code:'BE01',name:'Local Lager',price:8,category:'beer',station:'Bar',cookTime:1,modifiers:[]},
-  {id:'i11',code:'WN01',name:'Malbec Reserva',price:52,category:'wine',station:'Bar',cookTime:1,modifiers:[{group:'Pour',options:['Glass $14','Bottle $52']}]},
-  {id:'i12',code:'WN02',name:'Chardonnay',price:44,category:'wine',station:'Bar',cookTime:1,modifiers:[{group:'Pour',options:['Glass $12','Bottle $44']}]},
-  {id:'i13',code:'SS01',name:'Soup of the Day',price:10,category:'soups-salads',station:'Sauté',cookTime:5,modifiers:[]},
-  {id:'i14',code:'SD01',name:'Truffle Fries',price:12,category:'sides',station:'Fry',cookTime:6,modifiers:[]}
+  {id:'i1',code:'SP01',name:'Tuna Tartare',price:16,category:'small-plates',station:'Cold/Garde Manger',cookTime:8,modifiers:[],description:'Ahi tuna, avocado mousse, sesame crisp, ponzu',allergens:['Fish','Sesame','Soy'],dietaryFlags:['Pescatarian','Gluten-Free']},
+  {id:'i2',code:'CE01',name:'Peruvian Ceviche',price:18,category:'ceviche',station:'Cold/Garde Manger',cookTime:5,modifiers:[],description:'Corvina, leche de tigre, sweet potato, red onion, cilantro',allergens:['Fish'],dietaryFlags:['Pescatarian','Gluten-Free','Dairy-Free']},
+  {id:'i3',code:'CE02',name:'Shrimp Ceviche',price:19,category:'ceviche',station:'Cold/Garde Manger',cookTime:5,modifiers:[],description:'Tiger shrimp, mango, habanero, coconut milk',allergens:['Shellfish'],dietaryFlags:['Pescatarian','Gluten-Free']},
+  {id:'i4',code:'EN01',name:'Wagyu Ribeye',price:58,category:'entrees',station:'Grill',cookTime:18,modifiers:[{group:'Temperature',options:['R','MR','M']}],description:'12oz prime wagyu, chimichurri, roasted garlic, seasonal vegetables',allergens:[],dietaryFlags:['Gluten-Free']},
+  {id:'i5',code:'EN02',name:'Pan-Seared Salmon',price:34,category:'entrees',station:'Sauté',cookTime:14,modifiers:[{group:'Temperature',options:['MR','M']}],description:'Atlantic salmon, lemon beurre blanc, asparagus, fingerling potatoes',allergens:['Fish','Dairy'],dietaryFlags:['Pescatarian']},
+  {id:'i6',code:'DE01',name:'Chocolate Studio Torte',price:14,category:'desserts',station:'Pastry',cookTime:3,modifiers:[],description:'Single-origin dark chocolate, raspberry coulis, gold leaf',allergens:['Dairy','Egg','Gluten'],dietaryFlags:['Vegetarian']},
+  {id:'i7',code:'DE02',name:'Crème Brûlée',price:12,category:'desserts',station:'Pastry',cookTime:2,modifiers:[],description:'Tahitian vanilla bean custard, caramelized sugar',allergens:['Dairy','Egg'],dietaryFlags:['Vegetarian','Gluten-Free']},
+  {id:'i8',code:'CK01',name:'Pisco Sour',price:14,category:'cocktails',station:'Bar',cookTime:3,modifiers:[],description:'Peruvian pisco, lime, egg white, Angostura bitters',allergens:['Egg'],dietaryFlags:['Vegetarian']},
+  {id:'i9',code:'CK02',name:'Chocolate Old Fashioned',price:16,category:'cocktails',station:'Bar',cookTime:3,modifiers:[],description:'Bourbon, cacao nib-infused syrup, orange peel, chocolate bitters',allergens:[],dietaryFlags:['Vegan']},
+  {id:'i10',code:'BE01',name:'Local Lager',price:8,category:'beer',station:'Bar',cookTime:1,modifiers:[],description:'Crisp craft lager from local brewery',allergens:['Gluten'],dietaryFlags:['Vegan']},
+  {id:'i11',code:'WN01',name:'Malbec Reserva',price:52,category:'wine',station:'Bar',cookTime:1,modifiers:[{group:'Pour',options:['Glass $14','Bottle $52']}],description:'Mendoza, Argentina. Full-bodied, dark fruit, spice, velvety tannins',allergens:['Sulfites'],dietaryFlags:['Vegan']},
+  {id:'i12',code:'WN02',name:'Chardonnay',price:44,category:'wine',station:'Bar',cookTime:1,modifiers:[{group:'Pour',options:['Glass $12','Bottle $44']}],description:'Sonoma Coast. Crisp citrus, green apple, light oak',allergens:['Sulfites'],dietaryFlags:['Vegan']},
+  {id:'i13',code:'SS01',name:'Soup of the Day',price:10,category:'soups-salads',station:'Sauté',cookTime:5,modifiers:[],description:'Chef\'s daily creation, ask your server for today\'s selection',allergens:['Dairy'],dietaryFlags:['Vegetarian']},
+  {id:'i14',code:'SD01',name:'Truffle Fries',price:12,category:'sides',station:'Fry',cookTime:6,modifiers:[],description:'Hand-cut fries, truffle oil, parmesan, fresh herbs',allergens:['Dairy'],dietaryFlags:['Vegetarian']}
 ];
 
 var SEED_STAFF = [
@@ -396,6 +435,44 @@ var SEED_STAFF = [
   {code:'3002',name:'Paco Arias',role:'Food Master'},
   {code:'4001',name:'Edwin Perez',role:'Front of House'},
   {code:'5001',name:'General Manager',role:'Manager'}
+];
+
+var SEED_TASTING_MENUS = [
+  {id:'tm1',name:"Chef's Tasting",subtitle:'7-Course Seasonal Journey',price:145,duration:'~3 hours',service:'dinner',active:true,
+   courses:[
+     {name:'Amuse-Bouche',description:'Seasonal micro-bite',station:'Cold / Garde Manger'},
+     {name:'Ceviche Course',description:'Corvina, leche de tigre',station:'Cold / Garde Manger'},
+     {name:'Cold Plate',description:'Tuna tartare, avocado mousse',station:'Cold / Garde Manger'},
+     {name:'Soup',description:'Seasonal bisque, herb oil',station:'Sauté'},
+     {name:'Fish',description:'Pan-seared salmon, beurre blanc',station:'Sauté'},
+     {name:'Meat',description:'Wagyu ribeye, chimichurri',station:'Grill'},
+     {name:'Dessert',description:'Chocolate torte, raspberry',station:'Pastry'}
+   ],
+   pairings:[{id:'wp1',name:'Wine Pairing',description:'Sommelier-selected',price:85},{id:'wp2',name:'Premium Pairing',description:'Reserve selections',price:145}]},
+  {id:'tm2',name:'Chocolate Experience',subtitle:'5-Course Cacao Journey',price:95,duration:'~2 hours',service:'dinner',active:true,
+   courses:[
+     {name:'Cacao Amuse',description:'White chocolate sphere',station:'Pastry'},
+     {name:'Savory Cacao',description:'Cacao-crusted duck',station:'Sauté'},
+     {name:'Intermezzo',description:'Cacao nib sorbet',station:'Pastry'},
+     {name:'Main',description:'Mole negro, short rib',station:'Grill'},
+     {name:'Grand Dessert',description:'Chocolate studio showpiece',station:'Pastry'}
+   ],
+   pairings:[{id:'wp3',name:'Dessert Wine Pairing',description:'Sweet wine flight',price:65}]}
+];
+
+var SEED_PRIX_FIXE_MENUS = [
+  {id:'pf1',name:'Lunch Prix Fixe',subtitle:'Choose one from each course',price:42,service:'lunch',active:true,
+   courses:[
+     {label:'Appetizer',station:'Cold / Garde Manger',options:[{name:'Soup of the Day',upcharge:0},{name:'Caesar Salad',upcharge:0},{name:'Tuna Tartare',upcharge:5}]},
+     {label:'Main Course',station:'Grill',options:[{name:'Grilled Salmon',upcharge:0},{name:'Chicken Breast',upcharge:0},{name:'Wagyu Burger',upcharge:8}]},
+     {label:'Dessert',station:'Pastry',options:[{name:'Crème Brûlée',upcharge:0},{name:'Sorbet Trio',upcharge:0},{name:'Chocolate Torte',upcharge:4}]}
+   ]},
+  {id:'pf2',name:'Sunday Brunch Prix Fixe',subtitle:'Three courses + welcome cocktail',price:55,service:'brunch',active:true,
+   courses:[
+     {label:'Starter',station:'Cold / Garde Manger',options:[{name:'Avocado Toast',upcharge:0},{name:'Shrimp Cocktail',upcharge:6}]},
+     {label:'Main',station:'Sauté',options:[{name:'Eggs Benedict',upcharge:0},{name:'Steak & Eggs',upcharge:10},{name:'Lobster Omelette',upcharge:14}]},
+     {label:'Dessert',station:'Pastry',options:[{name:'French Toast',upcharge:0},{name:'Chocolate Soufflé',upcharge:5}]}
+   ]}
 ];
 
 // ─── Helpers ────────────────────────────────────────────────────
@@ -411,7 +488,7 @@ function genId() { return Date.now().toString(36)+Math.random().toString(36).sli
 
 // ─── Firebase load ──────────────────────────────────────────────
 function loadData() {
-  if (!fbReady) { STATE.menuCategories=SEED_CATEGORIES; STATE.menuItems=SEED_ITEMS; return; }
+  if (!fbReady) { STATE.menuCategories=SEED_CATEGORIES; STATE.menuItems=SEED_ITEMS; STATE.tastingMenus=SEED_TASTING_MENUS; STATE.prixFixeMenus=SEED_PRIX_FIXE_MENUS; return; }
 
   fbDb.collection('config').doc('menu_categories').get().then(doc=>{
     STATE.menuCategories = (doc.exists&&doc.data().items) ? doc.data().items.filter(c=>c.visible!==false) : SEED_CATEGORIES;
@@ -420,6 +497,14 @@ function loadData() {
   fbDb.collection('config').doc('menu_items').get().then(doc=>{
     STATE.menuItems = (doc.exists&&doc.data().items) ? doc.data().items : SEED_ITEMS;
   }).catch(()=>{ STATE.menuItems=SEED_ITEMS; });
+
+  // Load tasting & prix fixe menus from BOH
+  fbDb.collection('boh_shared').doc('tasting_menus').get().then(doc=>{
+    if (doc.exists&&doc.data().list) STATE.tastingMenus=doc.data().list.filter(t=>t.active);
+  }).catch(()=>{});
+  fbDb.collection('boh_shared').doc('prix_fixe_menus').get().then(doc=>{
+    if (doc.exists&&doc.data().list) STATE.prixFixeMenus=doc.data().list.filter(p=>p.active);
+  }).catch(()=>{});
 
   fbDb.collection('calls').onSnapshot(snap=>{
     STATE.calls=[]; snap.forEach(d=>STATE.calls.push({id:d.id,...d.data()}));
@@ -527,20 +612,40 @@ function renderOrder() {
   var html='<div class="order-section">';
   html+='<h3>Table '+STATE.selectedTable+' — New Order</h3>';
   html+='<div class="cat-pills">';
+  // Add Tasting & Prix Fixe pill if any are available
+  var hasTasting=(STATE.tastingMenus.length||STATE.prixFixeMenus.length);
+  if (hasTasting) {
+    html+='<div class="cat-pill tasting-pill'+(STATE.orderCat==='__tasting__'?' active':'')+'" onclick="filterCat(\'__tasting__\')">✦ Tasting</div>';
+  }
   cats.forEach(cat=>{
     html+='<div class="cat-pill'+(cat.id===STATE.orderCat?' active':'')+'" onclick="filterCat(\''+cat.id+'\')">'+cat.name+'</div>';
   });
   html+='</div>';
 
-  var filtered=items.filter(i=>i.category===STATE.orderCat);
   html+='<div id="menu-items-list">';
-  filtered.forEach(item=>{
-    html+='<div class="menu-item-row" onclick="addItem(\''+item.id+'\')">'+
-      '<div class="item-info"><div class="item-name">'+item.name+'</div>'+
-      '<div class="item-meta">'+item.station+' · '+item.cookTime+'min</div></div>'+
-      '<div class="item-price">$'+item.price.toFixed(2)+'</div>'+
-    '</div>';
-  });
+  if (STATE.orderCat==='__tasting__') {
+    html+=renderTastingItems();
+  } else {
+    var filtered=items.filter(i=>i.category===STATE.orderCat);
+    filtered.forEach(item=>{
+      var hasDesc = item.description || item.allergens || item.dietaryFlags;
+      html+='<div class="menu-item-row" onclick="addItem(\''+item.id+'\')">'+
+        '<div class="item-info"><div class="item-name">'+item.name+'</div>'+
+        '<div class="item-meta">'+item.station+' · '+item.cookTime+'min</div>'+
+        (hasDesc ? '<div class="item-desc-toggle" onclick="event.stopPropagation();toggleItemDesc(\''+item.id+'\')">[i] details</div>' : '')+
+        '</div>'+
+        '<div class="item-price">$'+item.price.toFixed(2)+'</div>'+
+      '</div>';
+      // Expandable description panel (hidden by default)
+      if (hasDesc && STATE._expandedItems && STATE._expandedItems[item.id]) {
+        html+='<div class="item-desc-expanded">';
+        if (item.description) html+='<div>'+item.description+'</div>';
+        if (item.allergens && item.allergens.length) html+='<div class="desc-allergens">⚠ Allergens: '+item.allergens.join(', ')+'</div>';
+        if (item.dietaryFlags && item.dietaryFlags.length) html+='<div class="desc-dietary">'+item.dietaryFlags.join(' · ')+'</div>';
+        html+='</div>';
+      }
+    });
+  }
   html+='</div>';
 
   // Current order
@@ -557,13 +662,37 @@ function renderOrder() {
   }
   html+='<button class="send-btn" onclick="sendOrder()"'+(STATE.currentOrder.length?'':' disabled')+'>🔥 Send to Kitchen</button>';
 
+  // Show active tasting/prix fixe orders with Fire Next Course
+  var tableTastings=STATE.activeTastingOrders.filter(o=>o.table===STATE.selectedTable&&o.status==='active');
+  if (tableTastings.length) {
+    html+='<div class="tasting-progress">';
+    tableTastings.forEach(to=>{
+      var courses=to.type==='tasting'?to.courses:to.selections;
+      var firedCount=courses.filter(c=>c.fired).length;
+      var totalCourses=courses.length;
+      var allFired=firedCount>=totalCourses;
+      html+='<div class="tp-card"><div class="tp-name">'+(to.tastingName||to.prixFixeName)+'</div>'+
+        '<div class="tp-progress">Course '+firedCount+'/'+totalCourses+' fired</div>';
+      if (!allFired) {
+        var nextCourse=courses[to.currentCourse+1];
+        var nextName=to.type==='tasting'?nextCourse.name:nextCourse.course+': '+nextCourse.choice;
+        html+='<button class="fire-btn" onclick="fireNextCourse(\''+to.id+'\')">🔥 Fire Course '+(to.currentCourse+2)+': '+nextName+'</button>';
+      } else {
+        html+='<div class="tp-done">✓ All courses served</div>';
+      }
+      html+='</div>';
+    });
+    html+='</div>';
+  }
+
   // Show Charge button for active orders on this table
   var tableOrders=STATE.orders.filter(o=>o.table===STATE.selectedTable&&o.status==='new');
-  if (tableOrders.length) {
+  var tastingTotal=tableTastings.reduce((s,to)=>s+(to.totalPrice||0),0);
+  if (tableOrders.length||tastingTotal>0) {
     var orderTotal=tableOrders.reduce((s,o)=>s+o.items.reduce((ss,i)=>{
       var found=(STATE.menuItems.length?STATE.menuItems:SEED_ITEMS).find(mi=>mi.id===i.id);
       return ss+(found?found.price:0);
-    },0),0);
+    },0),0)+tastingTotal;
     html+='<button class="pay-btn" onclick="openPayment('+orderTotal+')">💳 Charge Table — $'+orderTotal.toFixed(2)+'</button>';
   }
   html+='</div></div>';
@@ -572,6 +701,141 @@ function renderOrder() {
 
 function filterCat(catId) {
   STATE.orderCat=catId;
+  renderOrder();
+}
+
+// ─── Tasting & Prix Fixe Ordering ──────────────────────────────
+function renderTastingItems() {
+  var html='';
+  if (STATE.tastingMenus.length) {
+    html+='<div class="tasting-section-label">Tasting Menus</div>';
+    STATE.tastingMenus.forEach(tm=>{
+      html+='<div class="menu-item-row tasting-row" onclick="addTastingMenu(\''+tm.id+'\')">'+
+        '<div class="item-info"><div class="item-name">✦ '+tm.name+'</div>'+
+        '<div class="item-meta">'+tm.courses.length+' courses · '+tm.duration+'</div></div>'+
+        '<div class="item-price">$'+tm.price.toFixed(2)+'</div>'+
+      '</div>';
+      // Show pairings as sub-items
+      if (tm.pairings&&tm.pairings.length) {
+        tm.pairings.forEach(p=>{
+          html+='<div class="menu-item-row pairing-row" onclick="addPairing(\''+tm.id+'\',\''+p.id+'\')">'+
+            '<div class="item-info"><div class="item-name" style="padding-left:1rem;">🍷 '+p.name+'</div>'+
+            '<div class="item-meta" style="padding-left:1rem;">Add-on for '+tm.name+'</div></div>'+
+            '<div class="item-price">+$'+p.price.toFixed(2)+'</div>'+
+          '</div>';
+        });
+      }
+    });
+  }
+  if (STATE.prixFixeMenus.length) {
+    html+='<div class="tasting-section-label" style="margin-top:1rem;">Prix Fixe Menus</div>';
+    STATE.prixFixeMenus.forEach(pf=>{
+      html+='<div class="menu-item-row tasting-row" onclick="openPrixFixeSelector(\''+pf.id+'\')">'+
+        '<div class="item-info"><div class="item-name">◈ '+pf.name+'</div>'+
+        '<div class="item-meta">'+pf.courses.length+' courses · Choose options</div></div>'+
+        '<div class="item-price">$'+pf.price.toFixed(2)+'</div>'+
+      '</div>';
+    });
+  }
+  if (!html) html='<p style="color:var(--text-muted);font-size:0.85rem;padding:1rem;">No tasting or prix fixe menus available. Create them in BOH.</p>';
+  return html;
+}
+
+function addTastingMenu(tmId) {
+  var tm=STATE.tastingMenus.find(t=>t.id===tmId);
+  if (!tm) return;
+  STATE.currentOrder.push({
+    id:'tasting_'+tmId+'_'+Date.now(),
+    name:tm.name+' (Tasting)',
+    price:tm.price,
+    category:'tasting',
+    station:'Expo',
+    cookTime:0,
+    isTasting:true,
+    tastingId:tmId,
+    courses:tm.courses,
+    selectedMod:tm.courses.length+' courses'
+  });
+  toast('+ '+tm.name);
+  renderOrder();
+}
+
+function addPairing(tmId, pairingId) {
+  var tm=STATE.tastingMenus.find(t=>t.id===tmId);
+  if (!tm) return;
+  var p=tm.pairings.find(x=>x.id===pairingId);
+  if (!p) return;
+  STATE.currentOrder.push({
+    id:'pairing_'+pairingId+'_'+Date.now(),
+    name:p.name+' (for '+tm.name+')',
+    price:p.price,
+    category:'tasting',
+    station:'Bar',
+    cookTime:0,
+    isPairing:true,
+    selectedMod:null
+  });
+  toast('+ '+p.name);
+  renderOrder();
+}
+
+function openPrixFixeSelector(pfId) {
+  var pf=STATE.prixFixeMenus.find(p=>p.id===pfId);
+  if (!pf) return;
+  var html='<div class="pf-selector"><h3>'+pf.name+' — $'+pf.price.toFixed(2)+'</h3>';
+  html+='<p class="pf-sel-sub">Select one option per course:</p>';
+  pf.courses.forEach((c,ci)=>{
+    html+='<div class="pf-course-select"><label>'+c.label+'</label><div class="pf-options">';
+    c.options.forEach((o,oi)=>{
+      html+='<label class="pf-opt-label"><input type="radio" name="pf-course-'+ci+'" value="'+oi+'"'+(oi===0?' checked':'')+'>'+
+        o.name+(o.upcharge>0?' <span class="pf-upcharge">+$'+o.upcharge.toFixed(2)+'</span>':'')+'</label>';
+    });
+    html+='</div></div>';
+  });
+  html+='<div class="pf-sel-actions"><button class="send-btn" onclick="confirmPrixFixe(\''+pfId+'\')">Add to Order</button>'+
+    '<button class="cancel-pay-btn" onclick="closePfSelector()">Cancel</button></div></div>';
+  document.getElementById('pf-overlay').innerHTML=html;
+  document.getElementById('pf-overlay').classList.add('show');
+}
+
+function closePfSelector() {
+  document.getElementById('pf-overlay').classList.remove('show');
+}
+
+function confirmPrixFixe(pfId) {
+  var pf=STATE.prixFixeMenus.find(p=>p.id===pfId);
+  if (!pf) return;
+  var selections=[];
+  var totalUpcharge=0;
+  pf.courses.forEach((c,ci)=>{
+    var radios=document.querySelectorAll('input[name="pf-course-'+ci+'"]');
+    var sel=0;
+    radios.forEach((r,i)=>{ if(r.checked) sel=i; });
+    var opt=c.options[sel];
+    selections.push({course:c.label, choice:opt.name, upcharge:opt.upcharge||0, station:c.station||'Expo'});
+    totalUpcharge+=(opt.upcharge||0);
+  });
+  var choiceStr=selections.map(s=>s.choice).join(', ');
+  STATE.currentOrder.push({
+    id:'prixfixe_'+pfId+'_'+Date.now(),
+    name:pf.name+' (Prix Fixe)',
+    price:pf.price+totalUpcharge,
+    category:'prix-fixe',
+    station:'Expo',
+    cookTime:0,
+    isPrixFixe:true,
+    prixFixeId:pfId,
+    selections:selections,
+    selectedMod:choiceStr
+  });
+  closePfSelector();
+  toast('+ '+pf.name);
+  renderOrder();
+}
+
+function toggleItemDesc(itemId) {
+  if (!STATE._expandedItems) STATE._expandedItems={};
+  STATE._expandedItems[itemId] = !STATE._expandedItems[itemId];
   renderOrder();
 }
 
@@ -594,21 +858,125 @@ function removeItem(idx) { STATE.currentOrder.splice(idx,1); renderOrder(); }
 
 function sendOrder() {
   if (!STATE.currentOrder.length) return;
-  var order = {
-    table: STATE.selectedTable,
-    server: STATE.currentServer?STATE.currentServer.name:'Unknown',
-    items: STATE.currentOrder.map(i=>({id:i.id,name:i.name,station:i.station,cookTime:i.cookTime,modifiers:i.modifiers||[],selectedMod:i.selectedMod})),
-    status:'new',
-    sentAt:Date.now(),
-    clearedAt:null
-  };
-  var localOrder={id:genId(),...order};
-  STATE.orders.push(localOrder);
-  if (!STATE._localOrders) STATE._localOrders=[];
-  STATE._localOrders.push(localOrder);
-  if (fbReady) fbDb.collection('orders').add(order);
+  // Separate tasting/prix fixe items from regular items
+  var regularItems=STATE.currentOrder.filter(i=>!i.isTasting&&!i.isPrixFixe&&!i.isPairing);
+  var tastingItems=STATE.currentOrder.filter(i=>i.isTasting||i.isPrixFixe||i.isPairing);
+
+  // Send regular items as normal order
+  if (regularItems.length) {
+    var order = {
+      table: STATE.selectedTable,
+      server: STATE.currentServer?STATE.currentServer.name:'Unknown',
+      items: regularItems.map(i=>({id:i.id,name:i.name,station:i.station,cookTime:i.cookTime,modifiers:i.modifiers||[],selectedMod:i.selectedMod})),
+      status:'new',
+      sentAt:Date.now(),
+      clearedAt:null
+    };
+    var localOrder={id:genId(),...order};
+    STATE.orders.push(localOrder);
+    if (!STATE._localOrders) STATE._localOrders=[];
+    STATE._localOrders.push(localOrder);
+    if (fbReady) fbDb.collection('orders').add(order);
+  }
+
+  // Send tasting/prix fixe as course-by-course orders
+  tastingItems.forEach(ti=>{
+    if (ti.isTasting) {
+      // Fire first course immediately, rest on demand
+      var tastingOrder = {
+        table: STATE.selectedTable,
+        server: STATE.currentServer?STATE.currentServer.name:'Unknown',
+        type:'tasting',
+        tastingName:ti.name,
+        tastingId:ti.tastingId,
+        totalPrice:ti.price,
+        courses:ti.courses.map((c,i)=>({...c, fired:i===0, firedAt:i===0?Date.now():null})),
+        currentCourse:0,
+        status:'active',
+        sentAt:Date.now()
+      };
+      if (fbReady) fbDb.collection('tasting_orders').add(tastingOrder);
+      STATE.activeTastingOrders.push({id:genId(),...tastingOrder});
+      // Also send first course to regular orders for kitchen display
+      var firstCourse=ti.courses[0];
+      var courseOrder={
+        table: STATE.selectedTable,
+        server: STATE.currentServer?STATE.currentServer.name:'Unknown',
+        items:[{id:'tc_'+Date.now(),name:ti.name+' — Course 1: '+firstCourse.name,station:firstCourse.station,cookTime:10,modifiers:[],selectedMod:null}],
+        status:'new', sentAt:Date.now(), clearedAt:null,
+        isTastingCourse:true, courseNum:1, tastingName:ti.name
+      };
+      if (fbReady) fbDb.collection('orders').add(courseOrder);
+    } else if (ti.isPrixFixe) {
+      // Fire first course immediately
+      var pfOrder = {
+        table: STATE.selectedTable,
+        server: STATE.currentServer?STATE.currentServer.name:'Unknown',
+        type:'prix-fixe',
+        prixFixeName:ti.name,
+        prixFixeId:ti.prixFixeId,
+        totalPrice:ti.price,
+        selections:ti.selections.map((s,i)=>({...s, fired:i===0, firedAt:i===0?Date.now():null})),
+        currentCourse:0,
+        status:'active',
+        sentAt:Date.now()
+      };
+      if (fbReady) fbDb.collection('tasting_orders').add(pfOrder);
+      STATE.activeTastingOrders.push({id:genId(),...pfOrder});
+      // Fire first course to kitchen
+      var firstSel=ti.selections[0];
+      var pfCourseOrder={
+        table: STATE.selectedTable,
+        server: STATE.currentServer?STATE.currentServer.name:'Unknown',
+        items:[{id:'pfc_'+Date.now(),name:ti.name+' — '+firstSel.course+': '+firstSel.choice,station:firstSel.station||'Expo',cookTime:10,modifiers:[],selectedMod:null}],
+        status:'new', sentAt:Date.now(), clearedAt:null,
+        isTastingCourse:true, courseNum:1, tastingName:ti.name
+      };
+      if (fbReady) fbDb.collection('orders').add(pfCourseOrder);
+    }
+    // Pairings just get noted on the tasting order, bar handles them
+    if (ti.isPairing) {
+      var pairingOrder={
+        table: STATE.selectedTable,
+        server: STATE.currentServer?STATE.currentServer.name:'Unknown',
+        items:[{id:'pair_'+Date.now(),name:ti.name,station:'Bar',cookTime:2,modifiers:[],selectedMod:null}],
+        status:'new', sentAt:Date.now(), clearedAt:null
+      };
+      if (fbReady) fbDb.collection('orders').add(pairingOrder);
+    }
+  });
+
   toast('✓ Order sent to kitchen!');
   STATE.currentOrder=[];
+  renderOrder();
+}
+
+// Fire next course for a tasting/prix fixe order
+function fireNextCourse(orderId) {
+  var to=STATE.activeTastingOrders.find(o=>o.id===orderId);
+  if (!to) return;
+  var courses = to.type==='tasting' ? to.courses : to.selections;
+  var nextIdx = to.currentCourse+1;
+  if (nextIdx>=courses.length) { toast('All courses fired!'); return; }
+  to.currentCourse=nextIdx;
+  courses[nextIdx].fired=true;
+  courses[nextIdx].firedAt=Date.now();
+  // Send next course to kitchen
+  var nextCourse=courses[nextIdx];
+  var courseName = to.type==='tasting' ? nextCourse.name : nextCourse.course+': '+nextCourse.choice;
+  var courseOrder={
+    table: to.table,
+    server: to.server,
+    items:[{id:'tc_'+Date.now(),name:(to.tastingName||to.prixFixeName)+' — Course '+(nextIdx+1)+': '+courseName,station:nextCourse.station||'Expo',cookTime:10,modifiers:[],selectedMod:null}],
+    status:'new', sentAt:Date.now(), clearedAt:null,
+    isTastingCourse:true, courseNum:nextIdx+1, tastingName:to.tastingName||to.prixFixeName
+  };
+  if (fbReady) {
+    fbDb.collection('orders').add(courseOrder);
+    // Update tasting_orders doc if we have a firebase ID
+    // For now just update local state
+  }
+  toast('🔥 Course '+(nextIdx+1)+' fired!');
   renderOrder();
 }
 
