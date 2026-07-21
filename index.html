@@ -902,7 +902,15 @@ function sendOrder() {
       var courseOrder={
         table: STATE.selectedTable,
         server: STATE.currentServer?STATE.currentServer.name:'Unknown',
-        items:[{id:'tc_'+Date.now(),name:ti.name+' — Course 1: '+firstCourse.name,station:firstCourse.station,cookTime:10,modifiers:[],selectedMod:null}],
+        tastingCourse:{
+          type:'tasting',
+          menuName:ti.name,
+          courseNum:1,
+          totalCourses:ti.courses.length,
+          courseName:firstCourse.name,
+          station:firstCourse.station||'Expo',
+          description:firstCourse.desc||''
+        },
         status:'new', sentAt:Date.now(), clearedAt:null,
         isTastingCourse:true, courseNum:1, tastingName:ti.name
       };
@@ -923,12 +931,20 @@ function sendOrder() {
       };
       if (fbReady) fbDb.collection('tasting_orders').add(pfOrder);
       STATE.activeTastingOrders.push({id:genId(),...pfOrder});
-      // Fire first course to kitchen
+      // Fire first course to kitchen with tastingCourse format
       var firstSel=ti.selections[0];
       var pfCourseOrder={
         table: STATE.selectedTable,
         server: STATE.currentServer?STATE.currentServer.name:'Unknown',
-        items:[{id:'pfc_'+Date.now(),name:ti.name+' — '+firstSel.course+': '+firstSel.choice,station:firstSel.station||'Expo',cookTime:10,modifiers:[],selectedMod:null}],
+        tastingCourse:{
+          type:'prix_fixe',
+          menuName:ti.name,
+          courseNum:1,
+          totalCourses:ti.selections.length,
+          courseName:firstSel.course+': '+firstSel.choice,
+          station:firstSel.station||'Expo',
+          choices:ti.selections.map(function(s){return s.course+': '+s.choice;}).join(' · ')
+        },
         status:'new', sentAt:Date.now(), clearedAt:null,
         isTastingCourse:true, courseNum:1, tastingName:ti.name
       };
@@ -964,19 +980,47 @@ function fireNextCourse(orderId) {
   // Send next course to kitchen
   var nextCourse=courses[nextIdx];
   var courseName = to.type==='tasting' ? nextCourse.name : nextCourse.course+': '+nextCourse.choice;
-  var courseOrder={
-    table: to.table,
-    server: to.server,
-    items:[{id:'tc_'+Date.now(),name:(to.tastingName||to.prixFixeName)+' — Course '+(nextIdx+1)+': '+courseName,station:nextCourse.station||'Expo',cookTime:10,modifiers:[],selectedMod:null}],
-    status:'new', sentAt:Date.now(), clearedAt:null,
-    isTastingCourse:true, courseNum:nextIdx+1, tastingName:to.tastingName||to.prixFixeName
-  };
+  var courseStation = nextCourse.station || 'Expo';
+  var menuName = to.tastingName||to.prixFixeName;
+  var courseOrder;
+  if (to.type==='prix-fixe') {
+    // Send with tastingCourse format for rich kitchen display
+    courseOrder={
+      table: to.table,
+      server: to.server,
+      tastingCourse:{
+        type:'prix_fixe',
+        menuName:menuName,
+        courseNum:nextIdx+1,
+        totalCourses:courses.length,
+        courseName:courseName,
+        station:courseStation,
+        choices:courses.map(function(s){return s.course+': '+s.choice;}).join(' \u00b7 ')
+      },
+      status:'new', sentAt:Date.now(), clearedAt:null,
+      isTastingCourse:true, courseNum:nextIdx+1, tastingName:menuName
+    };
+  } else {
+    // Tasting menu format
+    courseOrder={
+      table: to.table,
+      server: to.server,
+      tastingCourse:{
+        type:'tasting',
+        menuName:menuName,
+        courseNum:nextIdx+1,
+        totalCourses:courses.length,
+        courseName:courseName,
+        station:courseStation
+      },
+      status:'new', sentAt:Date.now(), clearedAt:null,
+      isTastingCourse:true, courseNum:nextIdx+1, tastingName:menuName
+    };
+  }
   if (fbReady) {
     fbDb.collection('orders').add(courseOrder);
-    // Update tasting_orders doc if we have a firebase ID
-    // For now just update local state
   }
-  toast('🔥 Course '+(nextIdx+1)+' fired!');
+  toast('\ud83d\udd25 Course '+(nextIdx+1)+' fired!');
   renderOrder();
 }
 
