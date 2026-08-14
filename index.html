@@ -518,6 +518,9 @@ if (typeof fbReady !== 'undefined' && fbReady) fbDb = createNamedFirestoreAdapte
 var STATE = {
   currentServer: null,
   selectedTable: 1,
+  guestCount: 2,
+  rooms: [],
+  roomObjs: [],
   menuItems: [],
   menuCategories: [],
   tastingMenus: [],
@@ -628,6 +631,16 @@ function loadData() {
     STATE.menuItems = (doc.exists&&doc.data().items) ? doc.data().items : SEED_ITEMS;
   }).catch(()=>{ STATE.menuItems=SEED_ITEMS; });
 
+  // Real-time listeners for BOH dining room layout tables
+  fbDb.collection('boh_shared').doc('tables').onSnapshot(function(doc){
+    if (doc.exists && doc.data()) {
+      var d = doc.data();
+      if (d.rooms) STATE.rooms = d.rooms;
+      if (d.roomObjs) STATE.roomObjs = d.roomObjs;
+      if (STATE.activeTab==='tables') renderTables();
+    }
+  }, function(){});
+
   // Real-time listeners for tasting & prix fixe menus from BOH
   fbDb.collection('boh_shared').doc('tasting_menus').onSnapshot(function(doc){
     if (doc.exists&&doc.data().list) STATE.tastingMenus=doc.data().list.filter(t=>t.active);
@@ -708,29 +721,61 @@ function switchTab(tab) {
   else if (tab==='history') renderHistory();
 }
 
-// ─── Tables ─────────────────────────────────────────────────────
+// ─── Tables (BOH Dining Room Layout & Audit) ───────────────────
 function renderTables() {
   var c=document.getElementById('app-content');
-  var html='<div class="table-grid">';
-  for (var i=1;i<=20;i++) {
-    var hasCall=STATE.calls.some(cl=>cl.table===i&&cl.status==='active');
-    var hasOrder=STATE.orders.some(o=>o.table===i&&o.status!=='cleared'&&o.status!=='paid');
-    var cls='table-card'+(hasCall?' has-call':'')+(hasOrder?' has-order':'');
-    html+='<div class="'+cls+'" onclick="selectTable('+i+')">'+
-      '<div class="table-num">'+i+'</div>'+
-      '<div class="table-status">'+(hasCall?'🔔 CALLING':hasOrder?'Active':'Open')+'</div>'+
-    '</div>';
+  var objs = (STATE.roomObjs && STATE.roomObjs.length) ? STATE.roomObjs.filter(o=>o.type==='table') : [];
+  
+  var html='<div class="dining-layout-container">';
+  html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;"><div><h2 style="margin:0;font-size:1.2rem;color:var(--primary-light);">Dining Room Layout (BOH Synced)</h2><p style="margin:0;font-size:0.8rem;color:var(--text-muted);">Tap any table to open check, enter guest count, and order with staff audit tracing.</p></div><div style="font-size:0.85rem;color:var(--text-muted);">Logged in: <strong style="color:var(--text);">'+(STATE.currentServer?STATE.currentServer.name+' ('+STATE.currentServer.code+')':'Server')+'</strong></div></div>';
+  
+  if (objs.length > 0) {
+    html+='<div class="table-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:1rem;">';
+    objs.forEach(o=>{
+      var tNum = o.num || o.id;
+      var hasCall=STATE.calls.some(cl=>cl.table==tNum&&cl.status==='active');
+      var hasOrder=STATE.orders.some(o2=>o2.table==tNum&&o2.status!=='cleared'&&o2.status!=='paid');
+      var serverAssigned = o.server ? 'Server: '+o.server : '';
+      var cls='table-card'+(hasCall?' has-call':'')+(hasOrder?' has-order':'');
+      html+='<div class="'+cls+'" style="border-radius:12px;padding:1rem;background:var(--card-bg);border:1px solid var(--border);cursor:pointer;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.2);position:relative;" onclick="selectTable(''+tNum+'')">'+
+        '<div style="position:absolute;top:6px;right:8px;font-size:0.7rem;background:var(--primary);color:#fff;padding:2px 6px;border-radius:4px;">'+(o.shape||'table')+'</div>'+
+        '<div class="table-num" style="font-size:1.4rem;font-weight:700;color:var(--primary-light);margin-top:0.2rem;">Table '+tNum+'</div>'+
+        '<div style="font-size:0.75rem;color:var(--text-muted);margin:0.2rem 0;">Seats: '+(o.seats||4)+'</div>'+
+        '<div class="table-status" style="font-weight:600;font-size:0.85rem;color:'+(hasCall?'var(--error)':hasOrder?'var(--warning)':'var(--success)')+';">'+(hasCall?'🔔 CALLING':hasOrder?'Active':'Open')+'</div>'+
+        (serverAssigned?'<div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.2rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+serverAssigned+'</div>':'')+
+      '</div>';
+    });
+    html+='</div>';
+  } else {
+    // Fallback 1-20 grid
+    html+='<div class="table-grid">';
+    for (var i=1;i<=20;i++) {
+      var hasCall=STATE.calls.some(cl=>cl.table==i&&cl.status==='active');
+      var hasOrder=STATE.orders.some(o=>o.table==i&&o.status!=='cleared'&&o.status!=='paid');
+      var cls='table-card'+(hasCall?' has-call':'')+(hasOrder?' has-order':'');
+      html+='<div class="'+cls+'" onclick="selectTable(''+i+'')">'+
+        '<div class="table-num">Table '+i+'</div>'+
+        '<div class="table-status">'+(hasCall?'🔔 CALLING':hasOrder?'Active':'Open')+'</div>'+
+      '</div>';
+    }
+    html+='</div>';
   }
   html+='</div>';
   c.innerHTML=html;
 }
+
 function selectTable(t) {
-  STATE.selectedTable=t;
+  var gc = prompt('Enter number of guests for Table ' + t + ':', '2');
+  if (gc === null) return; // cancelled
+  STATE.selectedTable = t;
+  STATE.guestCount = parseInt(gc) || 2;
+  
   if (fbReady) {
-    STATE.calls.filter(cl=>cl.table===t&&cl.status==='active').forEach(cl=>{
+    STATE.calls.filter(cl=>cl.table==t&&cl.status==='active').forEach(cl=>{
       fbDb.collection('calls').doc(cl.id).update({status:'acknowledged'});
     });
   }
+  toast('Table ' + t + ' selected (' + STATE.guestCount + ' guests)');
   switchTab('order');
 }
 
@@ -1013,7 +1058,10 @@ function sendOrder() {
   if (regularItems.length) {
     var order = {
       table: STATE.selectedTable,
+      guestCount: STATE.guestCount || 2,
       server: STATE.currentServer?STATE.currentServer.name:'Unknown',
+      serverCode: STATE.currentServer?STATE.currentServer.code:'0000',
+      serverRole: STATE.currentServer?STATE.currentServer.role:'Waiter',
       items: regularItems.map(i=>({id:i.id,name:i.name,station:i.station,cookTime:i.cookTime,modifiers:i.modifiers||[],selectedMod:i.selectedMod})),
       status:'new',
       sentAt:Date.now(),
@@ -1032,7 +1080,10 @@ function sendOrder() {
       // Fire first course immediately, rest on demand
       var tastingOrder = {
         table: STATE.selectedTable,
+        guestCount: STATE.guestCount || 2,
         server: STATE.currentServer?STATE.currentServer.name:'Unknown',
+        serverCode: STATE.currentServer?STATE.currentServer.code:'0000',
+        serverRole: STATE.currentServer?STATE.currentServer.role:'Waiter',
         type:'tasting',
         tastingName:ti.name,
         tastingId:ti.tastingId,
