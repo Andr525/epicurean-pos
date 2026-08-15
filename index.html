@@ -626,13 +626,15 @@ function genId() { return Date.now().toString(36)+Math.random().toString(36).sli
 function loadData() {
   if (!fbReady) { STATE.menuCategories=SEED_CATEGORIES; STATE.menuItems=SEED_ITEMS; STATE.tastingMenus=SEED_TASTING_MENUS; STATE.prixFixeMenus=SEED_PRIX_FIXE_MENUS; return; }
 
-  fbDb.collection('config').doc('menu_categories').get().then(doc=>{
-    STATE.menuCategories = (doc.exists&&doc.data().items) ? doc.data().items.filter(c=>c.visible!==false) : SEED_CATEGORIES;
-  }).catch(()=>{ STATE.menuCategories=SEED_CATEGORIES; });
-
-  fbDb.collection('config').doc('menu_items').get().then(doc=>{
-    STATE.menuItems = (doc.exists&&doc.data().items) ? doc.data().items : SEED_ITEMS;
-  }).catch(()=>{ STATE.menuItems=SEED_ITEMS; });
+  // Listen directly to BOH shared menu (boh_shared/menu)
+  fbDb.collection('boh_shared').doc('menu').onSnapshot(function(doc){
+    if (doc.exists && doc.data()) {
+      var d = doc.data();
+      if (d.cats) STATE.menuCategories = d.cats.filter(function(c){return c.visible!==false;});
+      if (d.items) STATE.menuItems = d.items;
+      if (STATE.activeTab==='order') renderOrder();
+    }
+  }, function(){});
 
   // Real-time listeners for BOH dining room layout tables
   fbDb.collection('boh_shared').doc('tables').onSnapshot(function(doc){
@@ -729,7 +731,20 @@ function switchTab(tab) {
 // ─── Tables (BOH Dining Room Layout & Audit) ───────────────────
 function renderTables() {
   var c=document.getElementById('app-content');
-  var objs = (STATE.roomObjs && STATE.roomObjs.length) ? STATE.roomObjs.filter(o=>o.type==='table') : [];
+  var objs = [];
+  if (STATE.roomObjs) {
+    if (Array.isArray(STATE.roomObjs)) {
+      objs = STATE.roomObjs.filter(o=>o.type==='table');
+    } else {
+      // roomObjs is dictionary keyed by room id
+      for (var rId in STATE.roomObjs) {
+        var arr = STATE.roomObjs[rId];
+        if (Array.isArray(arr)) {
+          arr.forEach(function(o){ if(o.type==='table') objs.push(o); });
+        }
+      }
+    }
+  }
   
   var html='<div class="dining-layout-container">';
   html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;"><div><h2 style="margin:0;font-size:1.2rem;color:var(--primary-light);">Dining Room Layout (BOH Synced)</h2><p style="margin:0;font-size:0.8rem;color:var(--text-muted);">Tap any table to open check, enter guest count, and order with staff audit tracing.</p></div><div style="font-size:0.85rem;color:var(--text-muted);">Logged in: <strong style="color:var(--text);">'+(STATE.currentServer?STATE.currentServer.name+' ('+STATE.currentServer.code+')':'Server')+'</strong></div></div>';
