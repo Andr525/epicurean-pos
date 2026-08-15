@@ -7,6 +7,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#3B2314">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>Epicurean POS</title>
@@ -684,7 +687,9 @@ function buildNumpad() {
     var btn=document.createElement('button');
     btn.className='numpad-btn'+(typeof k==='string'?' action':'');
     btn.textContent=k;
-    btn.onclick=()=>pinKey(k);
+    btn.setAttribute('type', 'button');
+    btn.onclick=(e)=>{ e.preventDefault(); pinKey(k); };
+    btn.ontouchstart=(e)=>{ e.preventDefault(); pinKey(k); };
     pad.appendChild(btn);
   });
 }
