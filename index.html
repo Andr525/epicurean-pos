@@ -628,13 +628,23 @@ function loadData() {
 
   // Listen directly to BOH shared menu (boh_shared/menu)
   fbDb.collection('boh_shared').doc('menu').onSnapshot(function(doc){
-    if (doc.exists && doc.data()) {
+    if (doc.exists && doc.data().cats) {
       var d = doc.data();
-      if (d.cats) STATE.menuCategories = d.cats.filter(function(c){return c.visible!==false;});
-      if (d.items) STATE.menuItems = d.items;
-      if (STATE.activeTab==='order') renderOrder();
+      STATE.menuCategories = d.cats.filter(function(c){return c.visible!==false;});
+      STATE.menuItems = (d.items||[]).map(function(it){
+        return Object.assign({}, it, {
+          category: (it.catIds||[])[0] || it.category || '',
+          photo: it.photoUrl || it.photo || '',
+          dietary: it.diet || it.dietary || [],
+          allergens: it.allergens || []
+        });
+      });
+    } else {
+      STATE.menuCategories = SEED_CATEGORIES;
+      STATE.menuItems = SEED_ITEMS;
     }
-  }, function(){});
+    if (STATE.activeTab==='order') renderOrder();
+  }, function(){ STATE.menuCategories = SEED_CATEGORIES; STATE.menuItems = SEED_ITEMS; });
 
   // Real-time listeners for BOH dining room layout tables
   fbDb.collection('boh_shared').doc('tables').onSnapshot(function(doc){
@@ -648,13 +658,14 @@ function loadData() {
 
   // Real-time listeners for tasting & prix fixe menus from BOH
   fbDb.collection('boh_shared').doc('tasting_menus').onSnapshot(function(doc){
-    if (doc.exists&&doc.data().list) STATE.tastingMenus=doc.data().list.filter(t=>t.active);
-    else STATE.tastingMenus=STATE.tastingMenus||[];
-  }, function(){});
+    if (doc.exists && doc.data().list) STATE.tastingMenus = doc.data().list.filter(function(t){return t.active;});
+    else STATE.tastingMenus = SEED_TASTING_MENUS;
+  }, function(){ STATE.tastingMenus = SEED_TASTING_MENUS; });
+
   fbDb.collection('boh_shared').doc('prix_fixe_menus').onSnapshot(function(doc){
-    if (doc.exists&&doc.data().list) STATE.prixFixeMenus=doc.data().list.filter(p=>p.active);
-    else STATE.prixFixeMenus=STATE.prixFixeMenus||[];
-  }, function(){});
+    if (doc.exists && doc.data().list) STATE.prixFixeMenus = doc.data().list.filter(function(p){return p.active;});
+    else STATE.prixFixeMenus = SEED_PRIX_FIXE_MENUS;
+  }, function(){ STATE.prixFixeMenus = SEED_PRIX_FIXE_MENUS; });
 
   fbDb.collection('calls').onSnapshot(snap=>{
     STATE.calls=[]; snap.forEach(d=>STATE.calls.push({id:d.id,...d.data()}));
