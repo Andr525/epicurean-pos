@@ -281,11 +281,30 @@ body { font-family:var(--font); color:var(--text); background:var(--bg); -webkit
 .floor-room-tabs { display:flex; gap:8px; overflow-x:auto; padding-bottom:0.4rem; margin-bottom:0.75rem; -webkit-overflow-scrolling:touch; }
 .floor-room-tab { flex:0 0 auto; padding:0.45rem 0.8rem; border-radius:999px; border:1px solid var(--border); background:var(--surface); color:var(--text-secondary); font-size:0.78rem; cursor:pointer; }
 .floor-room-tab.active { border-color:var(--primary); background:var(--primary-glow); color:var(--text); font-weight:600; }
-.floor-stage { position:relative; width:100%; overflow:auto; background:#13131a; border:1px solid rgba(201,168,76,0.3); border-radius:12px; box-shadow:inset 0 0 40px rgba(0,0,0,0.6); min-height:280px; }
-.floor-canvas { position:relative; }
+.floor-stage { position:relative; width:100%; overflow:hidden; touch-action:none; background:#13131a; border:1px solid rgba(201,168,76,0.3); border-radius:12px; box-shadow:inset 0 0 40px rgba(0,0,0,0.6); min-height:280px; height:min(58vh, 520px); }
+.floor-canvas { position:absolute; left:0; top:0; transform-origin:0 0; will-change:transform; }
 .floor-obj { position:absolute; box-sizing:border-box; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:0.2rem; }
-.floor-obj.seatable { cursor:pointer; box-shadow:0 4px 12px rgba(0,0,0,0.4); }
-.floor-obj.seatable:active { transform:scale(0.97); }
+.floor-obj.seatable { cursor:pointer; box-shadow:0 4px 12px rgba(0,0,0,0.4); z-index:2; -webkit-tap-highlight-color:rgba(184,115,51,0.35); touch-action:none; }
+.floor-zoombar { display:flex; gap:8px; align-items:center; margin:0.55rem 0 0.7rem; }
+.floor-zoombar button {
+  min-width:44px; min-height:44px; border-radius:12px; border:1px solid var(--border);
+  background:var(--surface); color:var(--text); font-size:1.1rem; font-weight:700; cursor:pointer;
+}
+.floor-zoom-label { font-size:0.78rem; color:var(--text-muted); min-width:3.2rem; font-weight:600; }
+.table-quick { display:flex; flex-wrap:wrap; gap:8px; margin-top:0.75rem; }
+.table-quick button {
+  min-width:56px; min-height:56px; border-radius:14px; border:1px solid var(--border);
+  background:var(--surface); color:var(--text); font-weight:800; font-size:1rem; cursor:pointer;
+}
+.table-quick button.active { border-color:var(--primary); color:var(--primary-light); }
+.table-quick button.call { border-color:var(--danger); color:var(--danger); }
+.floor-hint { font-size:0.72rem; color:var(--text-muted); margin-top:0.45rem; }
+.floor-obj.seatable:active { filter:brightness(1.18); }
+.floor-assign { background:rgba(201,168,76,0.12); border:1px solid var(--primary); border-radius:12px; padding:0.65rem 0.8rem; margin-bottom:0.6rem; font-size:0.82rem; }
+.login-input {
+  width:100%; padding:0.7rem 0.8rem; border:1px solid var(--border); border-radius:12px;
+  background:var(--surface-2); color:var(--text); font-size:1rem;
+}
 .floor-tnum { font-size:0.85rem; font-weight:700; color:#F3ECDC; line-height:1.1; }
 .floor-tsub { font-size:0.62rem; color:rgba(243,236,220,0.7); }
 .floor-tstat { font-size:0.62rem; font-weight:600; margin-top:1px; }
@@ -411,7 +430,7 @@ body { font-family:var(--font); color:var(--text); background:var(--bg); -webkit
     background:var(--surface); border-top:1px solid var(--border);
   }
   body.hh-on .app-content { padding:0.7rem 0.75rem 1rem; }
-  body.hh-on .floor-obj.seatable { min-width:48px !important; min-height:48px !important; }
+  body.hh-on .floor-obj.seatable { min-width:56px !important; min-height:56px !important; }
   body.hh-on .floor-tnum { font-size:0.95rem; }
   body.hh-on .cat-pill { min-height:40px; display:inline-flex; align-items:center; }
   .hh-back, .hh-more {
@@ -685,7 +704,14 @@ var STATE = {
   menuSearch: '',
   tableSessions: {},
   pendingItem: null,
-  pendingSend: null
+  pendingSend: null,
+  stations: [],
+  floorFilter: 'all',
+  floorZoom: 1,
+  floorPanX: 0,
+  floorPanY: 0,
+  floorFitDone: false,
+  stationAssignId: null
 };
 var COMMON_ALLERGENS = ['Fish','Shellfish','Dairy','Egg','Gluten','Soy','Sesame','Nuts','Sulfites'];
 
@@ -898,6 +924,10 @@ function toast(msg) {
   setTimeout(()=>t.classList.remove('show'),3000);
 }
 function genId() { return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+function esc(s) {
+  return String(s==null?'':s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 
 // ─── Firebase load ──────────────────────────────────────────────
 function loadData() {
@@ -934,6 +964,7 @@ function loadData() {
       var d = doc.data();
       if (d.rooms) STATE.rooms = d.rooms;
       if (d.roomObjs) STATE.roomObjs = d.roomObjs;
+      if (Array.isArray(d.stations)) STATE.stations = d.stations;
       if (!STATE.floorRoom && STATE.rooms && STATE.rooms.length) STATE.floorRoom = STATE.rooms[0].id;
       if (STATE.activeTab==='tables') renderTables();
     }
@@ -1056,26 +1087,258 @@ function tableHasCall(tNum){
 function tableHasOrder(tNum){
   return STATE.orders.some(function(o2){ return String(o2.table)===String(tNum) && o2.status!=='cleared' && o2.status!=='paid'; });
 }
-function setFloorRoom(roomId){
-  STATE.floorRoom = roomId;
+function isManager(){
+  var staff=STATE.currentServer;
+  if (!staff) return false;
+  var code=String(staff.code||'');
+  return code.charAt(0)==='5' || /manager/i.test(staff.role||'');
+}
+function objectRoomId(o){
+  return (o && (o._room || o.room || o.roomId)) || '';
+}
+function allFloorObjects(){
+  var objs=STATE.roomObjs;
+  var rooms=Array.isArray(STATE.rooms)?STATE.rooms:[];
+  if (!objs) return [];
+  if (Array.isArray(objs)) {
+    return objs.map(function(o){ return Object.assign({}, o, {_room:objectRoomId(o)}); });
+  }
+  var packed=[], xOff=0;
+  var ids=rooms.length?rooms.map(function(r){return r.id;}):Object.keys(objs);
+  ids.forEach(function(id){
+    var arr=Array.isArray(objs[id])?objs[id]:[];
+    var maxX=0;
+    arr.forEach(function(o){ maxX=Math.max(maxX,(o.x||0)+(o.w||80)); });
+    arr.forEach(function(o){
+      packed.push(Object.assign({}, o, {x:(o.x||0)+xOff, _room:id}));
+    });
+    xOff += Math.max(maxX, 200) + 48;
+  });
+  return packed;
+}
+function stationTableIds(st){
+  if (!st) return [];
+  var raw=st.tableIds || st.tableKeys || [];
+  return raw.map(String);
+}
+function serverOwnsTable(o, staff){
+  staff = staff || STATE.currentServer;
+  if (!o || !staff) return false;
+  var s=String(o.server||'');
+  var name=String(staff.name||'');
+  var code=String(staff.code||'');
+  if (s && (s===code || s===name || (name && s.toLowerCase().indexOf(name.toLowerCase())>-1))) return true;
+  var st=stationForTable(tableKey(o));
+  return !!(st && st.serverCode && String(st.serverCode)===code);
+}
+function stationForTable(tNum){
+  tNum=String(tNum);
+  return (STATE.stations||[]).find(function(st){ return stationTableIds(st).indexOf(tNum)>-1; })||null;
+}
+function visibleFloorObjects(){
+  var filter=STATE.floorFilter||'all';
+  var all=allFloorObjects();
+  if (filter==='all') return all;
+  if (filter==='mine') {
+    var mine=all.filter(function(o){ return SEATABLE[o.type] && serverOwnsTable(o, STATE.currentServer); });
+    return mine.length ? mine : all.filter(function(o){ return SEATABLE[o.type]; });
+  }
+  if (filter.indexOf('room:')===0) {
+    var rid=filter.slice(5);
+    var hit=all.filter(function(o){ return String(o._room)===String(rid); });
+    if (hit.length) return hit;
+    return (roomObjects(rid)||[]).map(function(o){ return Object.assign({}, o, {_room:rid}); });
+  }
+  if (filter.indexOf('station:')===0) {
+    var sid=filter.slice(8);
+    var st=(STATE.stations||[]).find(function(s){ return s.id===sid; });
+    if (!st) return [];
+    var keys={};
+    stationTableIds(st).forEach(function(k){ keys[k]=1; });
+    return all.filter(function(o){ return SEATABLE[o.type] && keys[String(tableKey(o))]; });
+  }
+  return all;
+}
+function normalizeFloor(objs){
+  objs = objs || [];
+  var minX=Infinity, minY=Infinity;
+  objs.forEach(function(o){
+    minX=Math.min(minX, o.x||0);
+    minY=Math.min(minY, o.y||0);
+  });
+  if (!isFinite(minX)) minX=0;
+  if (!isFinite(minY)) minY=0;
+  return objs.map(function(o){
+    return Object.assign({}, o, {x:(o.x||0)-minX+20, y:(o.y||0)-minY+20});
+  });
+}
+function setFloorFilter(filter){
+  STATE.floorFilter=filter;
+  STATE.floorFitDone=false;
+  STATE.stationAssignId=null;
   renderTables();
 }
+function applyFloorTransform(){
+  var c=document.getElementById('floor-canvas');
+  if (!c) return;
+  c.style.transform='translate('+STATE.floorPanX+'px,'+STATE.floorPanY+'px) scale('+STATE.floorZoom+')';
+  var lab=document.getElementById('floor-zoom-label');
+  if (lab) lab.textContent=Math.round((STATE.floorZoom||1)*100)+'%';
+}
+function floorZoomBy(factor){
+  var stage=document.getElementById('floor-stage');
+  if (!stage) return;
+  var rect=stage.getBoundingClientRect();
+  var cx=rect.width/2, cy=rect.height/2;
+  var old=STATE.floorZoom||1;
+  var nz=Math.max(0.45, Math.min(8, old*factor));
+  STATE.floorPanX = cx - (cx - STATE.floorPanX) * (nz/old);
+  STATE.floorPanY = cy - (cy - STATE.floorPanY) * (nz/old);
+  STATE.floorZoom=nz;
+  STATE.floorFitDone=true;
+  applyFloorTransform();
+}
+function floorResetView(){
+  var stage=document.getElementById('floor-stage');
+  var canvas=document.getElementById('floor-canvas');
+  if (!stage || !canvas) {
+    STATE.floorFitDone=true;
+    return;
+  }
+  var sw=stage.clientWidth || stage.getBoundingClientRect().width || 0;
+  var sh=stage.clientHeight || stage.getBoundingClientRect().height || 0;
+  var cw=parseFloat(canvas.style.width)||canvas.offsetWidth||0;
+  var ch=parseFloat(canvas.style.height)||canvas.offsetHeight||0;
+  if (!sw || !sh || !cw || !ch) {
+    STATE.floorZoom=1; STATE.floorPanX=0; STATE.floorPanY=0; STATE.floorFitDone=true;
+    applyFloorTransform();
+    return;
+  }
+  var fit=Math.min(sw/cw, sh/ch);
+  var vis=visibleFloorObjects().filter(function(o){ return SEATABLE[o.type]; });
+  var minDim=Infinity;
+  vis.forEach(function(o){ minDim=Math.min(minDim, o.w||70, o.h||70); });
+  var isolated=STATE.floorFilter && STATE.floorFilter!=='all';
+  if (isFinite(minDim) && vis.length && (isolated || vis.length<=16)) {
+    var want=isolated ? 64 : 56;
+    fit=Math.max(fit, want/minDim);
+  }
+  STATE.floorZoom=Math.max(0.45, Math.min(8, fit));
+  STATE.floorPanX=(sw - cw*STATE.floorZoom)/2;
+  STATE.floorPanY=(sh - ch*STATE.floorZoom)/2;
+  STATE.floorFitDone=true;
+  applyFloorTransform();
+}
+function tapTable(tNum, ev){
+  if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+  tNum=String(tNum||'');
+  if (!tNum) return;
+  if (STATE.stationAssignId) {
+    toggleStationTable(tNum);
+    return;
+  }
+  selectTable(tNum);
+}
+function bindFloorGestures(){
+  var stage=document.getElementById('floor-stage');
+  if (!stage || stage._bound) return;
+  stage._bound=true;
+  var pointers={};
+  var lastDist=0;
+  var moved=false;
+  var suppressClick=false;
+  function count(){ return Object.keys(pointers).length; }
+  function dist(){
+    var ids=Object.keys(pointers);
+    if (ids.length<2) return 0;
+    var a=pointers[ids[0]], b=pointers[ids[1]];
+    var dx=a.x-b.x, dy=a.y-b.y;
+    return Math.sqrt(dx*dx+dy*dy);
+  }
+  stage.addEventListener('pointerdown', function(e){
+    try { stage.setPointerCapture(e.pointerId); } catch (err) {}
+    pointers[e.pointerId]={x:e.clientX,y:e.clientY};
+    moved=false;
+    if (count()===2) lastDist=dist();
+  });
+  stage.addEventListener('pointermove', function(e){
+    if (!pointers[e.pointerId]) return;
+    var prev=pointers[e.pointerId];
+    var dx=e.clientX-prev.x, dy=e.clientY-prev.y;
+    pointers[e.pointerId]={x:e.clientX,y:e.clientY};
+    if (Math.abs(dx)+Math.abs(dy)>8) moved=true;
+    if (count()===1) {
+      STATE.floorPanX += dx;
+      STATE.floorPanY += dy;
+      applyFloorTransform();
+    } else if (count()>=2) {
+      var d=dist();
+      if (lastDist>0 && d>0) {
+        var factor=d/lastDist;
+        var rect=stage.getBoundingClientRect();
+        var ids=Object.keys(pointers);
+        var a=pointers[ids[0]], b=pointers[ids[1]];
+        var cx=((a.x+b.x)/2)-rect.left;
+        var cy=((a.y+b.y)/2)-rect.top;
+        var old=STATE.floorZoom||1;
+        var nz=Math.max(0.45, Math.min(8, old*factor));
+        STATE.floorPanX = cx - (cx - STATE.floorPanX) * (nz/old);
+        STATE.floorPanY = cy - (cy - STATE.floorPanY) * (nz/old);
+        STATE.floorZoom=nz;
+        STATE.floorFitDone=true;
+        applyFloorTransform();
+      }
+      lastDist=d;
+    }
+    if (e.cancelable) e.preventDefault();
+  }, {passive:false});
+  function endPtr(e){
+    delete pointers[e.pointerId];
+    if (count()<2) lastDist=0;
+    if (moved) suppressClick=true;
+  }
+  stage.addEventListener('pointerup', endPtr);
+  stage.addEventListener('pointercancel', endPtr);
+  stage.addEventListener('click', function(e){
+    if (!suppressClick) return;
+    e.preventDefault();
+    e.stopPropagation();
+    suppressClick=false;
+  }, true);
+}
+
 function renderTables() {
   var c=document.getElementById('app-content');
   var rooms = Array.isArray(STATE.rooms) ? STATE.rooms : [];
-  if (!STATE.floorRoom && rooms.length) STATE.floorRoom = rooms[0].id;
-  var roomId = STATE.floorRoom || (rooms[0] && rooms[0].id);
-  var objs = roomObjects(roomId);
+  var stations = Array.isArray(STATE.stations) ? STATE.stations : [];
+  var objs = normalizeFloor(visibleFloorObjects());
+  var mineCount = 0;
+  allFloorObjects().forEach(function(o){ if (SEATABLE[o.type] && serverOwnsTable(o, STATE.currentServer)) mineCount++; });
 
   var html='<div class="floor-wrap">';
-  html+='<div class="floor-head"><div><h2>Dining room</h2><p>Floor plan from Back of House. Tap a table to start an order.</p></div><div style="font-size:0.8rem;color:var(--text-muted);text-align:right;">'+(STATE.currentServer?STATE.currentServer.name:'Server')+'</div></div>';
+  html+='<div class="floor-head"><div><h2>Dining room</h2><p>Pinch or tap + to enlarge. Isolate a station for larger targets.</p></div><div style="font-size:0.8rem;color:var(--text-muted);text-align:right;">'+(STATE.currentServer?STATE.currentServer.name:'Server')+'</div></div>';
 
-  if (rooms.length > 1) {
-    html+='<div class="floor-room-tabs">';
-    rooms.forEach(function(rm){
-      html+='<button class="floor-room-tab'+(rm.id===roomId?' active':'')+'" onclick="setFloorRoom('+JSON.stringify(String(rm.id))+')">'+(rm.name||rm.id)+'</button>';
-    });
-    html+='</div>';
+  html+='<div class="floor-room-tabs">';
+  html+='<button class="floor-room-tab'+(STATE.floorFilter==='all'?' active':'')+'" onclick="setFloorFilter(\'all\')">All</button>';
+  html+='<button class="floor-room-tab'+(STATE.floorFilter==='mine'?' active':'')+'" onclick="setFloorFilter(\'mine\')">My station'+(mineCount?' ('+mineCount+')':'')+'</button>';
+  rooms.forEach(function(rm){
+    html+='<button class="floor-room-tab'+(STATE.floorFilter==='room:'+rm.id?' active':'')+'" onclick="setFloorFilter('+JSON.stringify('room:'+rm.id)+')">'+(rm.name||rm.id)+'</button>';
+  });
+  stations.forEach(function(st){
+    html+='<button class="floor-room-tab'+(STATE.floorFilter==='station:'+st.id?' active':'')+'" onclick="setFloorFilter('+JSON.stringify('station:'+st.id)+')">'+(st.name||'Station')+'</button>';
+  });
+  html+='</div>';
+
+  html+='<div class="floor-zoombar">';
+  html+='<button class="floor-zoom-btn" onclick="floorZoomBy(1/1.25)">−</button>';
+  html+='<button class="floor-zoom-btn" onclick="floorResetView()">Fit</button>';
+  html+='<button class="floor-zoom-btn" onclick="floorZoomBy(1.25)">+</button>';
+  html+='<span class="floor-zoom-label" id="floor-zoom-label">100%</span>';
+  if (isManager()) html+='<button class="floor-zoom-btn" style="margin-left:auto;width:auto;padding:0 0.7rem;font-size:0.72rem;" onclick="openStationEditor()">Stations</button>';
+  html+='</div>';
+  if (STATE.stationAssignId) {
+    var ast=stations.filter(function(s){ return s.id===STATE.stationAssignId; })[0];
+    html+='<div class="floor-assign">Assigning <strong>'+esc(ast&&ast.name||'station')+'</strong> — tap tables to add or remove. <button class="ghost-btn" style="min-height:36px;margin-top:0.35rem;" onclick="STATE.stationAssignId=null;renderTables()">Done</button></div>';
   }
 
   if (objs.length) {
@@ -1084,10 +1347,8 @@ function renderTables() {
       maxX=Math.max(maxX, (o.x||0)+(o.w||80)+24);
       maxY=Math.max(maxY, (o.y||0)+(o.h||80)+24);
     });
-    var availW = Math.max(280, (c.clientWidth||window.innerWidth||360) - 28);
-    var scale = Math.min(1, availW / maxX);
-    html+='<div class="floor-stage" style="height:'+Math.round(maxY*scale)+'px">';
-    html+='<div class="floor-canvas" style="width:'+maxX+'px;height:'+maxY+'px;transform:scale('+scale+');transform-origin:top left;">';
+    html+='<div class="floor-stage" id="floor-stage">';
+    html+='<div class="floor-canvas" id="floor-canvas" style="width:'+maxX+'px;height:'+maxY+'px;">';
     objs.forEach(function(o){
       var left=o.x||20, top=o.y||20, width=o.w||70, height=o.h||70, rot=o.rot||0;
       var style='left:'+left+'px;top:'+top+'px;width:'+width+'px;height:'+height+'px;transform:rotate('+rot+'deg);';
@@ -1095,30 +1356,43 @@ function renderTables() {
       if (SEATABLE[o.type]) {
         var hasCall=tableHasCall(tNum);
         var hasOrder=tableHasOrder(tNum);
-        var bg=hasCall?'rgba(230,80,80,0.28)':(hasOrder?'rgba(220,165,50,0.28)':'rgba(201,168,76,0.14)');
-        var border=hasCall?'#E65050':(hasOrder?'#DCA532':'rgba(201,168,76,0.45)');
+        var mine=serverOwnsTable(o, STATE.currentServer);
+        var inAssign=!!(STATE.stationAssignId && stationTableIds(stations.filter(function(s){ return s.id===STATE.stationAssignId; })[0]).indexOf(String(tNum))>-1);
+        var bg=hasCall?'rgba(230,80,80,0.28)':(hasOrder?'rgba(220,165,50,0.28)':(inAssign||mine?'rgba(201,168,76,0.22)':'rgba(201,168,76,0.12)'));
+        var border=hasCall?'#E65050':(hasOrder?'#DCA532':(inAssign?'#F3ECDC':(mine?'#C9A84C':'rgba(201,168,76,0.35)')));
         var radius=o.shape==='round'||o.type==='stool'?'50%':(o.type==='outdoor'?'10px':'12px');
         var status=hasCall?'CALL':hasOrder?'Active':(o.status&&o.status!=='open'?o.status:'Open');
         var statusColor=hasCall?'#E65050':hasOrder?'#DCA532':'#5FB48A';
-        html+='<div class="floor-obj seatable" onclick="selectTable('+JSON.stringify(String(tNum))+')" style="'+style+'border-radius:'+radius+';background:'+bg+';border:2px solid '+border+';">'+
-          '<div class="floor-tnum">'+tNum+'</div>'+
+        var extra=mine?'':'opacity:0.82;';
+        html+='<div class="floor-obj seatable" data-table="'+esc(String(tNum))+'" onclick="tapTable('+JSON.stringify(String(tNum))+')" style="'+style+extra+'border-radius:'+radius+';background:'+bg+';border:2px solid '+border+';">'+
+          '<div class="floor-tnum">'+esc(String(tNum))+'</div>'+
           '<div class="floor-tsub">'+(o.seats||(o.type==='stool'?1:4))+' seats</div>'+
           '<div class="floor-tstat" style="color:'+statusColor+'">'+status+'</div>'+
         '</div>';
       } else {
-        html+='<div class="floor-obj" style="'+style+'border:1px dashed rgba(255,255,255,0.16);border-radius:8px;background:rgba(255,255,255,0.04);color:rgba(243,236,220,0.5);font-size:0.7rem;pointer-events:none;">'+(o.label||o.type)+'</div>';
+        html+='<div class="floor-obj" style="'+style+'border:1px dashed rgba(255,255,255,0.16);border-radius:8px;background:rgba(255,255,255,0.04);color:rgba(243,236,220,0.5);font-size:0.7rem;pointer-events:none;">'+esc(o.label||o.type)+'</div>';
       }
     });
     html+='</div></div>';
-    html+='<div class="floor-legend"><span><span class="floor-dot" style="background:#5FB48A"></span>Open</span><span><span class="floor-dot" style="background:#DCA532"></span>Active order</span><span><span class="floor-dot" style="background:#E65050"></span>Guest call</span></div>';
+    var quick = objs.filter(function(o){ return SEATABLE[o.type]; });
+    if (quick.length) {
+      html+='<div class="table-quick">';
+      quick.forEach(function(o){
+        var tNum=tableKey(o);
+        html+='<button type="button" class="table-quick-btn'+(tableHasCall(tNum)?' call':'')+(tableHasOrder(tNum)?' active':'')+'" onclick="tapTable('+JSON.stringify(String(tNum))+')">'+esc(String(tNum))+'</button>';
+      });
+      html+='</div>';
+    }
+    html+='<div class="floor-legend"><span><span class="floor-dot" style="background:#5FB48A"></span>Open</span><span><span class="floor-dot" style="background:#DCA532"></span>Active</span><span><span class="floor-dot" style="background:#E65050"></span>Call</span><span><span class="floor-dot" style="background:#C9A84C"></span>Yours</span></div>';
+    html+='<p style="color:var(--text-muted);font-size:0.72rem;margin-top:0.4rem;">Pinch the map or use + to enlarge. Number chips below always open a table.</p>';
   } else {
-    html+='<p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:0.8rem;">No BOH floor plan yet. Showing numbered tables.</p>';
+    html+='<p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:0.8rem;">No tables in this view. Choose All, or ask a manager to assign stations.</p>';
     html+='<div class="table-grid">';
     for (var i=1;i<=20;i++) {
       var hasCall=tableHasCall(i);
       var hasOrder=tableHasOrder(i);
       var cls='table-card'+(hasCall?' has-call':'')+(hasOrder?' has-order':'');
-      html+='<div class="'+cls+'" onclick="selectTable('+i+')">'+
+      html+='<div class="'+cls+'" onclick="tapTable('+i+')">'+
         '<div class="table-num">'+i+'</div>'+
         '<div class="table-status">'+(hasCall?'CALLING':hasOrder?'Active':'Open')+'</div>'+
       '</div>';
@@ -1128,6 +1402,76 @@ function renderTables() {
   html+='</div>';
   c.innerHTML=html;
   paintChrome();
+  bindFloorGestures();
+  requestAnimationFrame(function(){ if (!STATE.floorFitDone) floorResetView(); else applyFloorTransform(); });
+}
+
+function saveStations(list) {
+  STATE.stations = list || [];
+  if (!fbReady) { toast('Stations saved on this device only'); return Promise.resolve(); }
+  return fbDb.collection('boh_shared').doc('tables').set({
+    stations: STATE.stations,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  }, { merge: true }).then(function(){ toast('Stations saved'); }).catch(function(err){ toast(err.message||'Save failed'); });
+}
+function openStationEditor() {
+  if (!isManager()) { toast('Manager PIN required'); return; }
+  STATE.stationAssignId = null;
+  var stations = (STATE.stations||[]).slice();
+  var html='<h2>Stations</h2>';
+  html+='<p class="sheet-sub">Name waiter areas before service, then tap tables on the floor to assign. BOH Rooms also appear as filters. Saved to the shared floor document.</p>';
+  stations.forEach(function(st){
+    html+='<div style="margin-bottom:0.7rem;padding:0.7rem;border:1px solid var(--border);border-radius:12px;">';
+    html+='<div style="display:flex;justify-content:space-between;gap:0.4rem;align-items:center;">';
+    html+='<strong>'+esc(st.name||'Station')+'</strong>';
+    html+='<button class="ghost-btn" style="min-height:40px;margin-top:0;" onclick="beginAssignStation('+JSON.stringify(st.id)+')">Assign tables</button></div>';
+    html+='<p class="sheet-sub" style="margin:0.35rem 0 0;">Waiter PIN '+esc(st.serverCode||'—')+' · '+stationTableIds(st).length+' tables</p>';
+    html+='<button class="ghost-btn" style="min-height:36px;" onclick="deleteStation('+JSON.stringify(st.id)+')">Remove</button>';
+    html+='</div>';
+  });
+  html+='<input class="login-input" id="st-name" placeholder="Station name (Patio, Bar, Dining)" style="margin-bottom:0.4rem;">';
+  html+='<input class="login-input" id="st-code" placeholder="Waiter PIN (optional, e.g. 4001)" inputmode="numeric" style="margin-bottom:0.5rem;">';
+  html+='<button class="primary-btn" onclick="addStationFromSheet()">Add station</button>';
+  html+='<button class="ghost-btn" onclick="closeSheet()">Close</button>';
+  openSheet(html);
+}
+function addStationFromSheet() {
+  var name=(document.getElementById('st-name').value||'').trim();
+  var code=(document.getElementById('st-code').value||'').trim();
+  if (!name) { toast('Name the station'); return; }
+  var st={ id:'st-'+Date.now(), name:name, serverCode:code, tableIds:[] };
+  STATE.stations.push(st);
+  saveStations(STATE.stations);
+  closeSheet();
+  openStationEditor();
+}
+function deleteStation(id) {
+  STATE.stations = STATE.stations.filter(function(s){ return s.id!==id; });
+  if (STATE.floorFilter==='station:'+id) STATE.floorFilter='all';
+  saveStations(STATE.stations);
+  closeSheet();
+  openStationEditor();
+  renderTables();
+}
+function beginAssignStation(id) {
+  STATE.stationAssignId = id;
+  closeSheet();
+  STATE.floorFilter='all';
+  STATE.floorFitDone=false;
+  renderTables();
+  var st = STATE.stations.filter(function(s){ return s.id===id; })[0];
+  toast('Tap tables to add/remove from '+(st&&st.name||'station'));
+}
+function toggleStationTable(tNum) {
+  var id = STATE.stationAssignId;
+  var st = STATE.stations.filter(function(s){ return s.id===id; })[0];
+  if (!st) return;
+  st.tableIds = st.tableIds || [];
+  var k=String(tNum);
+  var i=st.tableIds.indexOf(k);
+  if (i>=0) st.tableIds.splice(i,1); else st.tableIds.push(k);
+  saveStations(STATE.stations);
+  renderTables();
 }
 
 function selectTable(t) {
