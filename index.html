@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Epicurean POS">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#3B2314">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -12,6 +13,10 @@
 <meta http-equiv="Expires" content="0">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-192.png">
+<link rel="apple-touch-icon" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <title>Epicurean POS</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -267,6 +272,26 @@ body { font-family:var(--font); color:var(--text); background:var(--bg); -webkit
   padding:0.7rem 1.2rem; border:none; border-radius:var(--radius);
   background:var(--primary); color:#fff; font-weight:600; cursor:pointer;
 }
+
+/* FLOOR PLAN */
+.floor-wrap { padding:0.75rem 0.75rem 1.2rem; height:100%; overflow:auto; }
+.floor-head { display:flex; justify-content:space-between; align-items:flex-start; gap:0.75rem; margin-bottom:0.75rem; }
+.floor-head h2 { margin:0; font-size:1.05rem; color:var(--primary-light); }
+.floor-head p { margin:0.2rem 0 0; font-size:0.75rem; color:var(--text-muted); }
+.floor-room-tabs { display:flex; gap:8px; overflow-x:auto; padding-bottom:0.4rem; margin-bottom:0.75rem; -webkit-overflow-scrolling:touch; }
+.floor-room-tab { flex:0 0 auto; padding:0.45rem 0.8rem; border-radius:999px; border:1px solid var(--border); background:var(--surface); color:var(--text-secondary); font-size:0.78rem; cursor:pointer; }
+.floor-room-tab.active { border-color:var(--primary); background:var(--primary-glow); color:var(--text); font-weight:600; }
+.floor-stage { position:relative; width:100%; overflow:auto; background:#13131a; border:1px solid rgba(201,168,76,0.3); border-radius:12px; box-shadow:inset 0 0 40px rgba(0,0,0,0.6); min-height:280px; }
+.floor-canvas { position:relative; }
+.floor-obj { position:absolute; box-sizing:border-box; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:0.2rem; }
+.floor-obj.seatable { cursor:pointer; box-shadow:0 4px 12px rgba(0,0,0,0.4); }
+.floor-obj.seatable:active { transform:scale(0.97); }
+.floor-tnum { font-size:0.85rem; font-weight:700; color:#F3ECDC; line-height:1.1; }
+.floor-tsub { font-size:0.62rem; color:rgba(243,236,220,0.7); }
+.floor-tstat { font-size:0.62rem; font-weight:600; margin-top:1px; }
+.floor-legend { display:flex; flex-wrap:wrap; gap:0.7rem; margin-top:0.7rem; font-size:0.7rem; color:var(--text-muted); }
+.floor-dot { width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:4px; }
+.item-thumb { width:42px; height:42px; border-radius:8px; object-fit:cover; margin-right:0.6rem; flex-shrink:0; border:1px solid var(--border); }
 
 /* HISTORY */
 .history-card {
@@ -537,8 +562,29 @@ var STATE = {
   tipPercent: 18,
   customTip: 0,
   activeTastingOrders: [], // tracks course-by-course firing
-  _expandedItems: {}
+  _expandedItems: {},
+  floorRoom: null,
+  menuLive: false
 };
+var SEATABLE = {table:1, stool:1, outdoor:1, couch:1};
+
+function mapBohMenuItem(it){
+  it = it || {};
+  var cat = (it.catIds && it.catIds[0]) || it.category || '';
+  return Object.assign({}, it, {
+    category: cat,
+    photo: it.photoUrl || it.photo || '',
+    description: it.desc || it.description || '',
+    dietaryFlags: it.diet || it.dietary || it.dietaryFlags || [],
+    dietary: it.diet || it.dietary || it.dietaryFlags || [],
+    allergens: it.allergens || [],
+    cookTime: it.cookTime || it.cookMin || 0,
+    cookMin: it.cookMin || it.cookTime || 0,
+    station: it.station || 'Expo',
+    price: Number(it.price)||0,
+    active: it.active !== false
+  });
+}
 
 var SEED_CATEGORIES = [
   {id:'small-plates',name:'Small Plates'},{id:'ceviche',name:'Ceviche'},
@@ -628,23 +674,28 @@ function loadData() {
 
   // Listen directly to BOH shared menu (boh_shared/menu)
   fbDb.collection('boh_shared').doc('menu').onSnapshot(function(doc){
-    if (doc.exists && doc.data().cats) {
+    if (doc.exists && doc.data() && doc.data().cats) {
       var d = doc.data();
-      STATE.menuCategories = d.cats.filter(function(c){return c.visible!==false;});
+      STATE.menuLive = true;
+      STATE.menuCategories = (d.cats||[]).filter(function(c){return c.visible!==false;});
+      STATE.modGroups = d.modGroups || [];
       STATE.menuItems = (d.items||[]).map(function(it){
-        return Object.assign({}, it, {
-          category: (it.catIds||[])[0] || it.category || '',
-          photo: it.photoUrl || it.photo || '',
-          dietary: it.diet || it.dietary || [],
-          allergens: it.allergens || []
-        });
-      });
-    } else {
+        var mapped = mapBohMenuItem(it);
+        if ((!mapped.modifiers || !mapped.modifiers.length) && it.modGroupIds && STATE.modGroups.length) {
+          mapped.modifiers = it.modGroupIds.map(function(gid){
+            var g = STATE.modGroups.filter(function(x){ return x.id===gid; })[0];
+            if (!g) return null;
+            return {group:g.name, options:(g.options||[]).map(function(o){ return o.name+(o.up?(' +$'+o.up):''); })};
+          }).filter(Boolean);
+        }
+        return mapped;
+      }).filter(function(it){ return it.active !== false; });
+    } else if (!STATE.menuLive) {
       STATE.menuCategories = SEED_CATEGORIES;
       STATE.menuItems = SEED_ITEMS;
     }
     if (STATE.activeTab==='order') renderOrder();
-  }, function(){ STATE.menuCategories = SEED_CATEGORIES; STATE.menuItems = SEED_ITEMS; });
+  }, function(){ if (!STATE.menuLive) { STATE.menuCategories = SEED_CATEGORIES; STATE.menuItems = SEED_ITEMS; } });
 
   // Real-time listeners for BOH dining room layout tables
   fbDb.collection('boh_shared').doc('tables').onSnapshot(function(doc){
@@ -652,20 +703,29 @@ function loadData() {
       var d = doc.data();
       if (d.rooms) STATE.rooms = d.rooms;
       if (d.roomObjs) STATE.roomObjs = d.roomObjs;
+      if (!STATE.floorRoom && STATE.rooms && STATE.rooms.length) STATE.floorRoom = STATE.rooms[0].id;
       if (STATE.activeTab==='tables') renderTables();
     }
   }, function(){});
 
   // Real-time listeners for tasting & prix fixe menus from BOH
   fbDb.collection('boh_shared').doc('tasting_menus').onSnapshot(function(doc){
-    if (doc.exists && doc.data().list) STATE.tastingMenus = doc.data().list.filter(function(t){return t.active;});
-    else STATE.tastingMenus = SEED_TASTING_MENUS;
-  }, function(){ STATE.tastingMenus = SEED_TASTING_MENUS; });
+    if (doc.exists && Array.isArray((doc.data()||{}).list)) {
+      STATE.tastingMenus = doc.data().list.filter(function(t){ return t && t.active !== false; });
+    } else if (!STATE.menuLive) {
+      STATE.tastingMenus = SEED_TASTING_MENUS;
+    }
+    if (STATE.activeTab==='order') renderOrder();
+  }, function(){ if (!STATE.menuLive) STATE.tastingMenus = SEED_TASTING_MENUS; });
 
   fbDb.collection('boh_shared').doc('prix_fixe_menus').onSnapshot(function(doc){
-    if (doc.exists && doc.data().list) STATE.prixFixeMenus = doc.data().list.filter(function(p){return p.active;});
-    else STATE.prixFixeMenus = SEED_PRIX_FIXE_MENUS;
-  }, function(){ STATE.prixFixeMenus = SEED_PRIX_FIXE_MENUS; });
+    if (doc.exists && Array.isArray((doc.data()||{}).list)) {
+      STATE.prixFixeMenus = doc.data().list.filter(function(p){ return p && p.active !== false; });
+    } else if (!STATE.menuLive) {
+      STATE.prixFixeMenus = SEED_PRIX_FIXE_MENUS;
+    }
+    if (STATE.activeTab==='order') renderOrder();
+  }, function(){ if (!STATE.menuLive) STATE.prixFixeMenus = SEED_PRIX_FIXE_MENUS; });
 
   fbDb.collection('calls').onSnapshot(snap=>{
     STATE.calls=[]; snap.forEach(d=>STATE.calls.push({id:d.id,...d.data()}));
@@ -740,62 +800,93 @@ function switchTab(tab) {
 }
 
 // ─── Tables (BOH Dining Room Layout & Audit) ───────────────────
+function roomObjects(roomId){
+  var objs = STATE.roomObjs;
+  if (!objs) return [];
+  if (Array.isArray(objs)) return objs;
+  if (roomId && Array.isArray(objs[roomId])) return objs[roomId];
+  var all=[];
+  Object.keys(objs).forEach(function(id){
+    if (Array.isArray(objs[id])) objs[id].forEach(function(o){ all.push(o); });
+  });
+  return all;
+}
+function tableKey(o){
+  if (!o) return '';
+  if (o.num!=null && o.num!=='') return o.num;
+  return o.id || '';
+}
+function tableHasCall(tNum){
+  return STATE.calls.some(function(cl){ return String(cl.table)===String(tNum) && cl.status==='active'; });
+}
+function tableHasOrder(tNum){
+  return STATE.orders.some(function(o2){ return String(o2.table)===String(tNum) && o2.status!=='cleared' && o2.status!=='paid'; });
+}
+function setFloorRoom(roomId){
+  STATE.floorRoom = roomId;
+  renderTables();
+}
 function renderTables() {
   var c=document.getElementById('app-content');
-  var objs = [];
-  if (STATE.roomObjs) {
-    if (Array.isArray(STATE.roomObjs)) {
-      objs = STATE.roomObjs;
-    } else {
-      for (var rId in STATE.roomObjs) {
-        var arr = STATE.roomObjs[rId];
-        if (Array.isArray(arr)) {
-          arr.forEach(function(o){ objs.push(o); });
-        }
-      }
-    }
-  }
+  var rooms = Array.isArray(STATE.rooms) ? STATE.rooms : [];
+  if (!STATE.floorRoom && rooms.length) STATE.floorRoom = rooms[0].id;
+  var roomId = STATE.floorRoom || (rooms[0] && rooms[0].id);
+  var objs = roomObjects(roomId);
 
-  var html='<div class="dining-layout-container" style="padding:1rem;max-width:1200px;margin:0 auto;">';
-  html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;"><div><h2 style="margin:0;font-size:1.2rem;color:var(--primary-light);">Dining Room Layout (BOH Synced)</h2><p style="margin:0;font-size:0.8rem;color:var(--text-muted);">Interactive floor plan synced directly from Back of House.</p></div><div style="font-size:0.85rem;color:var(--text-muted);">Server: <strong style="color:var(--text);">'+(STATE.currentServer?STATE.currentServer.name+' ('+STATE.currentServer.code+')':'Server')+'</strong></div></div>';
+  var html='<div class="floor-wrap">';
+  html+='<div class="floor-head"><div><h2>Dining room</h2><p>Floor plan from Back of House. Tap a table to start an order.</p></div><div style="font-size:0.8rem;color:var(--text-muted);text-align:right;">'+(STATE.currentServer?STATE.currentServer.name:'Server')+'</div></div>';
 
-  if (objs.length > 0) {
-    html+='<div style="position:relative;width:1000px;height:700px;background:#13131a;border:1px solid rgba(201,168,76,0.3);border-radius:12px;overflow:auto;margin:0 auto;box-shadow:inset 0 0 40px rgba(0,0,0,0.6);">';
-    objs.forEach(function(o){
-      var left = o.x || 20, top = o.y || 20, width = o.w || 120, height = o.h || 120, rot = o.rot || 0;
-      var style = 'position:absolute;left:'+left+'px;top:'+top+'px;width:'+width+'px;height:'+height+'px;transform:rotate('+rot+'deg);box-sizing:border-box;';
-      
-      if (o.type === 'table') {
-        var tNum = o.num || o.id;
-        var hasCall = STATE.calls.some(function(cl){return cl.table==tNum&&cl.status==='active';});
-        var hasOrder = STATE.orders.some(function(o2){return o2.table==tNum&&o2.status!=='cleared'&&o2.status!=='paid';});
-        var bg = hasCall ? 'rgba(230,80,80,0.25)' : (hasOrder ? 'rgba(220,165,50,0.25)' : 'rgba(201,168,76,0.12)');
-        var borderColor = hasCall ? '#E65050' : (hasOrder ? '#DCA532' : 'rgba(201,168,76,0.4)');
-        var shapeRadius = o.shape === 'round' ? '50%' : '14px';
-        
-        html+='<div onclick="selectTable(\'tNum\')" style="'+style+'border-radius:'+shapeRadius+';background:'+bg+';border:2px solid '+borderColor+';cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0.5rem;text-align:center;box-shadow:0 4px 12px rgba(0,0,0,0.4);transition:all 0.2s;">'+
-          '<div style="font-size:1.1rem;font-weight:700;color:#F3ECDC;">Table '+tNum+'</div>'+
-          '<div style="font-size:0.7rem;color:rgba(243,236,220,0.7);">'+(o.seats||4)+' seats</div>'+
-          '<div style="font-size:0.7rem;font-weight:600;color:'+(hasCall?'#E65050':hasOrder?'#DCA532':'#5FB48A')+';">'+(hasCall?'🔔 CALL':hasOrder?'Active':'Open')+'</div>'+
-          (o.server?'<div style="font-size:0.65px;color:rgba(243,236,220,0.6);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%;">Svr: '+o.server+'</div>':'')+
-        '</div>';
-      } else if (o.type === 'wall' || o.type === 'bar' || o.type === 'door' || o.type === 'plant' || o.type === 'host' || o.type === 'station' || o.type === 'label' || o.type === 'stage' || o.type === 'kitchen' || o.type === 'privateroom' || o.type === 'kiosk' || o.type === 'store') {
-        html+='<div style="'+style+'border:1px dashed rgba(255,255,255,0.15);border-radius:8px;background:rgba(255,255,255,0.03);display:flex;align-items:center;justify-content:center;color:rgba(243,236,220,0.5);font-size:0.75rem;pointer-events:none;">'+(o.label||o.type)+'</div>';
-      } else {
-        html+='<div style="'+style+'border:1px solid rgba(255,255,255,0.15);border-radius:8px;background:rgba(255,255,255,0.03);"></div>';
-      }
+  if (rooms.length > 1) {
+    html+='<div class="floor-room-tabs">';
+    rooms.forEach(function(rm){
+      html+='<button class="floor-room-tab'+(rm.id===roomId?' active':'')+'" onclick="setFloorRoom('+JSON.stringify(String(rm.id))+')">'+(rm.name||rm.id)+'</button>';
     });
     html+='</div>';
+  }
+
+  if (objs.length) {
+    var maxX=320, maxY=240;
+    objs.forEach(function(o){
+      maxX=Math.max(maxX, (o.x||0)+(o.w||80)+24);
+      maxY=Math.max(maxY, (o.y||0)+(o.h||80)+24);
+    });
+    var availW = Math.max(280, (c.clientWidth||window.innerWidth||360) - 28);
+    var scale = Math.min(1, availW / maxX);
+    html+='<div class="floor-stage" style="height:'+Math.round(maxY*scale)+'px">';
+    html+='<div class="floor-canvas" style="width:'+maxX+'px;height:'+maxY+'px;transform:scale('+scale+');transform-origin:top left;">';
+    objs.forEach(function(o){
+      var left=o.x||20, top=o.y||20, width=o.w||70, height=o.h||70, rot=o.rot||0;
+      var style='left:'+left+'px;top:'+top+'px;width:'+width+'px;height:'+height+'px;transform:rotate('+rot+'deg);';
+      var tNum=tableKey(o);
+      if (SEATABLE[o.type]) {
+        var hasCall=tableHasCall(tNum);
+        var hasOrder=tableHasOrder(tNum);
+        var bg=hasCall?'rgba(230,80,80,0.28)':(hasOrder?'rgba(220,165,50,0.28)':'rgba(201,168,76,0.14)');
+        var border=hasCall?'#E65050':(hasOrder?'#DCA532':'rgba(201,168,76,0.45)');
+        var radius=o.shape==='round'||o.type==='stool'?'50%':(o.type==='outdoor'?'10px':'12px');
+        var status=hasCall?'CALL':hasOrder?'Active':(o.status&&o.status!=='open'?o.status:'Open');
+        var statusColor=hasCall?'#E65050':hasOrder?'#DCA532':'#5FB48A';
+        html+='<div class="floor-obj seatable" onclick="selectTable('+JSON.stringify(String(tNum))+')" style="'+style+'border-radius:'+radius+';background:'+bg+';border:2px solid '+border+';">'+
+          '<div class="floor-tnum">'+tNum+'</div>'+
+          '<div class="floor-tsub">'+(o.seats||(o.type==='stool'?1:4))+' seats</div>'+
+          '<div class="floor-tstat" style="color:'+statusColor+'">'+status+'</div>'+
+        '</div>';
+      } else {
+        html+='<div class="floor-obj" style="'+style+'border:1px dashed rgba(255,255,255,0.16);border-radius:8px;background:rgba(255,255,255,0.04);color:rgba(243,236,220,0.5);font-size:0.7rem;pointer-events:none;">'+(o.label||o.type)+'</div>';
+      }
+    });
+    html+='</div></div>';
+    html+='<div class="floor-legend"><span><span class="floor-dot" style="background:#5FB48A"></span>Open</span><span><span class="floor-dot" style="background:#DCA532"></span>Active order</span><span><span class="floor-dot" style="background:#E65050"></span>Guest call</span></div>';
   } else {
-    // Fallback 1-20 grid
-    html+='<div class="table-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:1rem;">';
+    html+='<p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:0.8rem;">No BOH floor plan yet. Showing numbered tables.</p>';
+    html+='<div class="table-grid">';
     for (var i=1;i<=20;i++) {
-      var hasCall=STATE.calls.some(function(cl){return cl.table==i&&cl.status==='active';});
-      var hasOrder=STATE.orders.some(function(o){return o.table==i&&o.status!=='cleared'&&o.status!=='paid';});
+      var hasCall=tableHasCall(i);
+      var hasOrder=tableHasOrder(i);
       var cls='table-card'+(hasCall?' has-call':'')+(hasOrder?' has-order':'');
-      html+='<div class="'+cls+'" onclick="selectTable(\'i\')" style="border-radius:12px;padding:1rem;background:var(--card-bg);border:1px solid var(--border);cursor:pointer;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.2);">'+
-        '<div class="table-num" style="font-size:1.4rem;font-weight:700;color:var(--primary-light);">Table '+i+'</div>'+
-        '<div class="table-status" style="font-weight:600;font-size:0.85rem;color:'+(hasCall?'var(--error)':hasOrder?'var(--warning)':'var(--success)')+';">'+(hasCall?'🔔 CALLING':hasOrder?'Active':'Open')+'</div>'+
+      html+='<div class="'+cls+'" onclick="selectTable('+i+')">'+
+        '<div class="table-num">'+i+'</div>'+
+        '<div class="table-status">'+(hasCall?'CALLING':hasOrder?'Active':'Open')+'</div>'+
       '</div>';
     }
     html+='</div>';
@@ -805,26 +896,25 @@ function renderTables() {
 }
 
 function selectTable(t) {
-  var gc = prompt('Enter number of guests for Table ' + t + ':', '2');
-  if (gc === null) return; // cancelled
+  var gc = prompt('Guests for Table ' + t + ':', String(STATE.guestCount||2));
+  if (gc === null) return;
   STATE.selectedTable = t;
-  STATE.guestCount = parseInt(gc) || 2;
-  
+  STATE.guestCount = parseInt(gc,10) || 2;
   if (fbReady) {
-    STATE.calls.filter(cl=>cl.table==t&&cl.status==='active').forEach(cl=>{
+    STATE.calls.filter(function(cl){ return String(cl.table)===String(t) && cl.status==='active'; }).forEach(function(cl){
       fbDb.collection('calls').doc(cl.id).update({status:'acknowledged'});
     });
   }
-  toast('Table ' + t + ' selected (' + STATE.guestCount + ' guests)');
+  toast('Table ' + t + ' · ' + STATE.guestCount + ' guests');
   switchTab('order');
 }
 
 // ─── Order ──────────────────────────────────────────────────────
 function renderOrder() {
   var c=document.getElementById('app-content');
-  var cats=STATE.menuCategories.length?STATE.menuCategories:SEED_CATEGORIES;
-  var items=STATE.menuItems.length?STATE.menuItems:SEED_ITEMS;
-  if (!STATE.orderCat) STATE.orderCat=cats[0].id;
+  var cats=STATE.menuCategories.length?STATE.menuCategories:(STATE.menuLive?[]:SEED_CATEGORIES);
+  var items=STATE.menuItems.length?STATE.menuItems:(STATE.menuLive?[]:SEED_ITEMS);
+  if (!STATE.orderCat && cats.length) STATE.orderCat=cats[0].id;
 
   var html='<div class="order-section">';
   html+='<h3>Table '+STATE.selectedTable+' — New Order</h3>';
@@ -843,20 +933,28 @@ function renderOrder() {
   if (STATE.orderCat==='__tasting__') {
     html+=renderTastingItems();
   } else {
-    var filtered=items.filter(i=>i.category===STATE.orderCat);
+    var filtered=items.filter(function(i){
+      if (i.catIds && i.catIds.length) return i.catIds.indexOf(STATE.orderCat)>-1;
+      return i.category===STATE.orderCat;
+    });
+    if (!filtered.length) {
+      html+='<p style="color:var(--text-muted);font-size:0.85rem;padding:1rem 0;">No dishes in this category from BOH yet.</p>';
+    }
     filtered.forEach(item=>{
-      var hasDesc = item.description || item.allergens || item.dietaryFlags;
+      var hasDesc = item.description || item.desc || (item.allergens&&item.allergens.length) || (item.dietaryFlags&&item.dietaryFlags.length);
+      var cook = item.cookTime || item.cookMin || 0;
       html+='<div class="menu-item-row" onclick="addItem(\''+item.id+'\')">'+
+        (item.photo?'<img class="item-thumb" src="'+item.photo+'" alt="">':'')+
         '<div class="item-info"><div class="item-name">'+item.name+'</div>'+
-        '<div class="item-meta">'+item.station+' · '+item.cookTime+'min</div>'+
+        '<div class="item-meta">'+(item.station||'')+' · '+cook+'min</div>'+
         (hasDesc ? '<div class="item-desc-toggle" onclick="event.stopPropagation();toggleItemDesc(\''+item.id+'\')">[i] details</div>' : '')+
         '</div>'+
-        '<div class="item-price">$'+item.price.toFixed(2)+'</div>'+
+        '<div class="item-price">$'+(Number(item.price)||0).toFixed(2)+'</div>'+
       '</div>';
       // Expandable description panel (hidden by default)
       if (hasDesc && STATE._expandedItems && STATE._expandedItems[item.id]) {
         html+='<div class="item-desc-expanded">';
-        if (item.description) html+='<div>'+item.description+'</div>';
+        if (item.description || item.desc) html+='<div>'+(item.description||item.desc)+'</div>';
         if (item.allergens && item.allergens.length) html+='<div class="desc-allergens">⚠ Allergens: '+item.allergens.join(', ')+'</div>';
         if (item.dietaryFlags && item.dietaryFlags.length) html+='<div class="desc-dietary">'+item.dietaryFlags.join(' · ')+'</div>';
         html+='</div>';
