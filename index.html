@@ -281,8 +281,12 @@ body { font-family:var(--font); color:var(--text); background:var(--bg); -webkit
 .floor-room-tabs { display:flex; gap:8px; overflow-x:auto; padding-bottom:0.4rem; margin-bottom:0.75rem; -webkit-overflow-scrolling:touch; }
 .floor-room-tab { flex:0 0 auto; padding:0.45rem 0.8rem; border-radius:999px; border:1px solid var(--border); background:var(--surface); color:var(--text-secondary); font-size:0.78rem; cursor:pointer; }
 .floor-room-tab.active { border-color:var(--primary); background:var(--primary-glow); color:var(--text); font-weight:600; }
-.floor-stage { position:relative; width:100%; overflow:hidden; touch-action:none; background:#13131a; border:1px solid rgba(201,168,76,0.3); border-radius:12px; box-shadow:inset 0 0 40px rgba(0,0,0,0.6); min-height:280px; height:min(58vh, 520px); }
-.floor-canvas { position:absolute; left:0; top:0; transform-origin:0 0; will-change:transform; }
+.floor-stage { position:relative; width:100%; overflow:hidden; touch-action:none; background:#0F1B2D; border:1px solid rgba(201,168,76,0.3); border-radius:12px; box-shadow:inset 0 0 60px rgba(0,0,0,0.55); min-height:320px; height:min(68vh, 680px); }
+.floor-canvas { position:absolute; left:0; top:0; transform-origin:0 0; will-change:transform;
+  background:
+    linear-gradient(rgba(201,168,76,0.05) 1px,transparent 1px) 0 0/40px 40px,
+    linear-gradient(90deg,rgba(201,168,76,0.05) 1px,transparent 1px) 0 0/40px 40px;
+}
 .floor-obj { position:absolute; box-sizing:border-box; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:0.2rem; }
 .floor-obj.seatable { cursor:pointer; box-shadow:0 4px 12px rgba(0,0,0,0.4); z-index:2; -webkit-tap-highlight-color:rgba(184,115,51,0.35); touch-action:none; }
 .floor-zoombar { display:flex; gap:8px; align-items:center; margin:0.55rem 0 0.7rem; }
@@ -324,9 +328,27 @@ body.hh-on.floor-drawing .floor-stage { outline:2px dashed var(--primary); }
   width:100%; padding:0.7rem 0.8rem; border:1px solid var(--border); border-radius:12px;
   background:var(--surface-2); color:var(--text); font-size:1rem;
 }
-.floor-tnum { font-size:0.85rem; font-weight:700; color:#F3ECDC; line-height:1.1; }
-.floor-tsub { font-size:0.62rem; color:rgba(243,236,220,0.7); }
+.floor-tnum, .f-tnum { font-size:0.85rem; font-weight:700; color:#F3ECDC; line-height:1.1; }
+.floor-tsub, .f-tsub { font-size:0.62rem; color:rgba(243,236,220,0.7); }
 .floor-tstat { font-size:0.62rem; font-weight:600; margin-top:1px; }
+.f-table { width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; border:2.5px solid; font-weight:700; line-height:1; }
+.f-table.round { border-radius:50%; }
+.f-table.square { border-radius:12px; }
+.f-table.rect { border-radius:10px; }
+.f-note { font-size:8px; font-weight:700; color:#E0A36B; margin-top:2px; max-width:90%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.f-wall { width:100%; height:100%; background:linear-gradient(180deg,#6b5a3a,#4a3d26); border-radius:3px; }
+.f-bar { width:100%; height:100%; background:linear-gradient(180deg,#1D3250,#13233A); border:2.5px solid #C9A84C; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#C9A84C; }
+.f-door { width:100%; height:100%; background:#0F1B2D; border:2px solid rgba(201,168,76,0.4); border-radius:50% 0 0 0; display:flex; align-items:center; justify-content:center; font-size:18px; }
+.f-plant { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:22px; }
+.f-host { width:100%; height:100%; background:#1D3250; border:1.5px solid #C9A84C; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#C9A84C; }
+.f-station { width:100%; height:100%; background:rgba(155,196,226,0.12); border:2px dashed #9BC4E2; border-radius:8px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:10px; font-weight:700; color:#9BC4E2; text-align:center; padding:4px; }
+.f-couch { width:100%; height:100%; background:#5a4126; border-radius:18px 18px 6px 6px; border:2px solid #3f2d18; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#f3ecdc; font-size:10px; font-weight:700; }
+.f-stool { width:100%; height:100%; border-radius:50%; border:2.5px solid; display:flex; align-items:center; justify-content:center; font-weight:700; }
+.f-outdoor { width:100%; height:100%; border-radius:10px; border:2px dashed; display:flex; flex-direction:column; align-items:center; justify-content:center; font-weight:700; }
+.f-zone { width:100%; height:100%; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:11px; font-weight:700; text-align:center; padding:6px; }
+.f-curve { width:100%; height:100%; background:#1D3250; border-radius:50% 50% 0 0 / 100% 100% 0 0; border:2px solid rgba(201,168,76,0.4); border-bottom:none; }
+.f-exit { width:100%; height:100%; background:#1a2430; border:2px solid #E07A6B; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#E07A6B; }
+.floor-poly { position:absolute; pointer-events:none; z-index:0; overflow:visible; }
 .floor-legend { display:flex; flex-wrap:wrap; gap:0.7rem; margin-top:0.7rem; font-size:0.7rem; color:var(--text-muted); }
 .floor-dot { width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:4px; }
 .floor-furn, .floor-zone-box, .floor-bar, .floor-host, .floor-svc {
@@ -739,6 +761,8 @@ var STATE = {
   pendingItem: null,
   pendingSend: null,
   stations: [],
+  staff: [],
+  guests: [],
   bar: [],
   wines: [],
   retail: [],
@@ -1245,8 +1269,24 @@ function loadData() {
       STATE.stations = Array.isArray(d.stations) ? d.stations : [];
       STATE.stations = mergeStationsFromFloor(STATE.stations, STATE.roomObjs);
       if (!STATE.floorRoom && STATE.rooms && STATE.rooms.length) STATE.floorRoom = STATE.rooms[0].id;
+      if (STATE.currentServer) {
+        if (!isManager() && STATE.floorFilter!=='mine') STATE.floorFilter='mine';
+        if (isManager() && (STATE.floorFilter==='all' || !STATE.floorFilter) && STATE.rooms && STATE.rooms.length) {
+          STATE.floorFilter='room:'+STATE.rooms[0].id;
+        }
+      }
       if (STATE.activeTab==='tables') renderTables();
     }
+  }, function(){});
+
+  fbDb.collection('boh_shared').doc('staff_clock').onSnapshot(function(doc){
+    if (doc.exists && doc.data()) {
+      var list=doc.data().list;
+      if (Array.isArray(list)) STATE.staff=list;
+    }
+  }, function(){});
+  fbDb.collection('boh_shared').doc('guests').onSnapshot(function(doc){
+    if (doc.exists && doc.data() && Array.isArray(doc.data().list)) STATE.guests=doc.data().list;
   }, function(){});
 
   // Real-time listeners for tasting & prix fixe menus from BOH
@@ -1317,11 +1357,36 @@ function pinKey(k) {
 function updateDots() {
   document.querySelectorAll('#pin-display .pin-dot').forEach((d,i)=>d.classList.toggle('filled',i<pin.length));
 }
+function bohRole(s){
+  var d=String((s&&s.code)||'')[0];
+  if (d==='5') return 'Manager';
+  if (d==='4') return 'Front of House';
+  if (d==='3') return 'Food Master';
+  if (s && s.role) return s.role;
+  return 'Staff';
+}
+function allStaffForLogin(){
+  var byCode={};
+  SEED_STAFF.forEach(function(s){ byCode[s.code]=s; });
+  (STATE.staff||[]).forEach(function(s){
+    if (!s || !s.code || s.status==='inactive') return;
+    byCode[String(s.code)]={ code:String(s.code), name:s.name, role:bohRole(s), id:s.id };
+  });
+  return Object.keys(byCode).map(function(k){ return byCode[k]; });
+}
+function defaultFloorFilter(){
+  if (!isManager()) return 'mine';
+  var rooms=STATE.rooms||[];
+  if (rooms.length) return 'room:'+rooms[0].id;
+  return 'all';
+}
 function attemptLogin() {
-  var staff=SEED_STAFF.find(s=>s.code===pin);
+  var staff=allStaffForLogin().find(function(s){ return String(s.code)===pin; });
   if (!staff) { document.getElementById('pin-error').textContent='Invalid code'; pin=''; updateDots(); return; }
   document.getElementById('pin-error').textContent='';
   STATE.currentServer=staff;
+  STATE.floorFilter=defaultFloorFilter();
+  STATE.floorFitDone=false;
   document.getElementById('user-name').textContent=staff.name;
   document.getElementById('user-role').textContent=staff.role;
   showScreen('app-screen');
@@ -1470,13 +1535,38 @@ function tableCenterInRect(o, rect){
   var cy=(o.y||0)+((o.h||70)/2);
   return cx>=rect.x && cy>=rect.y && cx<=rect.x+rect.w && cy<=rect.y+rect.h;
 }
+function pointInPoly(x, y, pts){
+  if (!pts || pts.length<3) return false;
+  var inside=false;
+  for (var i=0, j=pts.length-1; i<pts.length; j=i++) {
+    var xi=Number(pts[i].x), yi=Number(pts[i].y), xj=Number(pts[j].x), yj=Number(pts[j].y);
+    var hit=((yi>y)!==(yj>y)) && (x < (xj-xi)*(y-yi)/((yj-yi)||1e-9) + xi);
+    if (hit) inside=!inside;
+  }
+  return inside;
+}
+function stationPoints(st){
+  if (!st) return [];
+  if (Array.isArray(st.points) && st.points.length>=3) return st.points;
+  if (st.x==null || st.w==null || st.h==null) return [];
+  return [
+    {x:st.x, y:st.y},
+    {x:st.x+st.w, y:st.y},
+    {x:st.x+st.w, y:st.y+st.h},
+    {x:st.x, y:st.y+st.h}
+  ];
+}
 function tablesInsideStation(st){
   if (!st) return [];
   var objs=roomObjectList(st.room);
   var ids=[];
+  var pts=stationPoints(st);
   objs.forEach(function(o){
     if (!SEATABLE[o.type]) return;
-    if (!tableCenterInRect(o, st)) return;
+    var cx=(o.x||0)+((o.w||70)/2);
+    var cy=(o.y||0)+((o.h||70)/2);
+    var hit=pts.length>=3 ? pointInPoly(cx, cy, pts) : tableCenterInRect(o, st);
+    if (!hit) return;
     if (o.id!=null && o.id!=='') ids.push(String(o.id));
     var k=tableKey(o);
     if (k!=='' && ids.indexOf(String(k))<0) ids.push(String(k));
@@ -1496,7 +1586,14 @@ function tableInStation(o, st){
   var ids=stationTableIds(st);
   if (o.id!=null && ids.indexOf(String(o.id))>=0) return true;
   if (ids.indexOf(String(tableKey(o)))>=0) return true;
-  return !!(st.x!=null && st.w && st.h && String(objectRoomId(o)||st.room)===String(st.room||objectRoomId(o)) && tableCenterInRect(o, st));
+  if (String(objectRoomId(o)||st.room)!==String(st.room||objectRoomId(o))) return false;
+  var pts=stationPoints(st);
+  if (pts.length>=3) {
+    var cx=(o.x||0)+((o.w||70)/2);
+    var cy=(o.y||0)+((o.h||70)/2);
+    return pointInPoly(cx, cy, pts);
+  }
+  return !!(st.x!=null && st.w && st.h && tableCenterInRect(o, st));
 }
 function mergeStationsFromFloor(list, roomObjs){
   list = (list||[]).slice();
@@ -1511,6 +1608,7 @@ function mergeStationsFromFloor(list, roomObjs){
     else if (!st.name && !st.number) st.name=o.label||'Station';
     st.room=room||st.room||'';
     st.x=o.x; st.y=o.y; st.w=o.w; st.h=o.h;
+    if (Array.isArray(o.points) && o.points.length>=3) st.points=o.points;
     if (o.server) st.server=o.server;
     if (o.serverCode) st.serverCode=o.serverCode;
     if (!st.tableIds || !st.tableIds.length) st.tableIds=tablesInsideStation(st);
@@ -1524,22 +1622,27 @@ function mergeStationsFromFloor(list, roomObjs){
   }
   return list;
 }
+function staffMatchesRef(staff, ref){
+  if (!staff || ref==null || ref==='') return false;
+  ref=String(ref);
+  var name=String(staff.name||'');
+  var code=String(staff.code||'');
+  var id=String(staff.id||'');
+  if (ref===code || ref===id || ref===name) return true;
+  if (name && ref.toLowerCase().indexOf(name.toLowerCase())>-1) return true;
+  var live=(STATE.staff||[]).filter(function(x){ return x && (String(x.id)===ref || String(x.code)===ref); })[0];
+  return !!(live && (String(live.code)===code || String(live.id)===id || String(live.name)===name));
+}
 function serverOwnsStation(st, staff){
   staff = staff || STATE.currentServer;
   if (!st || !staff) return false;
-  var name=String(staff.name||'');
-  var code=String(staff.code||'');
-  if (st.serverCode && String(st.serverCode)===code) return true;
-  if (st.server && (String(st.server)===code || String(st.server)===name || (name && String(st.server).toLowerCase().indexOf(name.toLowerCase())>-1))) return true;
-  return false;
+  if (st.serverCode && String(st.serverCode)===String(staff.code||'')) return true;
+  return staffMatchesRef(staff, st.server);
 }
 function serverOwnsTable(o, staff){
   staff = staff || STATE.currentServer;
   if (!o || !staff) return false;
-  var s=String(o.server||'');
-  var name=String(staff.name||'');
-  var code=String(staff.code||'');
-  if (s && (s===code || s===name || (name && s.toLowerCase().indexOf(name.toLowerCase())>-1))) return true;
+  if (staffMatchesRef(staff, o.server)) return true;
   var st=stationForTable(tableKey(o), o);
   return !!(st && serverOwnsStation(st, staff));
 }
@@ -1573,7 +1676,6 @@ function visibleFloorObjects(){
   if (filter==='all') return all;
   if (filter==='mine') {
     var mine=all.filter(function(o){ return SEATABLE[o.type] && serverOwnsTable(o, STATE.currentServer); });
-    if (!mine.length) mine=all.filter(function(o){ return SEATABLE[o.type]; });
     var mineRooms={};
     mine.forEach(function(o){ if (o._room) mineRooms[String(o._room)]=1; });
     return mine.concat(layoutObjectsForRooms(all, Object.keys(mineRooms)));
@@ -1605,15 +1707,23 @@ function stationColor(st){
   return STATION_COLORS[i%STATION_COLORS.length];
 }
 function stationOverlay(st){
-  if (!st || st.x==null || !st.w || !st.h) return null;
+  var pts=stationPoints(st);
+  if (!pts.length && (st.x==null || !st.w || !st.h)) return null;
   var offsets=roomPackOffsets();
   var xOff=offsets[st.room]||0;
   var col=stationColor(st);
   var num=stationNumber(st);
   var lbl='Station'+(num!==''?' '+num:'')+(st.server?' · '+st.server:'');
+  var shifted=pts.map(function(p){ return {x:(p.x||0)+xOff, y:p.y||0}; });
+  var xs=shifted.map(function(p){ return p.x; });
+  var ys=shifted.map(function(p){ return p.y; });
+  var x=st.x==null?Math.min.apply(null,xs):(st.x||0)+xOff;
+  var y=st.y==null?Math.min.apply(null,ys):st.y;
+  var w=st.w||(Math.max.apply(null,xs)-x);
+  var h=st.h||(Math.max.apply(null,ys)-y);
   return {
     type:'waiterstation', id:st.id, number:num, label:lbl, server:st.server||'',
-    x:(st.x||0)+xOff, y:st.y||0, w:st.w, h:st.h, _room:st.room, _stationBorder:1, _color:col
+    x:x, y:y, w:w, h:h, points:shifted, _room:st.room, _stationBorder:1, _color:col
   };
 }
 function visibleStationOverlays(objs){
@@ -1700,15 +1810,14 @@ function floorResetView(){
     return;
   }
   var fit=Math.min(sw/cw, sh/ch);
-  var vis=visibleFloorObjects().filter(function(o){ return SEATABLE[o.type]; });
-  var minDim=Infinity;
-  vis.forEach(function(o){ minDim=Math.min(minDim, o.w||70, o.h||70); });
-  var isolated=STATE.floorFilter && STATE.floorFilter!=='all';
-  if (isFinite(minDim) && vis.length && (isolated || vis.length<=16)) {
-    var want=isolated ? 64 : 56;
-    fit=Math.max(fit, want/minDim);
+  var isolated=STATE.floorFilter==='mine' || String(STATE.floorFilter||'').indexOf('station:')===0;
+  if (isolated) {
+    var vis=visibleFloorObjects().filter(function(o){ return SEATABLE[o.type]; });
+    var minDim=Infinity;
+    vis.forEach(function(o){ minDim=Math.min(minDim, o.w||70, o.h||70); });
+    if (isFinite(minDim) && vis.length) fit=Math.max(fit, 64/minDim);
   }
-  STATE.floorZoom=Math.max(0.45, Math.min(8, fit));
+  STATE.floorZoom=Math.max(0.35, Math.min(8, fit*0.98));
   STATE.floorPanX=(sw - cw*STATE.floorZoom)/2;
   STATE.floorPanY=(sh - ch*STATE.floorZoom)/2;
   STATE.floorFitDone=true;
@@ -1868,18 +1977,21 @@ function renderTables() {
   allFloorObjects().forEach(function(o){ if (SEATABLE[o.type] && serverOwnsTable(o, STATE.currentServer)) mineCount++; });
 
   var html='<div class="floor-wrap">';
-  html+='<div class="floor-head"><div><h2>Dining room</h2><p>Layout and waiter stations come from BOH. Pinch or tap + to enlarge. Isolate your station for larger tables.</p></div><div style="font-size:0.8rem;color:var(--text-muted);text-align:right;">'+(STATE.currentServer?STATE.currentServer.name:'Server')+'</div></div>';
+  var mgr=isManager();
+  html+='<div class="floor-head"><div><h2>'+(mgr?'Dining room':'Your tables')+'</h2><p>'+(mgr?'Same rooms as BOH. Open a room, then tap any table to write the order. Pinch or + to zoom.':'Only the tables on your station. Tap one to start the order.')+'</p></div><div style="font-size:0.8rem;color:var(--text-muted);text-align:right;">'+(STATE.currentServer?STATE.currentServer.name:'Server')+'</div></div>';
 
   html+='<div class="floor-room-tabs">';
-  html+='<button class="floor-room-tab'+(STATE.floorFilter==='all'?' active':'')+'" onclick="setFloorFilter(\'all\')">All</button>';
-  html+='<button class="floor-room-tab'+(STATE.floorFilter==='mine'?' active':'')+'" onclick="setFloorFilter(\'mine\')">My station'+(mineCount?' ('+mineCount+')':'')+'</button>';
-  html+='<button class="floor-room-tab" onclick="openStationEditor()">Stations'+(stations.length?' ('+stations.length+')':'')+'</button>';
-  rooms.forEach(function(rm){
-    html+='<button class="floor-room-tab'+(STATE.floorFilter==='room:'+rm.id?' active':'')+'" onclick=\'setFloorFilter('+JSON.stringify('room:'+rm.id)+')\'>'+(rm.name||rm.id)+'</button>';
-  });
-  stations.forEach(function(st){
-    html+='<button class="floor-room-tab'+(STATE.floorFilter==='station:'+st.id?' active':'')+'" onclick=\'setFloorFilter('+JSON.stringify('station:'+st.id)+')\'>'+esc(stationLabel(st))+'</button>';
-  });
+  if (mgr) {
+    rooms.forEach(function(rm){
+      html+='<button class="floor-room-tab'+(STATE.floorFilter==='room:'+rm.id?' active':'')+'" onclick=\'setFloorFilter('+JSON.stringify('room:'+rm.id)+')\'>'+esc(rm.name||rm.id)+'</button>';
+    });
+    stations.forEach(function(st){
+      html+='<button class="floor-room-tab'+(STATE.floorFilter==='station:'+st.id?' active':'')+'" onclick=\'setFloorFilter('+JSON.stringify('station:'+st.id)+')\'>'+esc(stationLabel(st))+'</button>';
+    });
+    html+='<button class="floor-room-tab" onclick="openStationEditor()">Stations'+(stations.length?' ('+stations.length+')':'')+'</button>';
+  } else {
+    html+='<button class="floor-room-tab active">My station'+(mineCount?' ('+mineCount+')':'')+'</button>';
+  }
   html+='</div>';
 
   html+='<div class="floor-zoombar">';
@@ -1912,9 +2024,7 @@ function renderTables() {
       var left=o.x||20, top=o.y||20, width=o.w||70, height=o.h||70;
       var style='left:'+left+'px;top:'+top+'px;width:'+width+'px;height:'+height+'px;';
       if (o.type==='section' || o.type==='waiterstation' || o._stationBorder) {
-        var col=o._color||stationColor(o);
-        html+='<div class="floor-obj floor-station" style="'+style+'border:2px dashed '+col+';background:'+col+'14;">'+
-          '<span class="floor-station-tag" style="background:'+col+';">'+esc(o.label||stationLabel(o))+'</span></div>';
+        html+=stationShapeHtml(o, left, top, width, height);
         return;
       }
       style+='transform:rotate('+(o.rot||0)+'deg);';
@@ -1928,18 +2038,20 @@ function renderTables() {
         var inAssign=!!(STATE.stationAssignId && stationTableIds(stations.filter(function(s){ return s.id===STATE.stationAssignId; })[0]).indexOf(String(tNum))>-1);
         var bg=hasCall?'rgba(230,80,80,0.28)':(hasOrder?'rgba(220,165,50,0.28)':(inAssign||mine?'rgba(201,168,76,0.22)':'rgba(201,168,76,0.12)'));
         var border=hasCall?'#E65050':(hasOrder?'#DCA532':(stnCol||(inAssign?'#F3ECDC':(mine?'#C9A84C':'rgba(201,168,76,0.35)'))));
-        var radius=o.shape==='round'||o.type==='stool'?'50%':(o.type==='outdoor'?'10px':'12px');
         var status=hasCall?'CALL':hasOrder?'Active':(o.status&&o.status!=='open'?o.status:'Open');
         var statusColor=hasCall?'#E65050':hasOrder?'#DCA532':'#5FB48A';
-        var extra=mine?'':'opacity:0.82;';
-        if (stnCol) extra+='box-shadow:0 0 0 2px '+stnCol+'66, 0 4px 12px rgba(0,0,0,0.4);';
-        var stnBadge=stn?'<div class="floor-tstation" style="background:'+stnCol+';">S'+esc(String(stationNumber(stn)))+'</div>':'';
-        html+='<div class="floor-obj seatable" data-table="'+esc(String(tNum))+'" onclick=\'tapTable('+JSON.stringify(String(tNum))+')\' style="'+style+extra+'border-radius:'+radius+';background:'+bg+';border:2px solid '+border+';">'+
-          stnBadge+
-          '<div class="floor-tnum">'+esc(String(tNum))+'</div>'+
-          '<div class="floor-tsub">'+(o.seats||(o.type==='stool'?1:4))+' seats</div>'+
-          '<div class="floor-tstat" style="color:'+statusColor+'">'+status+'</div>'+
-        '</div>';
+        var extra=mine?'':'opacity:0.9;';
+        var shape=o.shape||(o.type==='stool'?'round':(o.type==='outdoor'?'rect':'square'));
+        var note=tableNote(o);
+        var innerCls=o.type==='couch'?'f-couch':(o.type==='stool'?'f-stool':(o.type==='outdoor'?'f-outdoor':('f-table '+shape)));
+        html+='<div class="floor-obj seatable" data-table="'+esc(String(tNum))+'" onclick=\'tapTable('+JSON.stringify(String(tNum))+')\' style="'+style+extra+'">'+
+          (stn?'<div class="floor-tstation" style="background:'+stnCol+';">S'+esc(String(stationNumber(stn)))+'</div>':'')+
+          '<div class="'+innerCls+'" style="background:'+bg+';border-color:'+border+';color:#F3ECDC;">'+
+            '<span class="f-tnum">'+esc(String(tNum))+'</span>'+
+            '<span class="f-tsub">'+(o.seats||(o.type==='stool'?1:4))+' seats</span>'+
+            '<span class="floor-tstat" style="color:'+statusColor+'">'+status+'</span>'+
+            (note?'<span class="f-note">'+esc(note)+'</span>':'')+
+          '</div></div>';
       } else {
         html+=layoutObjectHtml(o, style);
       }
@@ -1956,8 +2068,10 @@ function renderTables() {
     }
     html+='<div class="floor-legend"><span><span class="floor-dot" style="background:#5FB48A"></span>Open</span><span><span class="floor-dot" style="background:#DCA532"></span>Active</span><span><span class="floor-dot" style="background:#E65050"></span>Call</span><span><span class="floor-dot" style="background:#C9A84C"></span>Yours / station</span></div>';
     html+='<p style="color:var(--text-muted);font-size:0.72rem;margin-top:0.4rem;">Pinch the map or use + to enlarge. Number chips below always open a table.</p>';
+  } else if (!mgr && rooms.length) {
+    html+='<p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:0.8rem;">No tables on your station yet. A manager assigns your waiter station in BOH, then saves the layout.</p>';
   } else {
-    html+='<p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:0.8rem;">No tables in this view. Choose All, or ask a manager to add Waiter stations on the BOH floor.</p>';
+    html+='<p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:0.8rem;">'+(mgr?'No dining room from BOH yet. Add rooms on the BOH floor and Save Layout.':'No floor from BOH yet. Use a table number to start.')+'</p>';
     html+='<div class="table-grid">';
     for (var i=1;i<=20;i++) {
       var hasCall=tableHasCall(i);
@@ -1999,21 +2113,48 @@ function upsertStation(number, serverCode){
   STATE.stations.push(st);
   return st;
 }
+function tableNote(o){
+  if (!o) return '';
+  if (o.note) return String(o.note);
+  if (o.guestNote) return String(o.guestNote);
+  if (o.guestId && (STATE.guests||[]).length) {
+    var g=(STATE.guests||[]).filter(function(x){ return x.id===o.guestId; })[0];
+    if (g) return (g.name||'Guest')+(g.notes?(' · '+g.notes):'');
+  }
+  return '';
+}
+function stationShapeHtml(o, left, top, width, height){
+  var col=o._color||stationColor(o);
+  var pts=stationPoints(o);
+  if (pts.length>=3) {
+    var xs=pts.map(function(p){ return p.x; });
+    var ys=pts.map(function(p){ return p.y; });
+    var minX=Math.min.apply(null,xs), minY=Math.min.apply(null,ys);
+    var maxX=Math.max.apply(null,xs), maxY=Math.max.apply(null,ys);
+    var pw=Math.max(8, maxX-minX), ph=Math.max(8, maxY-minY);
+    var poly=pts.map(function(p){ return (p.x-minX)+','+(p.y-minY); }).join(' ');
+    return '<svg class="floor-poly" style="left:'+minX+'px;top:'+minY+'px;width:'+pw+'px;height:'+ph+'px;" viewBox="0 0 '+pw+' '+ph+'" preserveAspectRatio="none">'+
+      '<polygon points="'+poly+'" fill="'+col+'22" stroke="'+col+'" stroke-width="2" stroke-dasharray="6 4"></polygon></svg>'+
+      '<div class="floor-station-tag" style="left:'+(minX+6)+'px;top:'+(minY+4)+'px;background:'+col+';">'+esc(o.label||stationLabel(o))+'</div>';
+  }
+  return '<div class="floor-obj floor-station" style="left:'+left+'px;top:'+top+'px;width:'+width+'px;height:'+height+'px;border:2px dashed '+col+';background:'+col+'14;">'+
+    '<span class="floor-station-tag" style="background:'+col+';">'+esc(o.label||stationLabel(o))+'</span></div>';
+}
 function layoutObjectHtml(o, style){
   var t=o && o.type || '';
-  var label=esc(o && o.label || '');
-  if (t==='wall') return '<div class="floor-obj floor-wall" style="'+style+'"></div>';
-  if (t==='curve') return '<div class="floor-obj floor-curve" style="'+style+'"></div>';
-  if (t==='bar') return '<div class="floor-obj floor-furn floor-bar" style="'+style+'">🍸 '+esc(o.label||'Bar')+'</div>';
-  if (t==='host') return '<div class="floor-obj floor-furn floor-host" style="'+style+'">'+esc(o.label||'HOST')+'</div>';
-  if (t==='door') return '<div class="floor-obj floor-door" style="'+style+'">🚪</div>';
-  if (t==='plant') return '<div class="floor-obj floor-plant" style="'+style+'">🌿</div>';
-  if (t==='station') return '<div class="floor-obj floor-furn floor-svc" style="'+style+'">📦 '+esc(o.label||'Station')+'</div>';
-  if (t==='kitchen') return '<div class="floor-obj floor-zone-box" style="'+style+'">🔥 '+esc(o.label||'Kitchen')+'</div>';
-  if (t==='stage') return '<div class="floor-obj floor-zone-box" style="'+style+'">🎼 '+esc(o.label||'Orchestra')+'</div>';
-  if (t==='privateroom') return '<div class="floor-obj floor-zone-box" style="'+style+'">🏛 '+esc(o.label||'Private Dining')+'</div>';
-  if (t==='store') return '<div class="floor-obj floor-zone-box" style="'+style+'">☕ '+esc(o.label||'Coffee Studio')+'</div>';
-  if (t==='kiosk') return '<div class="floor-obj floor-furn" style="'+style+'">🛒 '+esc(o.label||'Kiosk')+'</div>';
+  if (t==='wall') return '<div class="floor-obj" style="'+style+'"><div class="f-wall"></div></div>';
+  if (t==='curve') return '<div class="floor-obj" style="'+style+'"><div class="f-curve"></div></div>';
+  if (t==='bar') return '<div class="floor-obj" style="'+style+'"><div class="f-bar">'+esc(o.label||'Bar')+'</div></div>';
+  if (t==='host') return '<div class="floor-obj" style="'+style+'"><div class="f-host">'+esc(o.label||'HOST')+'</div></div>';
+  if (t==='door') return '<div class="floor-obj" style="'+style+'"><div class="f-door">🚪</div></div>';
+  if (t==='exit') return '<div class="floor-obj" style="'+style+'"><div class="f-exit">EXIT</div></div>';
+  if (t==='plant') return '<div class="floor-obj" style="'+style+'"><div class="f-plant">🌿</div></div>';
+  if (t==='station') return '<div class="floor-obj" style="'+style+'"><div class="f-station">📦 '+esc(o.label||'Physical station')+'</div></div>';
+  if (t==='kitchen') return '<div class="floor-obj" style="'+style+'"><div class="f-zone" style="background:rgba(224,122,107,0.1);border:2px solid #E07A6B;color:#E07A6B;">🔥 '+esc(o.label||'Kitchen')+'</div></div>';
+  if (t==='stage') return '<div class="floor-obj" style="'+style+'"><div class="f-zone" style="background:rgba(155,90,200,0.14);border:2px solid #B98AD8;color:#C79FE4;">🎼 '+esc(o.label||'Orchestra')+'</div></div>';
+  if (t==='privateroom') return '<div class="floor-obj" style="'+style+'"><div class="f-zone" style="background:rgba(155,196,226,0.1);border:2px solid #9BC4E2;color:#9BC4E2;">🏛 '+esc(o.label||'Private Dining')+'</div></div>';
+  if (t==='store') return '<div class="floor-obj" style="'+style+'"><div class="f-zone" style="background:rgba(201,168,76,0.1);border:2px solid #C9A84C;color:#D9BE6E;">☕ '+esc(o.label||'Coffee Studio')+'</div></div>';
+  if (t==='kiosk') return '<div class="floor-obj" style="'+style+'"><div class="f-zone" style="background:rgba(95,180,138,0.12);border:2px solid #5FB48A;color:#8FD8B4;">🛒 '+esc(o.label||'Kiosk')+'</div></div>';
   if (t==='label') return '<div class="floor-obj floor-label" style="'+style+'">'+esc(o.label||'')+'</div>';
   return '<div class="floor-obj floor-furn" style="'+style+'">'+esc((o && o.label)||t)+'</div>';
 }
