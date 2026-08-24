@@ -329,7 +329,21 @@ body.hh-on.floor-drawing .floor-stage { outline:2px dashed var(--primary); }
 .floor-tstat { font-size:0.62rem; font-weight:600; margin-top:1px; }
 .floor-legend { display:flex; flex-wrap:wrap; gap:0.7rem; margin-top:0.7rem; font-size:0.7rem; color:var(--text-muted); }
 .floor-dot { width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:4px; }
+.floor-furn, .floor-zone-box, .floor-bar, .floor-host, .floor-svc {
+  pointer-events:none; z-index:1; color:#C9A84C; font-size:0.68rem; font-weight:700; letter-spacing:0.04em;
+  background:linear-gradient(180deg,#2a2430,#1c1c26); border:2px solid rgba(201,168,76,0.55); border-radius:10px;
+}
+.floor-bar { background:linear-gradient(180deg,#2a2430,#1a1520); }
+.floor-host, .floor-svc { letter-spacing:0.06em; }
+.floor-zone-box { background:rgba(201,168,76,0.08); border-style:solid; color:#E8D5A3; }
+.floor-wall { pointer-events:none; z-index:1; background:linear-gradient(180deg,#6b5a3a,#4a3d26); border-radius:3px; box-shadow:inset 0 1px 2px rgba(255,255,255,0.15); }
+.floor-curve { pointer-events:none; z-index:1; background:#2a2a36; border:2px solid #3a3a4a; border-bottom:none; border-radius:50% 50% 0 0 / 100% 100% 0 0; }
+.floor-door { pointer-events:none; z-index:1; background:#1a1a24; border:2px solid #3a3a4a; border-radius:50% 0 0 0; font-size:1rem; }
+.floor-plant { pointer-events:none; z-index:1; font-size:1.2rem; }
+.floor-label { pointer-events:none; z-index:3; color:rgba(243,236,220,0.7); font-size:0.72rem; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; }
 .item-thumb { width:42px; height:42px; border-radius:8px; object-fit:cover; margin-right:0.6rem; flex-shrink:0; border:1px solid var(--border); }
+.menu-item-row.sold-out { opacity:0.55; }
+.item-86 { display:inline-block; margin-left:6px; background:var(--danger); color:#fff; font-size:9px; font-weight:700; padding:1px 5px; border-radius:4px; letter-spacing:0.3px; vertical-align:middle; }
 
 /* HISTORY */
 .history-card {
@@ -725,6 +739,12 @@ var STATE = {
   pendingItem: null,
   pendingSend: null,
   stations: [],
+  bar: [],
+  wines: [],
+  retail: [],
+  foodCats: [],
+  foodItems: [],
+  modGroups: [],
   floorFilter: 'all',
   floorZoom: 1,
   floorPanX: 0,
@@ -751,9 +771,16 @@ function seatAllergies(seat){
   return s.allergies[k];
 }
 function defaultCourse(item){
-  var cat = String(item && (item.category||'') || '') + ' ' + ((item && item.catIds)||[]).join(' ');
-  cat = cat.toLowerCase();
-  if (/cocktail|beer|wine|spirit|bar|drink|bev/.test(cat)) return 1;
+  var cat = [
+    item && item.category,
+    item && item.source,
+    item && item.station,
+    item && item.retailCategory,
+    ((item && item.catIds)||[]).join(' '),
+    item && item.name
+  ].join(' ').toLowerCase();
+  if (/cake|bonbon|dessert|pastry|sweet|chocolate torte|cr[eè]me/.test(cat) && /retail|dessert|pastry/.test(cat)) return 4;
+  if (/cocktail|beer|wine|spirit|bar|drink|bev|retail/.test(cat)) return 1;
   if (/small|ceviche|soup|salad|start|app|cold/.test(cat)) return 2;
   if (/dessert|pastry|sweet/.test(cat)) return 4;
   return 3;
@@ -840,28 +867,242 @@ function backToFloor(){
   switchTab('tables');
 }
 function allergenHits(item, seat){
-  var a=(item.allergens||[]).map(function(x){return String(x).toLowerCase();});
+  var listed=asList(item && item.allergens);
+  var a=listed.map(function(x){return String(x).toLowerCase();});
   var g=seatAllergies(seat).map(function(x){return String(x).toLowerCase();});
-  return (item.allergens||[]).filter(function(x,i){ return g.indexOf(a[i])>-1; });
+  return listed.filter(function(x){ return g.indexOf(String(x).toLowerCase())>-1; });
 }
 var SEATABLE = {table:1, stool:1, outdoor:1, couch:1};
 
+function asList(v){
+  if (Array.isArray(v)) return v.filter(function(x){ return x!=null && String(x).trim()!==''; }).map(function(x){ return String(x); });
+  if (v==null || v==='') return [];
+  return String(v).split(/[,;]/).map(function(s){ return s.trim(); }).filter(Boolean);
+}
+function bohList(data){
+  if (!data) return [];
+  if (Array.isArray(data.list)) return data.list;
+  if (Array.isArray(data.items)) return data.items;
+  return [];
+}
+function itemIsEightySixed(it){
+  return !!(it && (it.active===false || it.available===false || Number(it.stock)===0));
+}
+function moneyOpt(n){
+  n=Number(n)||0;
+  return n%1 ? n.toFixed(2) : String(n);
+}
+function barKindCat(kind){
+  kind=String(kind||'');
+  if (/cocktail/i.test(kind)) return {id:'cocktails', name:'Cocktails'};
+  if (/beer/i.test(kind)) return {id:'beer', name:'Beer'};
+  if (/spirit|liquor/i.test(kind)) return {id:'spirits', name:'Spirits'};
+  if (/wine/i.test(kind)) return {id:'wine', name:'Wine'};
+  return {id: slugCat(kind||'bar'), name: kind || 'Bar'};
+}
+function slugCat(name){
+  return String(name||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'') || 'other';
+}
+function resolveCatId(cats, wantId, wantName){
+  var found=(cats||[]).find(function(c){
+    return c && (c.id===wantId || String(c.name||'').toLowerCase()===String(wantName||'').toLowerCase());
+  });
+  if (found) return found.id;
+  cats.push({id:wantId, name:wantName});
+  return wantId;
+}
+function winePourMods(w){
+  var opts=[];
+  var glass=Number(w && w.glassPrice || 0);
+  var bottle=Number(w && (w.bottlePrice || w.price) || 0);
+  if (glass>0) opts.push('Glass $'+moneyOpt(glass));
+  if (bottle>0) opts.push('Bottle $'+moneyOpt(bottle));
+  return opts.length ? [{group:'Pour', options:opts}] : [];
+}
 function mapBohMenuItem(it){
   it = it || {};
   var cat = (it.catIds && it.catIds[0]) || it.category || '';
+  var diet = asList(it.diet || it.dietary || it.dietaryFlags);
+  var allergens = asList(it.allergens);
   return Object.assign({}, it, {
     category: cat,
     photo: it.photoUrl || it.photo || '',
     description: it.desc || it.description || '',
-    dietaryFlags: it.diet || it.dietary || it.dietaryFlags || [],
-    dietary: it.diet || it.dietary || it.dietaryFlags || [],
-    allergens: it.allergens || [],
+    dietaryFlags: diet,
+    dietary: diet,
+    allergens: allergens,
     cookTime: it.cookTime || it.cookMin || 0,
     cookMin: it.cookMin || it.cookTime || 0,
     station: it.station || 'Expo',
     price: Number(it.price)||0,
+    code: String(it.code||''),
+    source: it.source || 'menu',
+    eightySixed: itemIsEightySixed(it),
     active: it.active !== false
   });
+}
+function mapBarToPos(it, catId){
+  it=it||{};
+  return {
+    id: String(it.id || it.code || ('bar-'+it.name)),
+    code: String(it.code||''),
+    name: String(it.name||'').trim(),
+    price: Number(it.price||0),
+    category: catId,
+    catIds: [catId],
+    station: 'Bar',
+    cookTime: 0,
+    cookMin: 0,
+    modifiers: [],
+    description: String(it.desc||it.description||''),
+    desc: String(it.desc||it.description||''),
+    photo: it.photoUrl || it.photo || '',
+    allergens: asList(it.allergens),
+    dietaryFlags: asList(it.diet || it.dietary || it.dietaryFlags),
+    source: 'bar',
+    eightySixed: itemIsEightySixed(it),
+    active: it.active !== false,
+    unit: it.unit || ''
+  };
+}
+function mapWineToPos(it, catId){
+  it=it||{};
+  var parts=[it.producer, it.vintage, it.region, it.varietal].filter(function(x){ return String(x||'').trim(); });
+  var bottle=Number(it.bottlePrice||it.price||0);
+  var glass=Number(it.glassPrice||0);
+  var allergens=asList(it.allergens);
+  if (!allergens.length) allergens=['Sulfites'];
+  return {
+    id: String(it.id || it.vin || ('wine-'+it.name)),
+    code: String(it.vin || it.code || ''),
+    name: String(it.name||'').trim(),
+    price: bottle || glass,
+    category: catId,
+    catIds: [catId],
+    station: 'Bar',
+    cookTime: 0,
+    cookMin: 0,
+    modifiers: winePourMods(it),
+    description: parts.join(' · '),
+    desc: parts.join(' · '),
+    photo: it.photoUrl || it.photo || '',
+    allergens: allergens,
+    dietaryFlags: asList(it.diet || it.dietaryFlags),
+    source: 'wine',
+    eightySixed: itemIsEightySixed(it),
+    active: it.active !== false
+  };
+}
+function mapRetailToPos(it, catId){
+  it=it||{};
+  return {
+    id: String(it.id || it.code || ('retail-'+it.name)),
+    code: String(it.code||''),
+    name: String(it.name||'').trim(),
+    price: Number(it.price||0),
+    category: catId,
+    catIds: [catId],
+    station: 'Retail',
+    cookTime: 0,
+    cookMin: 0,
+    modifiers: [],
+    description: [it.category, it.unit].filter(Boolean).join(' · '),
+    desc: [it.category, it.unit].filter(Boolean).join(' · '),
+    photo: it.photoUrl || it.photo || '',
+    allergens: asList(it.allergens),
+    dietaryFlags: asList(it.diet || it.dietaryFlags),
+    source: 'retail',
+    eightySixed: itemIsEightySixed(it),
+    retailCategory: it.category || 'Retail',
+    unit: it.unit || '',
+    active: it.active !== false
+  };
+}
+function attachFoodModifiers(mapped, it){
+  if ((!mapped.modifiers || !mapped.modifiers.length) && it && it.modGroupIds && (STATE.modGroups||[]).length) {
+    mapped.modifiers = it.modGroupIds.map(function(gid){
+      var g = STATE.modGroups.filter(function(x){ return x.id===gid; })[0];
+      if (!g) return null;
+      return {group:g.name, options:(g.options||[]).map(function(o){ return o.name+(o.up?(' +$'+o.up):''); })};
+    }).filter(Boolean);
+  }
+  return mapped;
+}
+function applyFoodFromMenuDoc(d){
+  d = d || {};
+  var cats = Array.isArray(d.cats) ? d.cats.slice() : [];
+  var hidden = {};
+  cats.forEach(function(c){ if (c && c.visible===false && c.id) hidden[c.id]=true; });
+  STATE.modGroups = d.modGroups || [];
+  var items = Array.isArray(d.items) ? d.items.slice() : [];
+  cats.forEach(function(c){
+    (c.items||[]).forEach(function(it){
+      if (!it) return;
+      if (!it.catIds) it = Object.assign({}, it, {catIds:[c.id], category:c.id});
+      items.push(it);
+    });
+  });
+  var seen = {};
+  items = items.filter(function(it){
+    var id = it && (it.id || it.name);
+    if (!id || seen[id]) return false;
+    seen[id] = true;
+    return it.visible !== false;
+  });
+  STATE.foodCats = cats.filter(function(c){ return c && c.visible !== false; });
+  STATE.foodItems = items.map(function(it){
+    return attachFoodModifiers(mapBohMenuItem(it), it);
+  }).filter(function(it){
+    var ids = (it.catIds && it.catIds.length) ? it.catIds : [it.category];
+    var named = ids.filter(Boolean);
+    if (!named.length) return true;
+    return named.some(function(id){ return !hidden[id]; });
+  });
+}
+function rebuildPosCatalog(){
+  var cats = (STATE.foodCats||[]).slice();
+  var items = (STATE.foodItems||[]).slice();
+  (STATE.bar||[]).forEach(function(it){
+    if (!it || it.visible===false || !String(it.name||'').trim()) return;
+    var spec=barKindCat(it.kind);
+    var catId=resolveCatId(cats, spec.id, spec.name);
+    items.push(mapBarToPos(it, catId));
+  });
+  (STATE.wines||[]).forEach(function(it){
+    if (!it || it.visible===false || !String(it.name||'').trim()) return;
+    var catId=resolveCatId(cats, 'wine', 'Wine');
+    items.push(mapWineToPos(it, catId));
+  });
+  var hasRetail=(STATE.retail||[]).some(function(it){ return it && it.visible!==false && String(it.name||'').trim(); });
+  var retailCatId=hasRetail ? resolveCatId(cats, 'retail', 'Retail') : null;
+  (STATE.retail||[]).forEach(function(it){
+    if (!it || it.visible===false || !String(it.name||'').trim()) return;
+    items.push(mapRetailToPos(it, retailCatId));
+  });
+  STATE.menuCategories = cats;
+  STATE.menuItems = items;
+}
+function itemMatchesSearch(item, q){
+  if (!q) return true;
+  var hay = [
+    item && item.name,
+    item && item.description,
+    item && item.desc,
+    item && item.subtitle,
+    item && item.station,
+    item && item.code,
+    item && item.category,
+    item && item.retailCategory,
+    item && item.producer,
+    item && item.region,
+    item && item.varietal,
+    asList(item && item.allergens).join(' '),
+    asList(item && item.dietaryFlags).join(' ')
+  ].join(' ').toLowerCase();
+  return hay.indexOf(q) > -1;
+}
+function refreshOrderView(){
+  if (STATE.activeTab==='order') { if (STATE.hhMode==='check') renderCheck(); else renderOrder(); }
 }
 
 var SEED_CATEGORIES = [
@@ -951,33 +1192,49 @@ function esc(s) {
 }
 
 // ─── Firebase load ──────────────────────────────────────────────
+function seedOfflineCatalog(){
+  STATE.foodCats = SEED_CATEGORIES.slice();
+  STATE.foodItems = SEED_ITEMS.slice();
+  STATE.menuCategories = SEED_CATEGORIES;
+  STATE.menuItems = SEED_ITEMS;
+}
+function listenBohList(docName, key){
+  fbDb.collection('boh_shared').doc(docName).onSnapshot(function(doc){
+    if (doc.exists && doc.data()) {
+      STATE.menuLive = true;
+      STATE[key] = bohList(doc.data());
+      rebuildPosCatalog();
+      refreshOrderView();
+    }
+  }, function(){});
+}
 function loadData() {
-  if (!fbReady) { STATE.menuCategories=SEED_CATEGORIES; STATE.menuItems=SEED_ITEMS; STATE.tastingMenus=SEED_TASTING_MENUS; STATE.prixFixeMenus=SEED_PRIX_FIXE_MENUS; return; }
+  if (!fbReady) {
+    seedOfflineCatalog();
+    STATE.tastingMenus = SEED_TASTING_MENUS;
+    STATE.prixFixeMenus = SEED_PRIX_FIXE_MENUS;
+    return;
+  }
 
   // Listen directly to BOH shared menu (boh_shared/menu)
   fbDb.collection('boh_shared').doc('menu').onSnapshot(function(doc){
-    if (doc.exists && doc.data() && doc.data().cats) {
+    if (doc.exists && doc.data()) {
       var d = doc.data();
-      STATE.menuLive = true;
-      STATE.menuCategories = (d.cats||[]).filter(function(c){return c.visible!==false;});
-      STATE.modGroups = d.modGroups || [];
-      STATE.menuItems = (d.items||[]).map(function(it){
-        var mapped = mapBohMenuItem(it);
-        if ((!mapped.modifiers || !mapped.modifiers.length) && it.modGroupIds && STATE.modGroups.length) {
-          mapped.modifiers = it.modGroupIds.map(function(gid){
-            var g = STATE.modGroups.filter(function(x){ return x.id===gid; })[0];
-            if (!g) return null;
-            return {group:g.name, options:(g.options||[]).map(function(o){ return o.name+(o.up?(' +$'+o.up):''); })};
-          }).filter(Boolean);
-        }
-        return mapped;
-      }).filter(function(it){ return it.active !== false; });
+      if (d.cats || d.items || d.modGroups) {
+        STATE.menuLive = true;
+        applyFoodFromMenuDoc(d);
+        rebuildPosCatalog();
+      } else if (!STATE.menuLive) {
+        seedOfflineCatalog();
+      }
     } else if (!STATE.menuLive) {
-      STATE.menuCategories = SEED_CATEGORIES;
-      STATE.menuItems = SEED_ITEMS;
+      seedOfflineCatalog();
     }
-    if (STATE.activeTab==='order') { if (STATE.hhMode==='check') renderCheck(); else renderOrder(); }
-  }, function(){ if (!STATE.menuLive) { STATE.menuCategories = SEED_CATEGORIES; STATE.menuItems = SEED_ITEMS; } });
+    refreshOrderView();
+  }, function(){ if (!STATE.menuLive) seedOfflineCatalog(); });
+  listenBohList('bar','bar');
+  listenBohList('wines','wines');
+  listenBohList('retail','retail');
 
   // Real-time listeners for BOH dining room layout tables
   fbDb.collection('boh_shared').doc('tables').onSnapshot(function(doc){
@@ -999,7 +1256,7 @@ function loadData() {
     } else if (!STATE.menuLive) {
       STATE.tastingMenus = SEED_TASTING_MENUS;
     }
-    if (STATE.activeTab==='order') { if (STATE.hhMode==='check') renderCheck(); else renderOrder(); }
+    refreshOrderView();
   }, function(){ if (!STATE.menuLive) STATE.tastingMenus = SEED_TASTING_MENUS; });
 
   fbDb.collection('boh_shared').doc('prix_fixe_menus').onSnapshot(function(doc){
@@ -1008,7 +1265,7 @@ function loadData() {
     } else if (!STATE.menuLive) {
       STATE.prixFixeMenus = SEED_PRIX_FIXE_MENUS;
     }
-    if (STATE.activeTab==='order') { if (STATE.hhMode==='check') renderCheck(); else renderOrder(); }
+    refreshOrderView();
   }, function(){ if (!STATE.menuLive) STATE.prixFixeMenus = SEED_PRIX_FIXE_MENUS; });
 
   fbDb.collection('calls').onSnapshot(snap=>{
@@ -1267,6 +1524,15 @@ function mergeStationsFromFloor(list, roomObjs){
   }
   return list;
 }
+function serverOwnsStation(st, staff){
+  staff = staff || STATE.currentServer;
+  if (!st || !staff) return false;
+  var name=String(staff.name||'');
+  var code=String(staff.code||'');
+  if (st.serverCode && String(st.serverCode)===code) return true;
+  if (st.server && (String(st.server)===code || String(st.server)===name || (name && String(st.server).toLowerCase().indexOf(name.toLowerCase())>-1))) return true;
+  return false;
+}
 function serverOwnsTable(o, staff){
   staff = staff || STATE.currentServer;
   if (!o || !staff) return false;
@@ -1275,10 +1541,23 @@ function serverOwnsTable(o, staff){
   var code=String(staff.code||'');
   if (s && (s===code || s===name || (name && s.toLowerCase().indexOf(name.toLowerCase())>-1))) return true;
   var st=stationForTable(tableKey(o), o);
-  if (!st) return false;
-  if (st.serverCode && String(st.serverCode)===code) return true;
-  if (st.server && (String(st.server)===code || String(st.server)===name || (name && String(st.server).toLowerCase().indexOf(name.toLowerCase())>-1))) return true;
-  return false;
+  return !!(st && serverOwnsStation(st, staff));
+}
+function isLayoutObject(o){
+  if (!o) return false;
+  if (SEATABLE[o.type]) return false;
+  if (o.type==='waiterstation' || o.type==='section' || o._stationBorder) return false;
+  return true;
+}
+function layoutObjectsForRooms(all, roomIds){
+  var set={};
+  (roomIds||[]).forEach(function(id){ if (id!=null && id!=='') set[String(id)]=1; });
+  var hasRooms=Object.keys(set).length>0;
+  return (all||[]).filter(function(o){
+    if (!isLayoutObject(o)) return false;
+    if (!hasRooms) return true;
+    return set[String(o._room||'')];
+  });
 }
 function stationForTable(tNum, obj){
   tNum=String(tNum);
@@ -1294,7 +1573,10 @@ function visibleFloorObjects(){
   if (filter==='all') return all;
   if (filter==='mine') {
     var mine=all.filter(function(o){ return SEATABLE[o.type] && serverOwnsTable(o, STATE.currentServer); });
-    return mine.length ? mine : all.filter(function(o){ return SEATABLE[o.type]; });
+    if (!mine.length) mine=all.filter(function(o){ return SEATABLE[o.type]; });
+    var mineRooms={};
+    mine.forEach(function(o){ if (o._room) mineRooms[String(o._room)]=1; });
+    return mine.concat(layoutObjectsForRooms(all, Object.keys(mineRooms)));
   }
   if (filter.indexOf('room:')===0) {
     var rid=filter.slice(5);
@@ -1308,7 +1590,10 @@ function visibleFloorObjects(){
     if (!st) return [];
     var tables=all.filter(function(o){ return SEATABLE[o.type] && tableInStation(o, st); });
     var overlay=stationOverlay(st);
-    return overlay ? tables.concat([overlay]) : tables;
+    var roomIds=st.room ? [st.room] : [];
+    tables.forEach(function(o){ if (o._room && roomIds.indexOf(o._room)<0) roomIds.push(o._room); });
+    var layout=layoutObjectsForRooms(all, roomIds);
+    return tables.concat(overlay?[overlay]:[]).concat(layout);
   }
   return all;
 }
@@ -1340,7 +1625,7 @@ function visibleStationOverlays(objs){
     if (seen[st.id]) return;
     if (filter.indexOf('room:')===0 && st.room && st.room!==filter.slice(5)) return;
     if (filter.indexOf('station:')===0 && st.id!==filter.slice(8)) return;
-    if (filter==='mine' && !((st.serverCode && STATE.currentServer && String(st.serverCode)===STATE.currentServer.code))) return;
+    if (filter==='mine' && !serverOwnsStation(st, STATE.currentServer)) return;
     var ov=stationOverlay(st);
     if (ov) extra.push(ov);
   });
@@ -1583,11 +1868,12 @@ function renderTables() {
   allFloorObjects().forEach(function(o){ if (SEATABLE[o.type] && serverOwnsTable(o, STATE.currentServer)) mineCount++; });
 
   var html='<div class="floor-wrap">';
-  html+='<div class="floor-head"><div><h2>Dining room</h2><p>Stations come from BOH Floor. Pinch or tap + to enlarge. Isolate your station for larger tables.</p></div><div style="font-size:0.8rem;color:var(--text-muted);text-align:right;">'+(STATE.currentServer?STATE.currentServer.name:'Server')+'</div></div>';
+  html+='<div class="floor-head"><div><h2>Dining room</h2><p>Layout and waiter stations come from BOH. Pinch or tap + to enlarge. Isolate your station for larger tables.</p></div><div style="font-size:0.8rem;color:var(--text-muted);text-align:right;">'+(STATE.currentServer?STATE.currentServer.name:'Server')+'</div></div>';
 
   html+='<div class="floor-room-tabs">';
   html+='<button class="floor-room-tab'+(STATE.floorFilter==='all'?' active':'')+'" onclick="setFloorFilter(\'all\')">All</button>';
   html+='<button class="floor-room-tab'+(STATE.floorFilter==='mine'?' active':'')+'" onclick="setFloorFilter(\'mine\')">My station'+(mineCount?' ('+mineCount+')':'')+'</button>';
+  html+='<button class="floor-room-tab" onclick="openStationEditor()">Stations'+(stations.length?' ('+stations.length+')':'')+'</button>';
   rooms.forEach(function(rm){
     html+='<button class="floor-room-tab'+(STATE.floorFilter==='room:'+rm.id?' active':'')+'" onclick=\'setFloorFilter('+JSON.stringify('room:'+rm.id)+')\'>'+(rm.name||rm.id)+'</button>';
   });
@@ -1619,7 +1905,10 @@ function renderTables() {
     html+='<div class="floor-canvas" id="floor-canvas" style="width:'+maxX+'px;height:'+maxY+'px;">';
     html+='<div class="floor-draw-rect" id="floor-draw-rect" style="display:none"></div>';
     objs.forEach(function(o){
-      if (o.type==='waiterstation' && !o._stationBorder) return;
+      if (o.type==='waiterstation' && !o._stationBorder) {
+        var merged=(STATE.stations||[]).some(function(st){ return st.id===o.id && st.w && st.h; });
+        if (merged) return;
+      }
       var left=o.x||20, top=o.y||20, width=o.w||70, height=o.h||70;
       var style='left:'+left+'px;top:'+top+'px;width:'+width+'px;height:'+height+'px;';
       if (o.type==='section' || o.type==='waiterstation' || o._stationBorder) {
@@ -1652,7 +1941,7 @@ function renderTables() {
           '<div class="floor-tstat" style="color:'+statusColor+'">'+status+'</div>'+
         '</div>';
       } else {
-        html+='<div class="floor-obj" style="'+style+'border:1px dashed rgba(255,255,255,0.16);border-radius:8px;background:rgba(255,255,255,0.04);color:rgba(243,236,220,0.5);font-size:0.7rem;pointer-events:none;">'+esc(o.label||o.type)+'</div>';
+        html+=layoutObjectHtml(o, style);
       }
     });
     html+='</div></div>';
@@ -1710,26 +1999,50 @@ function upsertStation(number, serverCode){
   STATE.stations.push(st);
   return st;
 }
+function layoutObjectHtml(o, style){
+  var t=o && o.type || '';
+  var label=esc(o && o.label || '');
+  if (t==='wall') return '<div class="floor-obj floor-wall" style="'+style+'"></div>';
+  if (t==='curve') return '<div class="floor-obj floor-curve" style="'+style+'"></div>';
+  if (t==='bar') return '<div class="floor-obj floor-furn floor-bar" style="'+style+'">🍸 '+esc(o.label||'Bar')+'</div>';
+  if (t==='host') return '<div class="floor-obj floor-furn floor-host" style="'+style+'">'+esc(o.label||'HOST')+'</div>';
+  if (t==='door') return '<div class="floor-obj floor-door" style="'+style+'">🚪</div>';
+  if (t==='plant') return '<div class="floor-obj floor-plant" style="'+style+'">🌿</div>';
+  if (t==='station') return '<div class="floor-obj floor-furn floor-svc" style="'+style+'">📦 '+esc(o.label||'Station')+'</div>';
+  if (t==='kitchen') return '<div class="floor-obj floor-zone-box" style="'+style+'">🔥 '+esc(o.label||'Kitchen')+'</div>';
+  if (t==='stage') return '<div class="floor-obj floor-zone-box" style="'+style+'">🎼 '+esc(o.label||'Orchestra')+'</div>';
+  if (t==='privateroom') return '<div class="floor-obj floor-zone-box" style="'+style+'">🏛 '+esc(o.label||'Private Dining')+'</div>';
+  if (t==='store') return '<div class="floor-obj floor-zone-box" style="'+style+'">☕ '+esc(o.label||'Coffee Studio')+'</div>';
+  if (t==='kiosk') return '<div class="floor-obj floor-furn" style="'+style+'">🛒 '+esc(o.label||'Kiosk')+'</div>';
+  if (t==='label') return '<div class="floor-obj floor-label" style="'+style+'">'+esc(o.label||'')+'</div>';
+  return '<div class="floor-obj floor-furn" style="'+style+'">'+esc((o && o.label)||t)+'</div>';
+}
+
 function openStationEditor() {
-  if (!isManager()) { toast('Manager PIN required'); return; }
   STATE.stationAssignId = null;
   var stations = sortedStations();
+  var mgr=isManager();
   var html='<h2>Waiter stations</h2>';
-  html+='<p class="sheet-sub">Number them however you want (1, 2, 7, 14…). Draw an imaginary border around the tables, or tap tables to assign. POS shows the same numbers.</p>';
+  html+='<p class="sheet-sub">'+(stations.length?'These numbers match the BOH floor. Tap Show to zoom that station.':'No stations from BOH yet. Add Waiter stations on the BOH floor and Save Layout.')+'</p>';
   stations.forEach(function(st){
     html+='<div style="margin-bottom:0.7rem;padding:0.7rem;border:1px solid var(--border);border-radius:12px;">';
     html+='<div style="display:flex;justify-content:space-between;gap:0.4rem;align-items:center;">';
     html+='<strong>'+esc(stationLabel(st))+'</strong>';
-    html+='<button class="ghost-btn" style="min-height:40px;margin-top:0;" onclick=\'beginAssignStation('+JSON.stringify(st.id)+')\'>Tap tables</button></div>';
-    html+='<p class="sheet-sub" style="margin:0.35rem 0 0;">Waiter PIN '+esc(st.serverCode||'—')+' · '+stationTableIds(st).length+' tables'+(st.w?' · border set':'')+'</p>';
-    html+='<button class="ghost-btn" style="min-height:36px;" onclick=\'beginDrawExisting('+JSON.stringify(st.id)+')\'>Redraw border</button>';
-    html+='<button class="ghost-btn" style="min-height:36px;" onclick=\'deleteStation('+JSON.stringify(st.id)+')\'>Remove</button>';
+    html+='<button class="ghost-btn" style="min-height:40px;margin-top:0;" onclick=\'closeSheet();setFloorFilter('+JSON.stringify('station:'+st.id)+')\'>Show</button></div>';
+    html+='<p class="sheet-sub" style="margin:0.35rem 0 0;">'+(st.server?esc(st.server)+' · ':'')+'PIN '+esc(st.serverCode||'—')+' · '+stationTableIds(st).length+' tables'+(st.w?' · on map':'')+'</p>';
+    if (mgr) {
+      html+='<button class="ghost-btn" style="min-height:36px;" onclick=\'beginAssignStation('+JSON.stringify(st.id)+')\'>Tap tables</button>';
+      html+='<button class="ghost-btn" style="min-height:36px;" onclick=\'beginDrawExisting('+JSON.stringify(st.id)+')\'>Redraw border</button>';
+      html+='<button class="ghost-btn" style="min-height:36px;" onclick=\'deleteStation('+JSON.stringify(st.id)+')\'>Remove</button>';
+    }
     html+='</div>';
   });
-  html+='<input class="login-input" id="st-num" type="number" min="1" step="1" inputmode="numeric" placeholder="Station number (1, 2, 3…)" value="'+nextStationNumber()+'" style="margin-bottom:0.4rem;">';
-  html+='<input class="login-input" id="st-code" placeholder="Waiter PIN (optional, e.g. 4001)" inputmode="numeric" style="margin-bottom:0.5rem;">';
-  html+='<button class="primary-btn" onclick="startNewStationDraw()">Draw station border</button>';
-  html+='<button class="ghost-btn" onclick="addStationFromSheet()">Add number only</button>';
+  if (mgr) {
+    html+='<input class="login-input" id="st-num" type="number" min="1" step="1" inputmode="numeric" placeholder="Station number (1, 2, 3…)" value="'+nextStationNumber()+'" style="margin-bottom:0.4rem;">';
+    html+='<input class="login-input" id="st-code" placeholder="Waiter PIN (optional, e.g. 4001)" inputmode="numeric" style="margin-bottom:0.5rem;">';
+    html+='<button class="primary-btn" onclick="startNewStationDraw()">Draw station border</button>';
+    html+='<button class="ghost-btn" onclick="addStationFromSheet()">Add number only</button>';
+  }
   html+='<button class="ghost-btn" onclick="closeSheet()">Close</button>';
   openSheet(html);
 }
@@ -1740,6 +2053,7 @@ function readStationForm(){
   return {number:n, serverCode:code};
 }
 function addStationFromSheet() {
+  if (!isManager()) { toast('Manager PIN required'); return; }
   var form=readStationForm();
   if (!form) return;
   upsertStation(form.number, form.serverCode);
@@ -1748,6 +2062,7 @@ function addStationFromSheet() {
   openStationEditor();
 }
 function startNewStationDraw(){
+  if (!isManager()) { toast('Manager PIN required'); return; }
   var form=readStationForm();
   if (!form) return;
   upsertStation(form.number, form.serverCode);
@@ -1760,6 +2075,7 @@ function startNewStationDraw(){
   toast('Drag a box around Station '+form.number);
 }
 function beginDrawExisting(id){
+  if (!isManager()) { toast('Manager PIN required'); return; }
   var st=(STATE.stations||[]).filter(function(s){ return s.id===id; })[0];
   if (!st) return;
   closeSheet();
@@ -1775,6 +2091,7 @@ function cancelStationDraw(){
   renderTables();
 }
 function deleteStation(id) {
+  if (!isManager()) { toast('Manager PIN required'); return; }
   STATE.stations = STATE.stations.filter(function(s){ return s.id!==id; });
   if (STATE.floorFilter==='station:'+id) STATE.floorFilter='all';
   saveStations(STATE.stations);
@@ -1783,6 +2100,7 @@ function deleteStation(id) {
   renderTables();
 }
 function beginAssignStation(id) {
+  if (!isManager()) { toast('Manager PIN required'); return; }
   STATE.stationAssignId = id;
   closeSheet();
   STATE.floorFilter='all';
@@ -1886,7 +2204,7 @@ function renderOrder() {
   var html='<div class="order-section">';
   if (!hh) html+='<h3>Table '+STATE.selectedTable+' — '+seatName(STATE.activeSeat)+'</h3>';
   html+=renderSeatBar();
-  html+='<input class="search-box" id="menu-search" type="search" placeholder="Search a dish…" value="'+(STATE.menuSearch||'').replace(/"/g,'&quot;')+'" oninput="STATE.menuSearch=this.value; renderOrder();">';
+  html+='<input class="search-box" id="menu-search" type="search" placeholder="Search food, bar, wine, retail…" value="'+(STATE.menuSearch||'').replace(/"/g,'&quot;')+'" oninput="STATE.menuSearch=this.value; renderOrder();">';
   html+='<div class="cat-pills">';
   var hasTasting=(STATE.tastingMenus.length||STATE.prixFixeMenus.length);
   if (hasTasting) {
@@ -1902,29 +2220,41 @@ function renderOrder() {
     html+=renderTastingItems();
   } else {
     var filtered=items.filter(function(i){
-      if (q) return String(i.name||'').toLowerCase().indexOf(q)>-1;
+      if (q) return itemMatchesSearch(i, q);
       if (i.catIds && i.catIds.length) return i.catIds.indexOf(STATE.orderCat)>-1;
       return i.category===STATE.orderCat;
     });
-    if (!filtered.length) {
-      html+='<p style="color:var(--text-muted);font-size:0.85rem;padding:1rem 0;">'+(q?'No matches.':'No dishes in this category from BOH yet.')+'</p>';
+    var tastingHits=q?renderTastingSearch(q):'';
+    if (tastingHits) html+=tastingHits;
+    if (!filtered.length && !tastingHits) {
+      html+='<p style="color:var(--text-muted);font-size:0.85rem;padding:1rem 0;">'+(q?'No matches.':'Nothing in this category from BOH yet.')+'</p>';
     }
     filtered.forEach(function(item){
-      var hasDesc = item.description || item.desc || (item.allergens&&item.allergens.length) || (item.dietaryFlags&&item.dietaryFlags.length);
+      var allergens=asList(item.allergens);
+      var diet=asList(item.dietaryFlags||item.dietary);
+      var hasDesc = item.description || item.desc || allergens.length || diet.length;
       var cook = item.cookTime || item.cookMin || 0;
-      html+='<div class="menu-item-row hh" onclick="beginAddItem(\''+item.id+'\')">'+
-        (item.photo?'<img class="item-thumb" src="'+item.photo+'" alt="">':'')+
-        '<div class="item-info"><div class="item-name">'+item.name+'</div>'+
-        '<div class="item-meta">'+(item.station||'')+' · '+cook+'min'+(item.allergens&&item.allergens.length?' · ⚠':'')+'</div>'+
-        (hasDesc ? '<div class="item-desc-toggle" onclick="event.stopPropagation();toggleItemDesc(\''+item.id+'\')">details</div>' : '')+
+      var meta=[];
+      if (item.code) meta.push(item.code);
+      if (item.station) meta.push(item.station);
+      if (item.source==='retail' && item.retailCategory) meta.push(item.retailCategory);
+      if (item.unit) meta.push(item.unit);
+      if (cook) meta.push(cook+'min');
+      if (allergens.length) meta.push('⚠');
+      var click=item.eightySixed ? 'toast("86 — not available")' : 'beginAddItem('+JSON.stringify(String(item.id))+')';
+      html+='<div class="menu-item-row hh'+(item.eightySixed?' sold-out':'')+'" onclick=\''+click+'\'>'+
+        (item.photo?'<img class="item-thumb" src="'+esc(item.photo)+'" alt="">':'')+
+        '<div class="item-info"><div class="item-name">'+esc(item.name)+(item.eightySixed?' <span class="item-86">86</span>':'')+'</div>'+
+        '<div class="item-meta">'+esc(meta.join(' · '))+'</div>'+
+        (hasDesc ? '<div class="item-desc-toggle" onclick="event.stopPropagation();toggleItemDesc('+JSON.stringify(String(item.id))+')">details</div>' : '')+
         '</div>'+
         '<div class="item-price">$'+(Number(item.price)||0).toFixed(2)+'</div>'+
       '</div>';
       if (hasDesc && STATE._expandedItems && STATE._expandedItems[item.id]) {
         html+='<div class="item-desc-expanded">';
-        if (item.description || item.desc) html+='<div>'+(item.description||item.desc)+'</div>';
-        if (item.allergens && item.allergens.length) html+='<div class="desc-allergens">⚠ Allergens: '+item.allergens.join(', ')+'</div>';
-        if (item.dietaryFlags && item.dietaryFlags.length) html+='<div class="desc-dietary">'+item.dietaryFlags.join(' · ')+'</div>';
+        if (item.description || item.desc) html+='<div>'+esc(item.description||item.desc)+'</div>';
+        if (allergens.length) html+='<div class="desc-allergens">⚠ Allergens: '+esc(allergens.join(', '))+'</div>';
+        if (diet.length) html+='<div class="desc-dietary">'+esc(diet.join(' · '))+'</div>';
         html+='</div>';
       }
     });
@@ -2004,6 +2334,24 @@ function filterCat(catId) {
 }
 
 // ─── Tasting & Prix Fixe Ordering ──────────────────────────────
+function renderTastingSearch(q){
+  var html='';
+  (STATE.tastingMenus||[]).forEach(function(tm){
+    if (!itemMatchesSearch(tm, q)) return;
+    html+='<div class="menu-item-row tasting-row" onclick="addTastingMenu('+JSON.stringify(String(tm.id))+')">'+
+      '<div class="item-info"><div class="item-name">✦ '+esc(tm.name)+'</div>'+
+      '<div class="item-meta">'+(tm.courses?tm.courses.length:0)+' courses · '+esc(tm.duration||'')+'</div></div>'+
+      '<div class="item-price">$'+(Number(tm.price)||0).toFixed(2)+'</div></div>';
+  });
+  (STATE.prixFixeMenus||[]).forEach(function(pf){
+    if (!itemMatchesSearch(pf, q)) return;
+    html+='<div class="menu-item-row tasting-row" onclick="openPrixFixeSelector('+JSON.stringify(String(pf.id))+')">'+
+      '<div class="item-info"><div class="item-name">◈ '+esc(pf.name)+'</div>'+
+      '<div class="item-meta">'+(pf.courses?pf.courses.length:0)+' courses · Choose options</div></div>'+
+      '<div class="item-price">$'+(Number(pf.price)||0).toFixed(2)+'</div></div>';
+  });
+  return html;
+}
 function renderTastingItems() {
   var html='';
   if (STATE.tastingMenus.length) {
@@ -2160,6 +2508,7 @@ function beginAddItem(itemId) {
   var items=STATE.menuItems.length?STATE.menuItems:SEED_ITEMS;
   var item=items.find(function(i){return i.id===itemId;});
   if (!item) return;
+  if (item.eightySixed) { toast('86 — not available'); return; }
   var price=Number(item.price)||0;
   STATE.pendingItem={
     lineId:genId(),
