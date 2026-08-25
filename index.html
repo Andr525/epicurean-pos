@@ -2115,13 +2115,18 @@ function upsertStation(number, serverCode){
 }
 function tableNote(o){
   if (!o) return '';
-  if (o.note) return String(o.note);
-  if (o.guestNote) return String(o.guestNote);
-  if (o.guestId && (STATE.guests||[]).length) {
-    var g=(STATE.guests||[]).filter(function(x){ return x.id===o.guestId; })[0];
-    if (g) return (g.name||'Guest')+(g.notes?(' · '+g.notes):'');
-  }
-  return '';
+  var parts=[];
+  if (o.vip) parts.push('\u2605 VIP');
+  var linked = (o.guestId && (STATE.guests||[]).length) ? (STATE.guests||[]).filter(function(x){ return x.id===o.guestId; })[0] : null;
+  var name = o.guestName || (linked ? (linked.name||'') : '');
+  if (name) parts.push(name);
+  var notes=[];
+  if (Array.isArray(o.notes)) notes=o.notes.filter(Boolean).map(String);
+  else if (o.note) notes=[String(o.note)];
+  else if (o.guestNote) notes=[String(o.guestNote)];
+  if (linked && linked.notes) notes.push(String(linked.notes));
+  if (notes.length) parts.push(notes.join('; '));
+  return parts.join(' \u00b7 ');
 }
 function stationShapeHtml(o, left, top, width, height){
   var col=o._color||stationColor(o);
