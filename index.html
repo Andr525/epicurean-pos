@@ -305,6 +305,7 @@ body { font-family:var(--font); color:var(--text); background:var(--bg); -webkit
 .floor-hint { font-size:0.72rem; color:var(--text-muted); margin-top:0.45rem; }
 .floor-obj.seatable:active { filter:brightness(1.18); }
 .floor-assign { background:rgba(201,168,76,0.12); border:1px solid var(--primary); border-radius:12px; padding:0.65rem 0.8rem; margin-bottom:0.6rem; font-size:0.82rem; }
+.floor-assign.mgr-override { background:rgba(96,165,250,0.12); border-color:var(--info); }
 .floor-section, .floor-station {
   pointer-events:none; z-index:0; border:2px dashed rgba(201,168,76,0.9);
   background:rgba(201,168,76,0.08); border-radius:10px; color:#C9A84C;
@@ -1982,6 +1983,7 @@ function renderTables() {
 
   html+='<div class="floor-room-tabs">';
   if (mgr) {
+    html+='<button class="floor-room-tab'+(STATE.floorFilter==='all'?' active':'')+'" onclick="setFloorFilter(\'all\')">All rooms</button>';
     rooms.forEach(function(rm){
       html+='<button class="floor-room-tab'+(STATE.floorFilter==='room:'+rm.id?' active':'')+'" onclick=\'setFloorFilter('+JSON.stringify('room:'+rm.id)+')\'>'+esc(rm.name||rm.id)+'</button>';
     });
@@ -1993,6 +1995,13 @@ function renderTables() {
     html+='<button class="floor-room-tab active">My station'+(mineCount?' ('+mineCount+')':'')+'</button>';
   }
   html+='</div>';
+
+  /* Req 8: make the manager "view as station" override explicit and reversible. */
+  if (mgr && String(STATE.floorFilter||'').indexOf('station:')===0) {
+    var vst=stations.filter(function(s){ return s.id===STATE.floorFilter.slice(8); })[0];
+    html+='<div class="floor-assign mgr-override">Manager override — viewing <strong>'+esc(vst?stationLabel(vst):'station')+'</strong> as its Food Master would (their tables only). '+
+      '<button class="ghost-btn" style="min-height:36px;margin-top:0.35rem;" onclick="setFloorFilter(\'all\')">Show all tables</button></div>';
+  }
 
   html+='<div class="floor-zoombar">';
   html+='<button class="floor-zoom-btn" onclick="floorZoomBy(1/1.25)">−</button>';
