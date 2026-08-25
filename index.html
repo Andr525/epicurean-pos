@@ -2149,7 +2149,7 @@ function layoutObjectHtml(o, style){
   if (t==='door') return '<div class="floor-obj" style="'+style+'"><div class="f-door">🚪</div></div>';
   if (t==='exit') return '<div class="floor-obj" style="'+style+'"><div class="f-exit">EXIT</div></div>';
   if (t==='plant') return '<div class="floor-obj" style="'+style+'"><div class="f-plant">🌿</div></div>';
-  if (t==='station') return '<div class="floor-obj" style="'+style+'"><div class="f-station">📦 '+esc(o.label||'Physical station')+'</div></div>';
+  if (t==='station') return '<div class="floor-obj" style="'+style+'"><div class="f-station">📦 '+esc(o.label||'Sideboard')+'</div></div>';
   if (t==='kitchen') return '<div class="floor-obj" style="'+style+'"><div class="f-zone" style="background:rgba(224,122,107,0.1);border:2px solid #E07A6B;color:#E07A6B;">🔥 '+esc(o.label||'Kitchen')+'</div></div>';
   if (t==='stage') return '<div class="floor-obj" style="'+style+'"><div class="f-zone" style="background:rgba(155,90,200,0.14);border:2px solid #B98AD8;color:#C79FE4;">🎼 '+esc(o.label||'Orchestra')+'</div></div>';
   if (t==='privateroom') return '<div class="floor-obj" style="'+style+'"><div class="f-zone" style="background:rgba(155,196,226,0.1);border:2px solid #9BC4E2;color:#9BC4E2;">🏛 '+esc(o.label||'Private Dining')+'</div></div>';
@@ -2163,8 +2163,8 @@ function openStationEditor() {
   STATE.stationAssignId = null;
   var stations = sortedStations();
   var mgr=isManager();
-  var html='<h2>Waiter stations</h2>';
-  html+='<p class="sheet-sub">'+(stations.length?'These numbers match the BOH floor. Tap Show to zoom that station.':'No stations from BOH yet. Add Waiter stations on the BOH floor and Save Layout.')+'</p>';
+  var html='<h2>Food Master Stations</h2>';
+  html+='<p class="sheet-sub">'+(stations.length?'These numbers match the BOH floor. Tap Show to zoom that station.':'No stations from BOH yet. Add Food Master Stations on the BOH floor and Save Layout.')+'</p>';
   stations.forEach(function(st){
     html+='<div style="margin-bottom:0.7rem;padding:0.7rem;border:1px solid var(--border);border-radius:12px;">';
     html+='<div style="display:flex;justify-content:space-between;gap:0.4rem;align-items:center;">';
