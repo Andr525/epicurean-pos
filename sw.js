@@ -1,5 +1,6 @@
-// Epicurean POS — Service Worker (PWA offline shell)
-var CACHE = 'epicurean-pos-v2';
+// Epicurean POS — Service Worker
+// Network-first so floor-map and station updates actually reach devices.
+var CACHE = 'epicurean-pos-v3';
 var ASSETS = ['index.html','manifest.json','icon-192.png','icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -13,10 +14,17 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  // Network-first for Firebase, cache-first for static
   if (e.request.url.includes('firebase') || e.request.url.includes('googleapis')) {
     e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
-  } else {
-    e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
+    return;
   }
+  e.respondWith(
+    fetch(e.request).then(function(res){
+      if (res && res.ok && e.request.method==='GET') {
+        var copy=res.clone();
+        caches.open(CACHE).then(function(c){ c.put(e.request, copy); });
+      }
+      return res;
+    }).catch(function(){ return caches.match(e.request); })
+  );
 });

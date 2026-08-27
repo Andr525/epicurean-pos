@@ -486,7 +486,7 @@ body.hh-on.floor-drawing .floor-stage { outline:2px dashed var(--primary); }
     background:var(--surface); border-top:1px solid var(--border);
   }
   body.hh-on .app-content { padding:0.7rem 0.75rem 1rem; }
-  body.hh-on .floor-obj.seatable { min-width:56px !important; min-height:56px !important; }
+  body.hh-on .floor-obj.seatable { /* keep BOH geometry; enlarge via zoom, not min-size */ }
   body.hh-on .floor-tnum { font-size:0.95rem; }
   body.hh-on .cat-pill { min-height:40px; display:inline-flex; align-items:center; }
   .hh-back, .hh-more {
@@ -1590,19 +1590,27 @@ function stationTableIds(st){
   }
   return ids;
 }
+function roomLocalPos(o){
+  var x=o.x||0, y=o.y||0;
+  if (STATE.floorFilter==='all') {
+    var off=roomPackOffsets()[objectRoomId(o)]||0;
+    x=x-off;
+  }
+  return {x:x,y:y};
+}
 function tableInStation(o, st){
   if (!o || !st) return false;
   var ids=stationTableIds(st);
   if (o.id!=null && ids.indexOf(String(o.id))>=0) return true;
   if (ids.indexOf(String(tableKey(o)))>=0) return true;
   if (String(objectRoomId(o)||st.room)!==String(st.room||objectRoomId(o))) return false;
+  var loc=roomLocalPos(o);
+  var cx=loc.x+((o.w||70)/2);
+  var cy=loc.y+((o.h||70)/2);
   var pts=stationPoints(st);
-  if (pts.length>=3) {
-    var cx=(o.x||0)+((o.w||70)/2);
-    var cy=(o.y||0)+((o.h||70)/2);
-    return pointInPoly(cx, cy, pts);
-  }
-  return !!(st.x!=null && st.w && st.h && tableCenterInRect(o, st));
+  if (pts.length>=3) return pointInPoly(cx, cy, pts);
+  var unpacked={x:loc.x,y:loc.y,w:o.w,h:o.h};
+  return !!(st.x!=null && st.w && st.h && tableCenterInRect(unpacked, st));
 }
 function mergeStationsFromFloor(list, roomObjs){
   list = (list||[]).slice();
@@ -1646,6 +1654,7 @@ function serverOwnsStation(st, staff){
   staff = staff || STATE.currentServer;
   if (!st || !staff) return false;
   if (st.serverCode && String(st.serverCode)===String(staff.code||'')) return true;
+  if (st.serverId && staffMatchesRef(staff, st.serverId)) return true;
   return staffMatchesRef(staff, st.server);
 }
 function serverOwnsTable(o, staff){
@@ -1659,7 +1668,11 @@ function myStation(){
   var staff=STATE.currentServer;
   if (!staff) return null;
   var owned=sortedStations().filter(function(st){ return serverOwnsStation(st, staff); });
-  return owned[0]||null;
+  if (owned[0]) return owned[0];
+  var byTable=sortedStations().filter(function(st){
+    return (roomObjectList(st.room)||[]).some(function(o){ return SEATABLE[o.type] && serverOwnsTable(o, staff) && tableInStation(o, st); });
+  });
+  return byTable[0]||null;
 }
 function focusedStation(){
   var f=STATE.floorFilter||'';
@@ -1992,15 +2005,8 @@ function renderTables() {
       maxX=Math.max(maxX, (o.x||0)+(o.w||80)+24);
       maxY=Math.max(maxY, (o.y||0)+(o.h||80)+24);
     });
-    var clipCss='';
-    if (focusSt) {
-      var cpts=stationPoints(focusSt);
-      if (cpts.length>=3) {
-        clipCss='clip-path:polygon('+cpts.map(function(p){ return ((p.x||0))+'px '+((p.y||0))+'px'; }).join(',')+');';
-      }
-    }
     html+='<div class="floor-stage" id="floor-stage">';
-    html+='<div class="floor-canvas" id="floor-canvas" style="width:'+maxX+'px;height:'+maxY+'px;'+clipCss+'">';
+    html+='<div class="floor-canvas" id="floor-canvas" style="width:'+maxX+'px;height:'+maxY+'px;">';
     objs.forEach(function(o){
       var left=o.x||0, top=o.y||0, width=o.w||70, height=o.h||70;
       var style='left:'+left+'px;top:'+top+'px;width:'+width+'px;height:'+height+'px;';
@@ -2020,7 +2026,8 @@ function renderTables() {
         var border=hasCall?'#E65050':(hasOrder?'#DCA532':(stnCol||(mine?'#C9A84C':'rgba(201,168,76,0.35)')));
         var status=hasCall?'CALL':hasOrder?'Active':(o.status&&o.status!=='open'?o.status:'Open');
         var statusColor=hasCall?'#E65050':hasOrder?'#DCA532':'#5FB48A';
-        var extra=mine?'':'opacity:0.9;';
+        var inFocus=!focusSt || tableInStation(o, focusSt);
+        var extra=inFocus?'':(mine?'opacity:0.55;':'opacity:0.28;');
         var shape=o.shape||(o.type==='stool'?'round':(o.type==='outdoor'?'rect':'square'));
         var note=tableNote(o);
         var innerCls=o.type==='couch'?'f-couch':(o.type==='stool'?'f-stool':(o.type==='outdoor'?'f-outdoor':('f-table '+shape)));
