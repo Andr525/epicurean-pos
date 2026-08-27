@@ -359,7 +359,7 @@ body.hh-on.floor-drawing .floor-stage { outline:2px dashed var(--primary); }
 .floor-bar { background:linear-gradient(180deg,#2a2430,#1a1520); }
 .floor-host, .floor-svc { letter-spacing:0.06em; }
 .floor-zone-box { background:rgba(201,168,76,0.08); border-style:solid; color:#E8D5A3; }
-.floor-wall { pointer-events:none; z-index:1; background:linear-gradient(180deg,#6b5a3a,#4a3d26); border-radius:3px; box-shadow:inset 0 1px 2px rgba(255,255,255,0.15); }
+.floor-lshape { width:100%; height:100%; background:linear-gradient(180deg,rgba(201,168,76,0.22),rgba(201,168,76,0.12)); border:1.5px solid #B8943F; clip-path:polygon(0 0,42% 0,42% 58%,100% 58%,100% 100%,0 100%); }
 .floor-curve { pointer-events:none; z-index:1; background:#2a2a36; border:2px solid #3a3a4a; border-bottom:none; border-radius:50% 50% 0 0 / 100% 100% 0 0; }
 .floor-door { pointer-events:none; z-index:1; background:#1a1a24; border:2px solid #3a3a4a; border-radius:50% 0 0 0; font-size:1rem; }
 .floor-plant { pointer-events:none; z-index:1; font-size:1.2rem; }
@@ -638,9 +638,15 @@ function createNamedFirestoreAdapter(){
   function encodeValue(value){
     if(value===null || value===undefined) return {nullValue:null};
     if(value instanceof Date) return {timestampValue:value.toISOString()};
+    if(value && typeof value==='object' && (value._methodName==='FieldValue.serverTimestamp' || value._methodName==='serverTimestamp')){
+      return {timestampValue:new Date().toISOString()};
+    }
     if(Array.isArray(value)) return {arrayValue:{values:value.map(encodeValue)}};
     if(typeof value==='boolean') return {booleanValue:value};
-    if(typeof value==='number') return Number.isInteger(value)?{integerValue:String(value)}:{doubleValue:value};
+    if(typeof value==='number'){
+      if(!isFinite(value)) return {doubleValue:0};
+      return Number.isInteger(value)?{integerValue:String(value)}:{doubleValue:value};
+    }
     if(typeof value==='object') return {mapValue:{fields:encodeFields(value)}};
     return {stringValue:String(value)};
   }
@@ -648,6 +654,9 @@ function createNamedFirestoreAdapter(){
     var fields={};
     Object.keys(object||{}).forEach(function(key){ if(object[key]!==undefined) fields[key]=encodeValue(object[key]); });
     return fields;
+  }
+  function fieldMaskQuery(data){
+    return Object.keys(data||{}).filter(function(k){ return data[k]!==undefined; }).map(function(k){ return 'updateMask.fieldPaths='+encodeURIComponent(k); }).join('&');
   }
   function decodeValue(value){
     if(!value) return null;
@@ -682,14 +691,17 @@ function createNamedFirestoreAdapter(){
     });
   }
   function setDoc(collection,id,data,options){
-    var merged=Promise.resolve(data);
+    var url=docUrl(collection,id);
     if(options && options.merge){
-      merged=getDoc(collection,id).then(function(existing){ return existing.exists?Object.assign({},existing.data(),data):data; });
+      var mask=fieldMaskQuery(data);
+      if(mask) url+='?'+mask;
     }
-    return merged.then(function(payload){ return request('PATCH',docUrl(collection,id),{fields:encodeFields(payload)}); }).then(function(json){return docFrom(json,id);});
+    return request('PATCH',url,{fields:encodeFields(data)}).then(function(json){return docFrom(json,id);});
   }
   function updateDoc(collection,id,data){
-    return request('PATCH',docUrl(collection,id),{fields:encodeFields(data)}).then(function(json){return docFrom(json,id);});
+    var mask=fieldMaskQuery(data);
+    var url=docUrl(collection,id)+(mask?'?'+mask:'');
+    return request('PATCH',url,{fields:encodeFields(data)}).then(function(json){return docFrom(json,id);});
   }
   function addDoc(collection,data){
     var id='web_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,10);
@@ -1270,12 +1282,7 @@ function loadData() {
       STATE.stations = Array.isArray(d.stations) ? d.stations : [];
       STATE.stations = mergeStationsFromFloor(STATE.stations, STATE.roomObjs);
       if (!STATE.floorRoom && STATE.rooms && STATE.rooms.length) STATE.floorRoom = STATE.rooms[0].id;
-      if (STATE.currentServer) {
-        if (!isManager() && STATE.floorFilter!=='mine') STATE.floorFilter='mine';
-        if (isManager() && (STATE.floorFilter==='all' || !STATE.floorFilter) && STATE.rooms && STATE.rooms.length) {
-          STATE.floorFilter='room:'+STATE.rooms[0].id;
-        }
-      }
+      if (STATE.currentServer && !STATE.floorFilter) STATE.floorFilter=defaultFloorFilter();
       if (STATE.activeTab==='tables') renderTables();
     }
   }, function(){});
@@ -1376,8 +1383,9 @@ function allStaffForLogin(){
   return Object.keys(byCode).map(function(k){ return byCode[k]; });
 }
 function defaultFloorFilter(){
-  if (!isManager()) return 'mine';
   var rooms=STATE.rooms||[];
+  var mine=myStation();
+  if (mine && mine.room) return 'room:'+mine.room;
   if (rooms.length) return 'room:'+rooms[0].id;
   return 'all';
 }
@@ -1647,6 +1655,40 @@ function serverOwnsTable(o, staff){
   var st=stationForTable(tableKey(o), o);
   return !!(st && serverOwnsStation(st, staff));
 }
+function myStation(){
+  var staff=STATE.currentServer;
+  if (!staff) return null;
+  var owned=sortedStations().filter(function(st){ return serverOwnsStation(st, staff); });
+  return owned[0]||null;
+}
+function focusedStation(){
+  var f=STATE.floorFilter||'';
+  if (f==='mine' || f==='station-focus') return myStation();
+  if (f.indexOf('station:')===0) {
+    var sid=f.slice(8);
+    return (STATE.stations||[]).find(function(s){ return s.id===sid || String(stationNumber(s))===String(sid); })||null;
+  }
+  return null;
+}
+function focusedRoomId(){
+  var st=focusedStation();
+  if (st && st.room) return st.room;
+  var f=STATE.floorFilter||'';
+  if (f.indexOf('room:')===0) return f.slice(5);
+  if (STATE.floorRoom) return STATE.floorRoom;
+  var rooms=STATE.rooms||[];
+  return rooms[0]?rooms[0].id:'';
+}
+function stationViewBox(st){
+  var pts=stationPoints(st);
+  if (pts.length>=3) {
+    var xs=pts.map(function(p){ return +p.x||0; });
+    var ys=pts.map(function(p){ return +p.y||0; });
+    var minX=Math.min.apply(null,xs), minY=Math.min.apply(null,ys);
+    return {x:minX,y:minY,w:Math.max(8,Math.max.apply(null,xs)-minX),h:Math.max(8,Math.max.apply(null,ys)-minY)};
+  }
+  return {x:st.x||0,y:st.y||0,w:st.w||220,h:st.h||180};
+}
 function isLayoutObject(o){
   if (!o) return false;
   if (SEATABLE[o.type]) return false;
@@ -1673,32 +1715,12 @@ function stationForTable(tNum, obj){
 }
 function visibleFloorObjects(){
   var filter=STATE.floorFilter||'all';
-  var all=allFloorObjects();
-  if (filter==='all') return all;
-  if (filter==='mine') {
-    var mine=all.filter(function(o){ return SEATABLE[o.type] && serverOwnsTable(o, STATE.currentServer); });
-    var mineRooms={};
-    mine.forEach(function(o){ if (o._room) mineRooms[String(o._room)]=1; });
-    return mine.concat(layoutObjectsForRooms(all, Object.keys(mineRooms)));
-  }
-  if (filter.indexOf('room:')===0) {
-    var rid=filter.slice(5);
-    var hit=all.filter(function(o){ return String(o._room)===String(rid); });
-    if (hit.length) return hit;
-    return (roomObjects(rid)||[]).map(function(o){ return Object.assign({}, o, {_room:rid}); });
-  }
-  if (filter.indexOf('station:')===0) {
-    var sid=filter.slice(8);
-    var st=(STATE.stations||[]).find(function(s){ return s.id===sid || String(stationNumber(s))===sid; });
-    if (!st) return [];
-    var tables=all.filter(function(o){ return SEATABLE[o.type] && tableInStation(o, st); });
-    var overlay=stationOverlay(st);
-    var roomIds=st.room ? [st.room] : [];
-    tables.forEach(function(o){ if (o._room && roomIds.indexOf(o._room)<0) roomIds.push(o._room); });
-    var layout=layoutObjectsForRooms(all, roomIds);
-    return tables.concat(overlay?[overlay]:[]).concat(layout);
-  }
-  return all;
+  if (filter==='all' && isManager()) return allFloorObjects();
+  var rid=focusedRoomId();
+  if (!rid) return allFloorObjects();
+  return roomObjectList(rid).filter(function(o){ return o && o.type!=='waiterstation'; }).map(function(o){
+    return Object.assign({}, o, {_room:rid});
+  });
 }
 var STATION_COLORS=['#C9A84C','#9BC4E2','#5FB48A','#E0A36B','#B98AD8','#E07A6B'];
 function stationColor(st){
@@ -1710,8 +1732,8 @@ function stationColor(st){
 function stationOverlay(st){
   var pts=stationPoints(st);
   if (!pts.length && (st.x==null || !st.w || !st.h)) return null;
-  var offsets=roomPackOffsets();
-  var xOff=offsets[st.room]||0;
+  var pack=(STATE.floorFilter==='all' && isManager());
+  var xOff=pack?(roomPackOffsets()[st.room]||0):0;
   var col=stationColor(st);
   var num=stationNumber(st);
   var lbl='Station'+(num!==''?' '+num:'')+(st.server?' · '+st.server:'');
@@ -1728,15 +1750,17 @@ function stationOverlay(st){
   };
 }
 function visibleStationOverlays(objs){
-  var seen={};
-  (objs||[]).forEach(function(o){ if (o && (o.type==='section' || o._stationBorder)) seen[o.id||o._room]=1; });
   var extra=[];
-  var filter=STATE.floorFilter||'all';
+  var filter=STATE.floorFilter||'';
+  var rid=focusedRoomId();
+  var focus=focusedStation();
   sortedStations().forEach(function(st){
-    if (seen[st.id]) return;
-    if (filter.indexOf('room:')===0 && st.room && st.room!==filter.slice(5)) return;
-    if (filter.indexOf('station:')===0 && st.id!==filter.slice(8)) return;
-    if (filter==='mine' && !serverOwnsStation(st, STATE.currentServer)) return;
+    if (filter==='all' && isManager()) {
+      /* packed all-rooms overview: show every station */
+    } else if (st.room && rid && st.room!==rid) {
+      return;
+    }
+    if (focus && st.id!==focus.id) return;
     var ov=stationOverlay(st);
     if (ov) extra.push(ov);
   });
@@ -1744,6 +1768,10 @@ function visibleStationOverlays(objs){
 }
 function normalizeFloor(objs){
   objs = objs || [];
+  if (STATE.floorFilter!=='all') {
+    STATE.floorOrigin={x:0,y:0};
+    return objs.map(function(o){ return Object.assign({}, o); });
+  }
   var minX=Infinity, minY=Infinity;
   objs.forEach(function(o){
     minX=Math.min(minX, o.x||0);
@@ -1771,7 +1799,7 @@ function setFloorFilter(filter){
   STATE.floorFilter=filter;
   STATE.floorFitDone=false;
   STATE.stationAssignId=null;
-  if (!(STATE.stationDraw && STATE.stationDraw.active)) STATE.stationDraw=null;
+  STATE.stationDraw=null;
   renderTables();
 }
 function applyFloorTransform(){
@@ -1803,6 +1831,19 @@ function floorResetView(){
   }
   var sw=stage.clientWidth || stage.getBoundingClientRect().width || 0;
   var sh=stage.clientHeight || stage.getBoundingClientRect().height || 0;
+  var st=focusedStation();
+  if (st && sw && sh) {
+    var box=stationViewBox(st);
+    var pad=40;
+    box={x:box.x-pad,y:box.y-pad,w:box.w+pad*2,h:box.h+pad*2};
+    var fit=Math.min(sw/Math.max(box.w,1), sh/Math.max(box.h,1));
+    STATE.floorZoom=Math.max(0.35, Math.min(8, fit*0.98));
+    STATE.floorPanX=(sw - box.w*STATE.floorZoom)/2 - box.x*STATE.floorZoom;
+    STATE.floorPanY=(sh - box.h*STATE.floorZoom)/2 - box.y*STATE.floorZoom;
+    STATE.floorFitDone=true;
+    applyFloorTransform();
+    return;
+  }
   var cw=parseFloat(canvas.style.width)||canvas.offsetWidth||0;
   var ch=parseFloat(canvas.style.height)||canvas.offsetHeight||0;
   if (!sw || !sh || !cw || !ch) {
@@ -1811,13 +1852,6 @@ function floorResetView(){
     return;
   }
   var fit=Math.min(sw/cw, sh/ch);
-  var isolated=STATE.floorFilter==='mine' || String(STATE.floorFilter||'').indexOf('station:')===0;
-  if (isolated) {
-    var vis=visibleFloorObjects().filter(function(o){ return SEATABLE[o.type]; });
-    var minDim=Infinity;
-    vis.forEach(function(o){ minDim=Math.min(minDim, o.w||70, o.h||70); });
-    if (isFinite(minDim) && vis.length) fit=Math.max(fit, 64/minDim);
-  }
   STATE.floorZoom=Math.max(0.35, Math.min(8, fit*0.98));
   STATE.floorPanX=(sw - cw*STATE.floorZoom)/2;
   STATE.floorPanY=(sh - ch*STATE.floorZoom)/2;
@@ -1828,11 +1862,6 @@ function tapTable(tNum, ev){
   if (ev) { ev.preventDefault(); ev.stopPropagation(); }
   tNum=String(tNum||'');
   if (!tNum) return;
-  if (STATE.stationDraw && STATE.stationDraw.active) return;
-  if (STATE.stationAssignId) {
-    toggleStationTable(tNum);
-    return;
-  }
   selectTable(tNum);
 }
 function stageToCanvas(e, stage){
@@ -1863,13 +1892,6 @@ function bindFloorGestures(){
     try { stage.setPointerCapture(e.pointerId); } catch (err) {}
     pointers[e.pointerId]={x:e.clientX,y:e.clientY};
     moved=false;
-    if (STATE.stationDraw && STATE.stationDraw.active && count()===1) {
-      var p=stageToCanvas(e, stage);
-      STATE.stationDraw.start=p;
-      STATE.stationDraw.rect={x:p.x,y:p.y,w:0,h:0};
-      paintDrawRect();
-      return;
-    }
     if (count()===2) lastDist=dist();
   });
   stage.addEventListener('pointermove', function(e){
@@ -1878,17 +1900,6 @@ function bindFloorGestures(){
     var dx=e.clientX-prev.x, dy=e.clientY-prev.y;
     pointers[e.pointerId]={x:e.clientX,y:e.clientY};
     if (Math.abs(dx)+Math.abs(dy)>8) moved=true;
-    if (STATE.stationDraw && STATE.stationDraw.active && STATE.stationDraw.start) {
-      var p=stageToCanvas(e, stage);
-      var s=STATE.stationDraw.start;
-      STATE.stationDraw.rect={
-        x:Math.min(s.x,p.x), y:Math.min(s.y,p.y),
-        w:Math.abs(p.x-s.x), h:Math.abs(p.y-s.y)
-      };
-      paintDrawRect();
-      if (e.cancelable) e.preventDefault();
-      return;
-    }
     if (count()===1) {
       STATE.floorPanX += dx;
       STATE.floorPanY += dy;
@@ -1917,10 +1928,6 @@ function bindFloorGestures(){
   function endPtr(e){
     delete pointers[e.pointerId];
     if (count()<2) lastDist=0;
-    if (STATE.stationDraw && STATE.stationDraw.active && STATE.stationDraw.start && count()===0) {
-      finishStationDraw();
-      return;
-    }
     if (moved) suppressClick=true;
   }
   stage.addEventListener('pointerup', endPtr);
@@ -1932,39 +1939,8 @@ function bindFloorGestures(){
     suppressClick=false;
   }, true);
 }
-function paintDrawRect(){
-  var box=document.getElementById('floor-draw-rect');
-  var r=STATE.stationDraw && STATE.stationDraw.rect;
-  if (!box || !r) return;
-  box.style.display='block';
-  box.style.left=r.x+'px'; box.style.top=r.y+'px';
-  box.style.width=r.w+'px'; box.style.height=r.h+'px';
-}
-function finishStationDraw(){
-  var draw=STATE.stationDraw;
-  STATE.stationDraw=null;
-  document.body.classList.remove('floor-drawing');
-  if (!draw || !draw.rect || draw.rect.w<36 || draw.rect.h<36) {
-    toast('Draw a larger station border');
-    renderTables();
-    return;
-  }
-  var a=displayToWorld(draw.rect.x, draw.rect.y);
-  var b=displayToWorld(draw.rect.x+draw.rect.w, draw.rect.y+draw.rect.h);
-  var loc=worldToRoom((a.x+b.x)/2);
-  var offset=(roomPackOffsets()[loc.room]||0);
-  var st=upsertStation(draw.number, draw.serverCode);
-  st.room=loc.room;
-  st.x=Math.min(a.x,b.x)-offset;
-  st.y=Math.min(a.y,b.y);
-  st.w=Math.abs(b.x-a.x);
-  st.h=Math.abs(b.y-a.y);
-  st.tableIds=tablesInsideStation(st);
-  saveStations(STATE.stations);
-  STATE.floorFilter='station:'+st.id;
-  STATE.floorFitDone=false;
-  renderTables();
-  toast(stationLabel(st)+' · '+st.tableIds.length+' tables');
+function stationsAreBohOnly(){
+  toast('Food Master Stations are created and edited in BOH only');
 }
 
 function renderTables() {
@@ -1979,28 +1955,28 @@ function renderTables() {
 
   var html='<div class="floor-wrap">';
   var mgr=isManager();
-  html+='<div class="floor-head"><div><h2>'+(mgr?'Dining room':'Your tables')+'</h2><p>'+(mgr?'Same rooms as BOH. Open a room, then tap any table to write the order. Pinch or + to zoom.':'Only the tables on your station. Tap one to start the order.')+'</p></div><div style="font-size:0.8rem;color:var(--text-muted);text-align:right;">'+(STATE.currentServer?STATE.currentServer.name:'Server')+'</div></div>';
+  var focusSt=focusedStation();
+  var roomId=focusedRoomId();
+  html+='<div class="floor-head"><div><h2>'+(mgr?'Dining room':'Floor map')+'</h2><p>'+(mgr?'Same geometry as BOH. Open a room, or view one Food Master Station. Tap a table to write the order.':'The complete room as drawn in BOH. Use MY STATION to zoom to your tables, then FULL ROOM to return.')+'</p></div><div style="font-size:0.8rem;color:var(--text-muted);text-align:right;">'+(STATE.currentServer?STATE.currentServer.name:'Server')+'</div></div>';
 
   html+='<div class="floor-room-tabs">';
   if (mgr) {
     html+='<button class="floor-room-tab'+(STATE.floorFilter==='all'?' active':'')+'" onclick="setFloorFilter(\'all\')">All rooms</button>';
-    rooms.forEach(function(rm){
-      html+='<button class="floor-room-tab'+(STATE.floorFilter==='room:'+rm.id?' active':'')+'" onclick=\'setFloorFilter('+JSON.stringify('room:'+rm.id)+')\'>'+esc(rm.name||rm.id)+'</button>';
-    });
-    stations.forEach(function(st){
-      html+='<button class="floor-room-tab'+(STATE.floorFilter==='station:'+st.id?' active':'')+'" onclick=\'setFloorFilter('+JSON.stringify('station:'+st.id)+')\'>'+esc(stationLabel(st))+'</button>';
-    });
-    html+='<button class="floor-room-tab" onclick="openStationEditor()">Stations'+(stations.length?' ('+stations.length+')':'')+'</button>';
-  } else {
-    html+='<button class="floor-room-tab active">My station'+(mineCount?' ('+mineCount+')':'')+'</button>';
   }
+  rooms.forEach(function(rm){
+    html+='<button class="floor-room-tab'+(STATE.floorFilter==='room:'+rm.id?' active':'')+'" onclick=\'setFloorFilter('+JSON.stringify('room:'+rm.id)+')\'>'+esc(rm.name||rm.id)+'</button>';
+  });
+  html+='<button class="floor-room-tab'+(STATE.floorFilter==='mine'?' active':'')+'" onclick="showMyStation()">MY STATION'+(mineCount?' ('+mineCount+')':'')+'</button>';
+  html+='<button class="floor-room-tab'+(!focusSt && String(STATE.floorFilter||'').indexOf('room:')===0?' active':'')+'" onclick="showFullRoom()">FULL ROOM</button>';
+  html+='<button class="floor-room-tab" onclick="openStationEditor()">Stations'+(stations.length?' ('+stations.length+')':'')+'</button>';
   html+='</div>';
 
-  /* Req 8: make the manager "view as station" override explicit and reversible. */
-  if (mgr && String(STATE.floorFilter||'').indexOf('station:')===0) {
-    var vst=stations.filter(function(s){ return s.id===STATE.floorFilter.slice(8); })[0];
-    html+='<div class="floor-assign mgr-override">Manager override — viewing <strong>'+esc(vst?stationLabel(vst):'station')+'</strong> as its Food Master would (their tables only). '+
-      '<button class="ghost-btn" style="min-height:36px;margin-top:0.35rem;" onclick="setFloorFilter(\'all\')">Show all tables</button></div>';
+  if (focusSt) {
+    html+='<div class="floor-assign'+(mgr?' mgr-override':'')+'">'+
+      (mgr?'Viewing ':'Your station: ')+'<strong>'+esc(stationLabel(focusSt))+'</strong>'+
+      (focusSt.server?' · '+esc(focusSt.server):'')+
+      ' — table positions match the BOH floor. '+
+      '<button class="ghost-btn" style="min-height:36px;margin-top:0.35rem;" onclick="showFullRoom()">Full room</button></div>';
   }
 
   html+='<div class="floor-zoombar">';
@@ -2009,28 +1985,24 @@ function renderTables() {
   html+='<button class="floor-zoom-btn" onclick="floorZoomBy(1.25)">+</button>';
   html+='<span class="floor-zoom-label" id="floor-zoom-label">100%</span>';
   html+='</div>';
-  if (STATE.stationDraw && STATE.stationDraw.active) {
-    html+='<div class="floor-assign">Draw a dashed border around Station <strong>'+esc(String(STATE.stationDraw.number))+'</strong>. Pinch is paused. <button class="ghost-btn" style="min-height:36px;margin-top:0.35rem;" onclick="cancelStationDraw()">Cancel</button></div>';
-  } else if (STATE.stationAssignId) {
-    var ast=stations.filter(function(s){ return s.id===STATE.stationAssignId; })[0];
-    html+='<div class="floor-assign">Assigning <strong>'+esc(ast?stationLabel(ast):'station')+'</strong> — tap tables to add or remove. <button class="ghost-btn" style="min-height:36px;margin-top:0.35rem;" onclick="STATE.stationAssignId=null;renderTables()">Done</button></div>';
-  }
 
   if (objs.length) {
-    var maxX=320, maxY=240;
+    var maxX=1200, maxY=800;
     objs.forEach(function(o){
       maxX=Math.max(maxX, (o.x||0)+(o.w||80)+24);
       maxY=Math.max(maxY, (o.y||0)+(o.h||80)+24);
     });
-    html+='<div class="floor-stage" id="floor-stage">';
-    html+='<div class="floor-canvas" id="floor-canvas" style="width:'+maxX+'px;height:'+maxY+'px;">';
-    html+='<div class="floor-draw-rect" id="floor-draw-rect" style="display:none"></div>';
-    objs.forEach(function(o){
-      if (o.type==='waiterstation' && !o._stationBorder) {
-        var merged=(STATE.stations||[]).some(function(st){ return st.id===o.id && st.w && st.h; });
-        if (merged) return;
+    var clipCss='';
+    if (focusSt) {
+      var cpts=stationPoints(focusSt);
+      if (cpts.length>=3) {
+        clipCss='clip-path:polygon('+cpts.map(function(p){ return ((p.x||0))+'px '+((p.y||0))+'px'; }).join(',')+');';
       }
-      var left=o.x||20, top=o.y||20, width=o.w||70, height=o.h||70;
+    }
+    html+='<div class="floor-stage" id="floor-stage">';
+    html+='<div class="floor-canvas" id="floor-canvas" style="width:'+maxX+'px;height:'+maxY+'px;'+clipCss+'">';
+    objs.forEach(function(o){
+      var left=o.x||0, top=o.y||0, width=o.w||70, height=o.h||70;
       var style='left:'+left+'px;top:'+top+'px;width:'+width+'px;height:'+height+'px;';
       if (o.type==='section' || o.type==='waiterstation' || o._stationBorder) {
         html+=stationShapeHtml(o, left, top, width, height);
@@ -2044,9 +2016,8 @@ function renderTables() {
         var mine=serverOwnsTable(o, STATE.currentServer);
         var stn=stationForTable(tNum, o);
         var stnCol=stn?stationColor(stn):'';
-        var inAssign=!!(STATE.stationAssignId && stationTableIds(stations.filter(function(s){ return s.id===STATE.stationAssignId; })[0]).indexOf(String(tNum))>-1);
-        var bg=hasCall?'rgba(230,80,80,0.28)':(hasOrder?'rgba(220,165,50,0.28)':(inAssign||mine?'rgba(201,168,76,0.22)':'rgba(201,168,76,0.12)'));
-        var border=hasCall?'#E65050':(hasOrder?'#DCA532':(stnCol||(inAssign?'#F3ECDC':(mine?'#C9A84C':'rgba(201,168,76,0.35)'))));
+        var bg=hasCall?'rgba(230,80,80,0.28)':(hasOrder?'rgba(220,165,50,0.28)':(mine?'rgba(201,168,76,0.22)':'rgba(201,168,76,0.12)'));
+        var border=hasCall?'#E65050':(hasOrder?'#DCA532':(stnCol||(mine?'#C9A84C':'rgba(201,168,76,0.35)')));
         var status=hasCall?'CALL':hasOrder?'Active':(o.status&&o.status!=='open'?o.status:'Open');
         var statusColor=hasCall?'#E65050':hasOrder?'#DCA532':'#5FB48A';
         var extra=mine?'':'opacity:0.9;';
@@ -2066,7 +2037,11 @@ function renderTables() {
       }
     });
     html+='</div></div>';
-    var quick = objs.filter(function(o){ return SEATABLE[o.type]; });
+    var quick = objs.filter(function(o){
+      if (!SEATABLE[o.type]) return false;
+      if (focusSt) return tableInStation(o, focusSt);
+      return true;
+    });
     if (quick.length) {
       html+='<div class="table-quick">';
       quick.forEach(function(o){
@@ -2077,8 +2052,6 @@ function renderTables() {
     }
     html+='<div class="floor-legend"><span><span class="floor-dot" style="background:#5FB48A"></span>Open</span><span><span class="floor-dot" style="background:#DCA532"></span>Active</span><span><span class="floor-dot" style="background:#E65050"></span>Call</span><span><span class="floor-dot" style="background:#C9A84C"></span>Yours / station</span></div>';
     html+='<p style="color:var(--text-muted);font-size:0.72rem;margin-top:0.4rem;">Pinch the map or use + to enlarge. Number chips below always open a table.</p>';
-  } else if (!mgr && rooms.length) {
-    html+='<p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:0.8rem;">No tables on your station yet. A manager assigns your waiter station in BOH, then saves the layout.</p>';
   } else {
     html+='<p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:0.8rem;">'+(mgr?'No dining room from BOH yet. Add rooms on the BOH floor and Save Layout.':'No floor from BOH yet. Use a table number to start.')+'</p>';
     html+='<div class="table-grid">';
@@ -2095,32 +2068,24 @@ function renderTables() {
   }
   html+='</div>';
   c.innerHTML=html;
-  document.body.classList.toggle('floor-drawing', !!(STATE.stationDraw && STATE.stationDraw.active));
+  document.body.classList.remove('floor-drawing');
   paintChrome();
   bindFloorGestures();
   requestAnimationFrame(function(){ if (!STATE.floorFitDone) floorResetView(); else applyFloorTransform(); });
 }
 
-function saveStations(list) {
-  STATE.stations = list || [];
-  if (!fbReady) { toast('Stations saved on this device only'); return Promise.resolve(); }
-  return fbDb.collection('boh_shared').doc('tables').set({
-    stations: STATE.stations,
-    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-  }, { merge: true }).then(function(){ toast('Stations saved'); }).catch(function(err){ toast(err.message||'Save failed'); });
+function showMyStation(){
+  var st=myStation();
+  if (!st) { toast('No Food Master Station is assigned to you in BOH'); return; }
+  setFloorFilter('mine');
 }
-function upsertStation(number, serverCode){
-  var n=parseStationNumber(number);
-  var existing=(STATE.stations||[]).filter(function(s){ return stationNumber(s)===n; })[0];
-  if (existing) {
-    if (serverCode) existing.serverCode=serverCode;
-    existing.number=n;
-    existing.name=String(n);
-    return existing;
-  }
-  var st={ id:'st-'+n+'-'+Date.now().toString(36), number:n, name:String(n), serverCode:serverCode||'', tableIds:[], x:null, y:null, w:null, h:null, room:'' };
-  STATE.stations.push(st);
-  return st;
+function showFullRoom(){
+  var rid=focusedRoomId() || (STATE.rooms[0]&&STATE.rooms[0].id);
+  setFloorFilter(rid?('room:'+rid):'all');
+}
+function saveStations() {
+  toast('Food Master Stations are created in BOH only');
+  return Promise.resolve();
 }
 function tableNote(o){
   if (!o) return '';
@@ -2157,6 +2122,7 @@ function stationShapeHtml(o, left, top, width, height){
 function layoutObjectHtml(o, style){
   var t=o && o.type || '';
   if (t==='wall') return '<div class="floor-obj" style="'+style+'"><div class="f-wall"></div></div>';
+  if (t==='lshape') return '<div class="floor-obj" style="'+style+'"><div class="floor-lshape"></div></div>';
   if (t==='curve') return '<div class="floor-obj" style="'+style+'"><div class="f-curve"></div></div>';
   if (t==='bar') return '<div class="floor-obj" style="'+style+'"><div class="f-bar">'+esc(o.label||'Bar')+'</div></div>';
   if (t==='host') return '<div class="floor-obj" style="'+style+'"><div class="f-host">'+esc(o.label||'HOST')+'</div></div>';
@@ -2174,108 +2140,28 @@ function layoutObjectHtml(o, style){
 }
 
 function openStationEditor() {
-  STATE.stationAssignId = null;
   var stations = sortedStations();
-  var mgr=isManager();
   var html='<h2>Food Master Stations</h2>';
-  html+='<p class="sheet-sub">'+(stations.length?'These numbers match the BOH floor. Tap Show to zoom that station.':'No stations from BOH yet. Add Food Master Stations on the BOH floor and Save Layout.')+'</p>';
+  html+='<p class="sheet-sub">'+(stations.length?'Created in BOH. Tap Show to zoom that station on the real floor map.':'No stations from BOH yet. Add Food Master Stations on the BOH floor and Save Layout.')+'</p>';
   stations.forEach(function(st){
     html+='<div style="margin-bottom:0.7rem;padding:0.7rem;border:1px solid var(--border);border-radius:12px;">';
     html+='<div style="display:flex;justify-content:space-between;gap:0.4rem;align-items:center;">';
     html+='<strong>'+esc(stationLabel(st))+'</strong>';
     html+='<button class="ghost-btn" style="min-height:40px;margin-top:0;" onclick=\'closeSheet();setFloorFilter('+JSON.stringify('station:'+st.id)+')\'>Show</button></div>';
     html+='<p class="sheet-sub" style="margin:0.35rem 0 0;">'+(st.server?esc(st.server)+' · ':'')+'PIN '+esc(st.serverCode||'—')+' · '+stationTableIds(st).length+' tables'+(st.w?' · on map':'')+'</p>';
-    if (mgr) {
-      html+='<button class="ghost-btn" style="min-height:36px;" onclick=\'beginAssignStation('+JSON.stringify(st.id)+')\'>Tap tables</button>';
-      html+='<button class="ghost-btn" style="min-height:36px;" onclick=\'beginDrawExisting('+JSON.stringify(st.id)+')\'>Redraw border</button>';
-      html+='<button class="ghost-btn" style="min-height:36px;" onclick=\'deleteStation('+JSON.stringify(st.id)+')\'>Remove</button>';
-    }
     html+='</div>';
   });
-  if (mgr) {
-    html+='<input class="login-input" id="st-num" type="number" min="1" step="1" inputmode="numeric" placeholder="Station number (1, 2, 3…)" value="'+nextStationNumber()+'" style="margin-bottom:0.4rem;">';
-    html+='<input class="login-input" id="st-code" placeholder="Waiter PIN (optional, e.g. 4001)" inputmode="numeric" style="margin-bottom:0.5rem;">';
-    html+='<button class="primary-btn" onclick="startNewStationDraw()">Draw station border</button>';
-    html+='<button class="ghost-btn" onclick="addStationFromSheet()">Add number only</button>';
-  }
+  html+='<p class="sheet-sub">To create, reshape, assign, or delete a station, use Back of House.</p>';
   html+='<button class="ghost-btn" onclick="closeSheet()">Close</button>';
   openSheet(html);
 }
-function readStationForm(){
-  var n=parseStationNumber((document.getElementById('st-num')||{}).value);
-  var code=((document.getElementById('st-code')||{}).value||'').trim();
-  if (n==null) { toast('Enter a station number (1 or higher)'); return null; }
-  return {number:n, serverCode:code};
-}
-function addStationFromSheet() {
-  if (!isManager()) { toast('Manager PIN required'); return; }
-  var form=readStationForm();
-  if (!form) return;
-  upsertStation(form.number, form.serverCode);
-  saveStations(STATE.stations);
-  closeSheet();
-  openStationEditor();
-}
-function startNewStationDraw(){
-  if (!isManager()) { toast('Manager PIN required'); return; }
-  var form=readStationForm();
-  if (!form) return;
-  upsertStation(form.number, form.serverCode);
-  saveStations(STATE.stations);
-  closeSheet();
-  STATE.stationDraw={active:true, number:form.number, serverCode:form.serverCode, start:null, rect:null};
-  STATE.floorFilter='all';
-  STATE.floorFitDone=false;
-  renderTables();
-  toast('Drag a box around Station '+form.number);
-}
-function beginDrawExisting(id){
-  if (!isManager()) { toast('Manager PIN required'); return; }
-  var st=(STATE.stations||[]).filter(function(s){ return s.id===id; })[0];
-  if (!st) return;
-  closeSheet();
-  STATE.stationDraw={active:true, number:stationNumber(st), serverCode:st.serverCode||'', start:null, rect:null};
-  STATE.floorFilter='all';
-  STATE.floorFitDone=false;
-  renderTables();
-  toast('Drag a new border for '+stationLabel(st));
-}
-function cancelStationDraw(){
-  STATE.stationDraw=null;
-  document.body.classList.remove('floor-drawing');
-  renderTables();
-}
-function deleteStation(id) {
-  if (!isManager()) { toast('Manager PIN required'); return; }
-  STATE.stations = STATE.stations.filter(function(s){ return s.id!==id; });
-  if (STATE.floorFilter==='station:'+id) STATE.floorFilter='all';
-  saveStations(STATE.stations);
-  closeSheet();
-  openStationEditor();
-  renderTables();
-}
-function beginAssignStation(id) {
-  if (!isManager()) { toast('Manager PIN required'); return; }
-  STATE.stationAssignId = id;
-  closeSheet();
-  STATE.floorFilter='all';
-  STATE.floorFitDone=false;
-  renderTables();
-  var st = STATE.stations.filter(function(s){ return s.id===id; })[0];
-  toast('Tap tables to add/remove from '+(st?stationLabel(st):'station'));
-}
-function toggleStationTable(tNum) {
-  var id = STATE.stationAssignId;
-  var st = STATE.stations.filter(function(s){ return s.id===id; })[0];
-  if (!st) return;
-  st.tableIds = stationTableIds(st).slice();
-  st.x=null; st.y=null; st.w=null; st.h=null;
-  var k=String(tNum);
-  var i=st.tableIds.indexOf(k);
-  if (i>=0) st.tableIds.splice(i,1); else st.tableIds.push(k);
-  saveStations(STATE.stations);
-  renderTables();
-}
+function addStationFromSheet(){ stationsAreBohOnly(); }
+function startNewStationDraw(){ stationsAreBohOnly(); }
+function beginDrawExisting(){ stationsAreBohOnly(); }
+function cancelStationDraw(){ STATE.stationDraw=null; document.body.classList.remove('floor-drawing'); renderTables(); }
+function deleteStation(){ stationsAreBohOnly(); }
+function beginAssignStation(){ stationsAreBohOnly(); }
+function toggleStationTable(){ stationsAreBohOnly(); }
 
 function selectTable(t) {
   STATE.selectedTable = t;
