@@ -1,6 +1,6 @@
 // Epicurean POS — Service Worker
 // Network-first so floor-map and station updates actually reach devices.
-var CACHE = 'epicurean-pos-v3';
+var CACHE = 'epicurean-pos-v5';
 var ASSETS = ['index.html','manifest.json','icon-192.png','icon-512.png'];
 
 self.addEventListener('install', e => {

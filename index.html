@@ -281,7 +281,8 @@ body { font-family:var(--font); color:var(--text); background:var(--bg); -webkit
 .floor-room-tabs { display:flex; gap:8px; overflow-x:auto; padding-bottom:0.4rem; margin-bottom:0.75rem; -webkit-overflow-scrolling:touch; }
 .floor-room-tab { flex:0 0 auto; padding:0.45rem 0.8rem; border-radius:999px; border:1px solid var(--border); background:var(--surface); color:var(--text-secondary); font-size:0.78rem; cursor:pointer; }
 .floor-room-tab.active { border-color:var(--primary); background:var(--primary-glow); color:var(--text); font-weight:600; }
-.floor-stage { position:relative; width:100%; overflow:hidden; touch-action:none; background:#0F1B2D; border:1px solid rgba(201,168,76,0.3); border-radius:12px; box-shadow:inset 0 0 60px rgba(0,0,0,0.55); min-height:320px; height:min(68vh, 680px); }
+.floor-stage { position:relative; width:100%; overflow:hidden; touch-action:none; background:#0F1B2D; border:1px solid rgba(201,168,76,0.3); border-radius:12px; box-shadow:inset 0 0 60px rgba(0,0,0,0.55); min-height:320px; height:min(72vh, 720px); }
+.floor-stage.station-locked { height:calc(100dvh - 10.5rem); min-height:420px; }
 .floor-canvas { position:absolute; left:0; top:0; transform-origin:0 0; will-change:transform;
   background:
     linear-gradient(rgba(201,168,76,0.05) 1px,transparent 1px) 0 0/40px 40px,
@@ -313,12 +314,9 @@ body { font-family:var(--font); color:var(--text); background:var(--bg); -webkit
   padding:0;
 }
 .floor-station-tag {
-  position:absolute; top:4px; left:6px; font-size:0.6rem; font-weight:800; color:#1a1306;
-  padding:1px 6px; border-radius:5px; white-space:nowrap; box-shadow:0 2px 6px rgba(0,0,0,0.35);
-}
-.floor-tstation {
-  position:absolute; top:2px; right:2px; font-size:0.55rem; font-weight:800; color:#1a1306;
-  padding:0 4px; border-radius:4px; line-height:1.35;
+  position:absolute; z-index:24; font-size:0.78rem; font-weight:800; color:#1a1306;
+  padding:5px 9px; border-radius:8px; white-space:normal; max-width:48%; line-height:1.2;
+  box-shadow:0 2px 10px rgba(0,0,0,0.5); pointer-events:none; text-align:center;
 }
 .floor-draw-rect {
   position:absolute; border:2px dashed #F3ECDC; background:rgba(243,236,220,0.14);
@@ -342,7 +340,10 @@ body.hh-on.floor-drawing .floor-stage { outline:2px dashed var(--primary); }
 .f-door { width:100%; height:100%; background:#0F1B2D; border:2px solid rgba(201,168,76,0.4); border-radius:50% 0 0 0; display:flex; align-items:center; justify-content:center; font-size:18px; }
 .f-plant { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:22px; }
 .f-host { width:100%; height:100%; background:#1D3250; border:1.5px solid #C9A84C; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#C9A84C; }
-.f-station { width:100%; height:100%; background:rgba(155,196,226,0.12); border:2px dashed #9BC4E2; border-radius:8px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:10px; font-weight:700; color:#9BC4E2; text-align:center; padding:4px; }
+.f-station { width:100%; height:100%; background:rgba(155,196,226,0.12); border:2px dashed #9BC4E2; border-radius:8px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:10px; font-weight:700; color:#9BC4E2; text-align:center; padding:4px; gap:4px; }
+.f-station-ico { width:28px; height:22px; background:#fff; border-radius:4px; border:1.5px solid #1a1306; position:relative; flex-shrink:0; }
+.f-station-ico:before { content:''; position:absolute; left:4px; right:4px; top:6px; height:1.5px; background:#1a1306; }
+.f-station-ico:after { content:''; position:absolute; left:4px; right:4px; top:12px; height:1.5px; background:#1a1306; }
 .f-couch { width:100%; height:100%; background:#5a4126; border-radius:18px 18px 6px 6px; border:2px solid #3f2d18; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#f3ecdc; font-size:10px; font-weight:700; }
 .f-stool { width:100%; height:100%; border-radius:50%; border:2.5px solid; display:flex; align-items:center; justify-content:center; font-weight:700; }
 .f-outdoor { width:100%; height:100%; border-radius:10px; border:2px dashed; display:flex; flex-direction:column; align-items:center; justify-content:center; font-weight:700; }
@@ -363,7 +364,10 @@ body.hh-on.floor-drawing .floor-stage { outline:2px dashed var(--primary); }
 .floor-curve { pointer-events:none; z-index:1; background:#2a2a36; border:2px solid #3a3a4a; border-bottom:none; border-radius:50% 50% 0 0 / 100% 100% 0 0; }
 .floor-door { pointer-events:none; z-index:1; background:#1a1a24; border:2px solid #3a3a4a; border-radius:50% 0 0 0; font-size:1rem; }
 .floor-plant { pointer-events:none; z-index:1; font-size:1.2rem; }
-.floor-label { pointer-events:none; z-index:3; color:rgba(243,236,220,0.7); font-size:0.72rem; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; }
+.floor-label { pointer-events:none; z-index:3; background:#fff; color:#1a1306; font-size:0.72rem; font-weight:800; letter-spacing:0.05em; text-transform:uppercase; border-radius:6px; padding:2px 6px; }
+.f-chair { width:100%; height:100%; position:relative; pointer-events:none; }
+.f-chair-back { position:absolute; left:18%; right:18%; top:6%; height:36%; border:2.5px solid #C9A84C; border-bottom:none; border-radius:10px 10px 0 0; background:rgba(201,168,76,0.22); }
+.f-chair-seat { position:absolute; left:10%; right:10%; top:40%; bottom:10%; border:2.5px solid #C9A84C; border-radius:8px; background:rgba(201,168,76,0.18); }
 .item-thumb { width:42px; height:42px; border-radius:8px; object-fit:cover; margin-right:0.6rem; flex-shrink:0; border:1px solid var(--border); }
 .menu-item-row.sold-out { opacity:0.55; }
 .item-86 { display:inline-block; margin-left:6px; background:var(--danger); color:#fff; font-size:9px; font-weight:700; padding:1px 5px; border-radius:4px; letter-spacing:0.3px; vertical-align:middle; }
@@ -787,6 +791,7 @@ var STATE = {
   floorPanX: 0,
   floorPanY: 0,
   floorFitDone: false,
+  floorMinZoom: 1,
   stationAssignId: null,
   stationDraw: null,
   floorOrigin: {x:0,y:0}
@@ -1702,6 +1707,82 @@ function stationViewBox(st){
   }
   return {x:st.x||0,y:st.y||0,w:st.w||220,h:st.h||180};
 }
+function floorViewLocked(){ return !!focusedStation(); }
+function stationCropBox(st){
+  if (!st) return null;
+  var box=stationViewBox(st);
+  var pad=10;
+  return {x:box.x-pad, y:box.y-pad, w:box.w+pad*2, h:box.h+pad*2};
+}
+function cropFloorToStation(objs, st){
+  var crop=stationCropBox(st);
+  if (!crop) return objs||[];
+  return (objs||[]).filter(function(o){
+    if (o && (o._stationBorder || o.type==='waiterstation')) return true;
+    var ox=o.x||0, oy=o.y||0, ow=o.w||70, oh=o.h||70;
+    return ox+ow>=crop.x && oy+oh>=crop.y && ox<=crop.x+crop.w && oy<=crop.y+crop.h;
+  }).map(function(o){
+    var c=Object.assign({}, o, {x:(o.x||0)-crop.x, y:(o.y||0)-crop.y});
+    if (Array.isArray(o.points)) {
+      c.points=o.points.map(function(p){ return {x:(p.x||0)-crop.x, y:(p.y||0)-crop.y}; });
+    }
+    return c;
+  });
+}
+function rectsOverlap(a, b){
+  return a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y;
+}
+function foodMasterName(st){
+  if (!st) return '';
+  var n=String(st.server||st.name||'').trim();
+  if (n && !/^station\s*\d*$/i.test(n)) return n;
+  return '';
+}
+function stationNamePlacement(st, tableRects, canvasW, canvasH){
+  var box=stationViewBox(st);
+  var name=foodMasterName(st);
+  var text=name || stationLabel(st);
+  var labelW=Math.min(Math.max(88, text.length*8+18), Math.max(100, (canvasW||400)*0.46));
+  var labelH=name?32:26;
+  var spots=[
+    {x:box.x+box.w/2-labelW/2, y:box.y-labelH-6},
+    {x:box.x+box.w/2-labelW/2, y:box.y+box.h+6},
+    {x:box.x-labelW-6, y:box.y+box.h/2-labelH/2},
+    {x:box.x+box.w+6, y:box.y+box.h/2-labelH/2},
+    {x:box.x+6, y:box.y+6},
+    {x:box.x+box.w-labelW-6, y:box.y+6},
+    {x:box.x+6, y:box.y+box.h-labelH-6},
+    {x:box.x+box.w-labelW-6, y:box.y+box.h-labelH-6},
+    {x:box.x+box.w/2-labelW/2, y:box.y+6}
+  ];
+  var gx, gy;
+  for (gy=0; gy<=5; gy++) {
+    for (gx=0; gx<=5; gx++) {
+      spots.push({
+        x: box.x + Math.max(0, box.w-labelW)*gx/5,
+        y: box.y + Math.max(0, box.h-labelH)*gy/5
+      });
+    }
+  }
+  function score(pos){
+    var r={x:pos.x,y:pos.y,w:labelW,h:labelH};
+    var minD=1e9, hits=0;
+    (tableRects||[]).forEach(function(t){
+      if (rectsOverlap(r, t)) hits++;
+      var d=Math.hypot((r.x+r.w/2)-(t.x+t.w/2), (r.y+r.h/2)-(t.y+t.h/2));
+      if (d<minD) minD=d;
+    });
+    var inCanvas=r.x>=-4 && r.y>=-4 && r.x+r.w<=(canvasW||0)+4 && r.y+r.h<=(canvasH||0)+4;
+    return {pos:pos, hits:hits, minD:minD, inCanvas:inCanvas};
+  }
+  var ranked=spots.map(score).sort(function(a,b){
+    if (a.hits!==b.hits) return a.hits-b.hits;
+    if (a.inCanvas!==b.inCanvas) return a.inCanvas?-1:1;
+    return b.minD-a.minD;
+  });
+  var best=ranked[0] ? ranked[0].pos : {x:box.x+6, y:box.y+6};
+  return {x:best.x, y:best.y, w:labelW, h:labelH, text:text, name:name};
+}
 function isLayoutObject(o){
   if (!o) return false;
   if (SEATABLE[o.type]) return false;
@@ -1749,7 +1830,8 @@ function stationOverlay(st){
   var xOff=pack?(roomPackOffsets()[st.room]||0):0;
   var col=stationColor(st);
   var num=stationNumber(st);
-  var lbl='Station'+(num!==''?' '+num:'')+(st.server?' · '+st.server:'');
+  var fm=foodMasterName(st);
+  var lbl=fm || ('Station'+(num!==''?' '+num:''));
   var shifted=pts.map(function(p){ return {x:(p.x||0)+xOff, y:p.y||0}; });
   var xs=shifted.map(function(p){ return p.x; });
   var ys=shifted.map(function(p){ return p.y; });
@@ -1819,16 +1901,16 @@ function applyFloorTransform(){
   var c=document.getElementById('floor-canvas');
   if (!c) return;
   c.style.transform='translate('+STATE.floorPanX+'px,'+STATE.floorPanY+'px) scale('+STATE.floorZoom+')';
-  var lab=document.getElementById('floor-zoom-label');
-  if (lab) lab.textContent=Math.round((STATE.floorZoom||1)*100)+'%';
 }
+function floorMinZoom(){ return STATE.floorMinZoom || 1; }
 function floorZoomBy(factor){
+  if (floorViewLocked()) return;
   var stage=document.getElementById('floor-stage');
   if (!stage) return;
   var rect=stage.getBoundingClientRect();
   var cx=rect.width/2, cy=rect.height/2;
   var old=STATE.floorZoom||1;
-  var nz=Math.max(0.45, Math.min(8, old*factor));
+  var nz=Math.max(floorMinZoom(), Math.min(8, old*factor));
   STATE.floorPanX = cx - (cx - STATE.floorPanX) * (nz/old);
   STATE.floorPanY = cy - (cy - STATE.floorPanY) * (nz/old);
   STATE.floorZoom=nz;
@@ -1844,30 +1926,19 @@ function floorResetView(){
   }
   var sw=stage.clientWidth || stage.getBoundingClientRect().width || 0;
   var sh=stage.clientHeight || stage.getBoundingClientRect().height || 0;
-  var st=focusedStation();
-  if (st && sw && sh) {
-    var box=stationViewBox(st);
-    var pad=40;
-    box={x:box.x-pad,y:box.y-pad,w:box.w+pad*2,h:box.h+pad*2};
-    var fit=Math.min(sw/Math.max(box.w,1), sh/Math.max(box.h,1));
-    STATE.floorZoom=Math.max(0.35, Math.min(8, fit*0.98));
-    STATE.floorPanX=(sw - box.w*STATE.floorZoom)/2 - box.x*STATE.floorZoom;
-    STATE.floorPanY=(sh - box.h*STATE.floorZoom)/2 - box.y*STATE.floorZoom;
-    STATE.floorFitDone=true;
-    applyFloorTransform();
-    return;
-  }
   var cw=parseFloat(canvas.style.width)||canvas.offsetWidth||0;
   var ch=parseFloat(canvas.style.height)||canvas.offsetHeight||0;
   if (!sw || !sh || !cw || !ch) {
-    STATE.floorZoom=1; STATE.floorPanX=0; STATE.floorPanY=0; STATE.floorFitDone=true;
+    STATE.floorZoom=1; STATE.floorPanX=0; STATE.floorPanY=0; STATE.floorMinZoom=1; STATE.floorFitDone=true;
     applyFloorTransform();
     return;
   }
   var fit=Math.min(sw/cw, sh/ch);
-  STATE.floorZoom=Math.max(0.35, Math.min(8, fit*0.98));
-  STATE.floorPanX=(sw - cw*STATE.floorZoom)/2;
-  STATE.floorPanY=(sh - ch*STATE.floorZoom)/2;
+  var z=Math.max(0.2, Math.min(8, fit*0.995));
+  STATE.floorMinZoom=z;
+  STATE.floorZoom=z;
+  STATE.floorPanX=(sw - cw*z)/2;
+  STATE.floorPanY=(sh - ch*z)/2;
   STATE.floorFitDone=true;
   applyFloorTransform();
 }
@@ -1912,11 +1983,17 @@ function bindFloorGestures(){
     var prev=pointers[e.pointerId];
     var dx=e.clientX-prev.x, dy=e.clientY-prev.y;
     pointers[e.pointerId]={x:e.clientX,y:e.clientY};
+    if (floorViewLocked()) {
+      pointers[e.pointerId]={x:e.clientX,y:e.clientY};
+      return;
+    }
     if (Math.abs(dx)+Math.abs(dy)>8) moved=true;
     if (count()===1) {
-      STATE.floorPanX += dx;
-      STATE.floorPanY += dy;
-      applyFloorTransform();
+      if ((STATE.floorZoom||1) > floorMinZoom()+0.02) {
+        STATE.floorPanX += dx;
+        STATE.floorPanY += dy;
+        applyFloorTransform();
+      }
     } else if (count()>=2) {
       var d=dist();
       if (lastDist>0 && d>0) {
@@ -1927,7 +2004,7 @@ function bindFloorGestures(){
         var cx=((a.x+b.x)/2)-rect.left;
         var cy=((a.y+b.y)/2)-rect.top;
         var old=STATE.floorZoom||1;
-        var nz=Math.max(0.45, Math.min(8, old*factor));
+        var nz=Math.max(floorMinZoom(), Math.min(8, old*factor));
         STATE.floorPanX = cx - (cx - STATE.floorPanX) * (nz/old);
         STATE.floorPanY = cy - (cy - STATE.floorPanY) * (nz/old);
         STATE.floorZoom=nz;
@@ -1970,7 +2047,7 @@ function renderTables() {
   var mgr=isManager();
   var focusSt=focusedStation();
   var roomId=focusedRoomId();
-  html+='<div class="floor-head"><div><h2>'+(mgr?'Dining room':'Floor map')+'</h2><p>'+(mgr?'Same geometry as BOH. Open a room, or view one Food Master Station. Tap a table to write the order.':'The complete room as drawn in BOH. Use MY STATION to zoom to your tables, then FULL ROOM to return.')+'</p></div><div style="font-size:0.8rem;color:var(--text-muted);text-align:right;">'+(STATE.currentServer?STATE.currentServer.name:'Server')+'</div></div>';
+  html+='<div class="floor-head"><div><h2>'+(mgr?'Dining room':'Floor map')+'</h2>'+(focusSt?'':'<p>'+(mgr?'Same geometry as BOH. Open a room, or view one Food Master Station. Tap a table to write the order.':'The complete room as drawn in BOH. MY STATION locks your tables in place. FULL ROOM returns to the whole dining room.')+'</p>')+'</div><div style="font-size:0.8rem;color:var(--text-muted);text-align:right;">'+(STATE.currentServer?STATE.currentServer.name:'Server')+'</div></div>';
 
   html+='<div class="floor-room-tabs">';
   if (mgr) {
@@ -1984,28 +2061,24 @@ function renderTables() {
   html+='<button class="floor-room-tab" onclick="openStationEditor()">Stations'+(stations.length?' ('+stations.length+')':'')+'</button>';
   html+='</div>';
 
-  if (focusSt) {
-    html+='<div class="floor-assign'+(mgr?' mgr-override':'')+'">'+
-      (mgr?'Viewing ':'Your station: ')+'<strong>'+esc(stationLabel(focusSt))+'</strong>'+
-      (focusSt.server?' · '+esc(focusSt.server):'')+
-      ' — table positions match the BOH floor. '+
-      '<button class="ghost-btn" style="min-height:36px;margin-top:0.35rem;" onclick="showFullRoom()">Full room</button></div>';
-  }
-
-  html+='<div class="floor-zoombar">';
-  html+='<button class="floor-zoom-btn" onclick="floorZoomBy(1/1.25)">−</button>';
-  html+='<button class="floor-zoom-btn" onclick="floorResetView()">Fit</button>';
-  html+='<button class="floor-zoom-btn" onclick="floorZoomBy(1.25)">+</button>';
-  html+='<span class="floor-zoom-label" id="floor-zoom-label">100%</span>';
-  html+='</div>';
-
   if (objs.length) {
+    if (focusSt && STATE.floorFilter!=='all') objs=cropFloorToStation(objs, focusSt);
     var maxX=1200, maxY=800;
+    if (focusSt && STATE.floorFilter!=='all') {
+      var crop=stationCropBox(focusSt);
+      maxX=Math.max(220, crop?crop.w:220);
+      maxY=Math.max(180, crop?crop.h:180);
+    } else {
+      objs.forEach(function(o){
+        maxX=Math.max(maxX, (o.x||0)+(o.w||80)+24);
+        maxY=Math.max(maxY, (o.y||0)+(o.h||80)+24);
+      });
+    }
+    var tableRects=[];
     objs.forEach(function(o){
-      maxX=Math.max(maxX, (o.x||0)+(o.w||80)+24);
-      maxY=Math.max(maxY, (o.y||0)+(o.h||80)+24);
+      if (SEATABLE[o.type]) tableRects.push({x:o.x||0,y:o.y||0,w:o.w||70,h:o.h||70});
     });
-    html+='<div class="floor-stage" id="floor-stage">';
+    html+='<div class="floor-stage'+(focusSt?' station-locked':'')+'" id="floor-stage">';
     html+='<div class="floor-canvas" id="floor-canvas" style="width:'+maxX+'px;height:'+maxY+'px;">';
     objs.forEach(function(o){
       var left=o.x||0, top=o.y||0, width=o.w||70, height=o.h||70;
@@ -2032,7 +2105,6 @@ function renderTables() {
         var note=tableNote(o);
         var innerCls=o.type==='couch'?'f-couch':(o.type==='stool'?'f-stool':(o.type==='outdoor'?'f-outdoor':('f-table '+shape)));
         html+='<div class="floor-obj seatable" data-table="'+esc(String(tNum))+'" onclick=\'tapTable('+JSON.stringify(String(tNum))+')\' style="'+style+extra+'">'+
-          (stn?'<div class="floor-tstation" style="background:'+stnCol+';">S'+esc(String(stationNumber(stn)))+'</div>':'')+
           '<div class="'+innerCls+'" style="background:'+bg+';border-color:'+border+';color:#F3ECDC;">'+
             '<span class="f-tnum">'+esc(String(tNum))+'</span>'+
             '<span class="f-tsub">'+(o.seats||(o.type==='stool'?1:4))+' seats</span>'+
@@ -2043,22 +2115,14 @@ function renderTables() {
         html+=layoutObjectHtml(o, style);
       }
     });
-    html+='</div></div>';
-    var quick = objs.filter(function(o){
-      if (!SEATABLE[o.type]) return false;
-      if (focusSt) return tableInStation(o, focusSt);
-      return true;
+    objs.forEach(function(o){
+      if (!(o.type==='waiterstation' || o._stationBorder)) return;
+      var place=stationNamePlacement(o, tableRects, maxX, maxY);
+      var col=o._color||stationColor(o);
+      html+='<div class="floor-station-tag" style="left:'+place.x+'px;top:'+place.y+'px;background:'+col+';">'+esc(place.text)+'</div>';
     });
-    if (quick.length) {
-      html+='<div class="table-quick">';
-      quick.forEach(function(o){
-        var tNum=tableKey(o);
-        html+='<button type="button" class="table-quick-btn'+(tableHasCall(tNum)?' call':'')+(tableHasOrder(tNum)?' active':'')+'" onclick=\'tapTable('+JSON.stringify(String(tNum))+')\'>'+esc(String(tNum))+'</button>';
-      });
-      html+='</div>';
-    }
+    html+='</div></div>';
     html+='<div class="floor-legend"><span><span class="floor-dot" style="background:#5FB48A"></span>Open</span><span><span class="floor-dot" style="background:#DCA532"></span>Active</span><span><span class="floor-dot" style="background:#E65050"></span>Call</span><span><span class="floor-dot" style="background:#C9A84C"></span>Yours / station</span></div>';
-    html+='<p style="color:var(--text-muted);font-size:0.72rem;margin-top:0.4rem;">Pinch the map or use + to enlarge. Number chips below always open a table.</p>';
   } else {
     html+='<p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:0.8rem;">'+(mgr?'No dining room from BOH yet. Add rooms on the BOH floor and Save Layout.':'No floor from BOH yet. Use a table number to start.')+'</p>';
     html+='<div class="table-grid">';
@@ -2120,11 +2184,9 @@ function stationShapeHtml(o, left, top, width, height){
     var pw=Math.max(8, maxX-minX), ph=Math.max(8, maxY-minY);
     var poly=pts.map(function(p){ return (p.x-minX)+','+(p.y-minY); }).join(' ');
     return '<svg class="floor-poly" style="left:'+minX+'px;top:'+minY+'px;width:'+pw+'px;height:'+ph+'px;" viewBox="0 0 '+pw+' '+ph+'" preserveAspectRatio="none">'+
-      '<polygon points="'+poly+'" fill="'+col+'22" stroke="'+col+'" stroke-width="2" stroke-dasharray="6 4"></polygon></svg>'+
-      '<div class="floor-station-tag" style="left:'+(minX+6)+'px;top:'+(minY+4)+'px;background:'+col+';">'+esc(o.label||stationLabel(o))+'</div>';
+      '<polygon points="'+poly+'" fill="'+col+'22" stroke="'+col+'" stroke-width="2" stroke-dasharray="6 4"></polygon></svg>';
   }
-  return '<div class="floor-obj floor-station" style="left:'+left+'px;top:'+top+'px;width:'+width+'px;height:'+height+'px;border:2px dashed '+col+';background:'+col+'14;">'+
-    '<span class="floor-station-tag" style="background:'+col+';">'+esc(o.label||stationLabel(o))+'</span></div>';
+  return '<div class="floor-obj floor-station" style="left:'+left+'px;top:'+top+'px;width:'+width+'px;height:'+height+'px;border:2px dashed '+col+';background:'+col+'14;"></div>';
 }
 function layoutObjectHtml(o, style){
   var t=o && o.type || '';
@@ -2136,13 +2198,14 @@ function layoutObjectHtml(o, style){
   if (t==='door') return '<div class="floor-obj" style="'+style+'"><div class="f-door">🚪</div></div>';
   if (t==='exit') return '<div class="floor-obj" style="'+style+'"><div class="f-exit">EXIT</div></div>';
   if (t==='plant') return '<div class="floor-obj" style="'+style+'"><div class="f-plant">🌿</div></div>';
-  if (t==='station') return '<div class="floor-obj" style="'+style+'"><div class="f-station">📦 '+esc(o.label||'Sideboard')+'</div></div>';
+  if (t==='station') return '<div class="floor-obj" style="'+style+'"><div class="f-station"><span class="f-station-ico" title="Sideboard"></span>'+esc(o.label||'Sideboard')+'</div></div>';
   if (t==='kitchen') return '<div class="floor-obj" style="'+style+'"><div class="f-zone" style="background:rgba(224,122,107,0.1);border:2px solid #E07A6B;color:#E07A6B;">🔥 '+esc(o.label||'Kitchen')+'</div></div>';
   if (t==='stage') return '<div class="floor-obj" style="'+style+'"><div class="f-zone" style="background:rgba(155,90,200,0.14);border:2px solid #B98AD8;color:#C79FE4;">🎼 '+esc(o.label||'Orchestra')+'</div></div>';
   if (t==='privateroom') return '<div class="floor-obj" style="'+style+'"><div class="f-zone" style="background:rgba(155,196,226,0.1);border:2px solid #9BC4E2;color:#9BC4E2;">🏛 '+esc(o.label||'Private Dining')+'</div></div>';
   if (t==='store') return '<div class="floor-obj" style="'+style+'"><div class="f-zone" style="background:rgba(201,168,76,0.1);border:2px solid #C9A84C;color:#D9BE6E;">☕ '+esc(o.label||'Coffee Studio')+'</div></div>';
   if (t==='kiosk') return '<div class="floor-obj" style="'+style+'"><div class="f-zone" style="background:rgba(95,180,138,0.12);border:2px solid #5FB48A;color:#8FD8B4;">🛒 '+esc(o.label||'Kiosk')+'</div></div>';
   if (t==='label') return '<div class="floor-obj floor-label" style="'+style+'">'+esc(o.label||'')+'</div>';
+  if (t==='chair') return '<div class="floor-obj" style="'+style+'"><div class="f-chair"><span class="f-chair-back"></span><span class="f-chair-seat"></span></div></div>';
   return '<div class="floor-obj floor-furn" style="'+style+'">'+esc((o && o.label)||t)+'</div>';
 }
 
@@ -2618,7 +2681,8 @@ function renderModifierSheet(){
   html+='<div class="tasting-section-label">Notes</div>';
   html+='<input class="search-box" id="mod-notes" value="'+(p.notes||'').replace(/"/g,'&quot;')+'" placeholder="Special instructions" oninput="STATE.pendingItem.notes=this.value">';
   var ready=modifiersReady(p);
-  html+='<button class="primary-btn" '+(ready?'':'disabled ')+'onclick="maybeAllergyThenAdd()">ADD TO CHECK</button>';
+  html+='<p class="sheet-sub">Tap a modifier to add this dish. Stay here and pick more dishes; SEND when the order is ready.</p>';
+  html+=(ready?'<button class="primary-btn" onclick="maybeAllergyThenAdd()">Add & keep ordering</button>':'');
   html+='<button class="ghost-btn" onclick="closeSheet()">Cancel</button>';
   openSheet(html);
 }
@@ -2629,7 +2693,8 @@ function pickMod(mi, opt){
   var dollar=String(opt).match(/\$(\d+(?:\.\d+)?)/);
   if (dollar) p.price=Number(dollar[1]);
   p.selectedMod=Object.keys(p.mods).map(function(g){return g+': '+p.mods[g];}).join(', ');
-  renderModifierSheet();
+  if (modifiersReady(p)) maybeAllergyThenAdd();
+  else renderModifierSheet();
 }
 function modifiersReady(p){
   if (!p.modifiers || !p.modifiers.length) return true;
