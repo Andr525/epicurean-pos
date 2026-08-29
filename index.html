@@ -1744,6 +1744,13 @@ function stationNamePlacement(st, tableRects, canvasW, canvasH){
   var text=name || stationLabel(st);
   var labelW=Math.min(Math.max(88, text.length*8+18), Math.max(100, (canvasW||400)*0.46));
   var labelH=name?32:26;
+  if (st && st.tagX!=null && st.tagY!=null) {
+    var mx=Math.max(0, (box.w||0)-labelW);
+    var my=Math.max(0, (box.h||0)-labelH);
+    var x=box.x + Math.max(0, Math.min(mx, +st.tagX||0));
+    var y=box.y + Math.max(0, Math.min(my, +st.tagY||0));
+    return {x:x, y:y, w:labelW, h:labelH, text:text, name:name};
+  }
   var spots=[
     {x:box.x+box.w/2-labelW/2, y:box.y-labelH-6},
     {x:box.x+box.w/2-labelW/2, y:box.y+box.h+6},
@@ -1841,7 +1848,8 @@ function stationOverlay(st){
   var h=st.h||(Math.max.apply(null,ys)-y);
   return {
     type:'waiterstation', id:st.id, number:num, label:lbl, server:st.server||'',
-    x:x, y:y, w:w, h:h, points:shifted, _room:st.room, _stationBorder:1, _color:col
+    x:x, y:y, w:w, h:h, points:shifted, _room:st.room, _stationBorder:1, _color:col,
+    tagX: st.tagX, tagY: st.tagY
   };
 }
 function visibleStationOverlays(objs){
