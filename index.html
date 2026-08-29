@@ -281,8 +281,22 @@ body { font-family:var(--font); color:var(--text); background:var(--bg); -webkit
 .floor-room-tabs { display:flex; gap:8px; overflow-x:auto; padding-bottom:0.4rem; margin-bottom:0.75rem; -webkit-overflow-scrolling:touch; }
 .floor-room-tab { flex:0 0 auto; padding:0.45rem 0.8rem; border-radius:999px; border:1px solid var(--border); background:var(--surface); color:var(--text-secondary); font-size:0.78rem; cursor:pointer; }
 .floor-room-tab.active { border-color:var(--primary); background:var(--primary-glow); color:var(--text); font-weight:600; }
-.floor-stage { position:relative; width:100%; overflow:hidden; touch-action:none; background:#0F1B2D; border:1px solid rgba(201,168,76,0.3); border-radius:12px; box-shadow:inset 0 0 60px rgba(0,0,0,0.55); min-height:320px; height:min(72vh, 720px); }
-.floor-stage.station-locked { height:calc(100dvh - 10.5rem); min-height:420px; }
+.floor-stage { position:relative; width:100%; overflow:hidden; touch-action:none; background:#0F1B2D; border:1px solid rgba(201,168,76,0.3); border-radius:12px; box-shadow:inset 0 0 60px rgba(0,0,0,0.55); min-height:320px; height:min(78vh, 760px); }
+.floor-stage.station-locked { height:calc(100dvh - 9.5rem); min-height:420px; }
+.floor-wrap.floor-fixed { overflow:hidden; }
+.f-star { position:absolute; top:2px; right:5px; color:#C9A84C; font-size:0.95rem; font-weight:800; line-height:1; z-index:3; text-shadow:0 1px 2px rgba(0,0,0,0.6); }
+.f-dwell { position:absolute; bottom:3px; left:0; right:0; font-size:0.58rem; font-weight:800; color:#fff; letter-spacing:0.02em; text-shadow:0 1px 2px rgba(0,0,0,0.7); }
+.f-table.open-tbl, .f-stool.open-tbl, .f-outdoor.open-tbl { background:#9BE3B8 !important; border-color:#3E9A68 !important; color:#0d2a18 !important; }
+.f-table.open-tbl .f-tnum, .f-stool.open-tbl .f-tnum, .f-outdoor.open-tbl .f-tnum,
+.f-table.open-tbl .f-tsub, .f-stool.open-tbl .f-tsub, .f-outdoor.open-tbl .f-tsub { color:#0d2a18; }
+.f-table.busy-tbl, .f-stool.busy-tbl, .f-outdoor.busy-tbl { background:#1A2740 !important; border-color:#0b1220 !important; color:#fff !important; }
+.f-table.busy-tbl .f-tnum, .f-stool.busy-tbl .f-tnum, .f-outdoor.busy-tbl .f-tnum,
+.f-table.busy-tbl .f-tsub, .f-stool.busy-tbl .f-tsub, .f-outdoor.busy-tbl .f-tsub { color:#fff; }
+.f-couch { width:100%; height:100%; background:#5a4126; border-radius:18px 18px 6px 6px; border:2px solid #3f2d18; }
+.guest-notes-panel { margin:0.7rem 0 1rem; padding:0.7rem 0.85rem; border:1px solid rgba(201,168,76,0.45); border-radius:12px; background:rgba(201,168,76,0.08); text-align:left; }
+.guest-notes-panel h3 { margin:0 0 0.4rem; font-size:0.85rem; color:var(--primary-light); }
+.guest-notes-panel .gn-row { font-size:0.82rem; margin:0.25rem 0; color:var(--text); }
+.guest-notes-panel .gn-note { font-size:0.75rem; color:var(--text-muted); margin-left:0.4rem; }
 .floor-canvas { position:absolute; left:0; top:0; transform-origin:0 0; will-change:transform;
   background:
     linear-gradient(rgba(201,168,76,0.05) 1px,transparent 1px) 0 0/40px 40px,
@@ -330,7 +344,7 @@ body.hh-on.floor-drawing .floor-stage { outline:2px dashed var(--primary); }
 .floor-tnum, .f-tnum { font-size:0.85rem; font-weight:700; color:#F3ECDC; line-height:1.1; }
 .floor-tsub, .f-tsub { font-size:0.62rem; color:rgba(243,236,220,0.7); }
 .floor-tstat { font-size:0.62rem; font-weight:600; margin-top:1px; }
-.f-table { width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; border:2.5px solid; font-weight:700; line-height:1; }
+.f-table { width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; border:2.5px solid; font-weight:700; line-height:1; position:relative; }
 .f-table.round { border-radius:50%; }
 .f-table.square { border-radius:12px; }
 .f-table.rect { border-radius:10px; }
@@ -344,8 +358,8 @@ body.hh-on.floor-drawing .floor-stage { outline:2px dashed var(--primary); }
 .f-station-ico { width:28px; height:22px; background:#fff; border-radius:4px; border:1.5px solid #1a1306; position:relative; flex-shrink:0; }
 .f-station-ico:before { content:''; position:absolute; left:4px; right:4px; top:6px; height:1.5px; background:#1a1306; }
 .f-station-ico:after { content:''; position:absolute; left:4px; right:4px; top:12px; height:1.5px; background:#1a1306; }
-.f-couch { width:100%; height:100%; background:#5a4126; border-radius:18px 18px 6px 6px; border:2px solid #3f2d18; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#f3ecdc; font-size:10px; font-weight:700; }
-.f-stool { width:100%; height:100%; border-radius:50%; border:2.5px solid; display:flex; align-items:center; justify-content:center; font-weight:700; }
+.f-couch { width:100%; height:100%; background:#5a4126; border-radius:18px 18px 6px 6px; border:2px solid #3f2d18; }
+.f-stool { width:100%; height:100%; border-radius:50%; border:2.5px solid; display:flex; flex-direction:column; align-items:center; justify-content:center; font-weight:700; position:relative; }
 .f-outdoor { width:100%; height:100%; border-radius:10px; border:2px dashed; display:flex; flex-direction:column; align-items:center; justify-content:center; font-weight:700; }
 .f-zone { width:100%; height:100%; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:11px; font-weight:700; text-align:center; padding:6px; }
 .f-curve { width:100%; height:100%; background:#1D3250; border-radius:50% 50% 0 0 / 100% 100% 0 0; border:2px solid rgba(201,168,76,0.4); border-bottom:none; }
@@ -543,6 +557,7 @@ body.hh-on.floor-drawing .floor-stage { outline:2px dashed var(--primary); }
     <button class="ghost-btn" onclick="closeOverflow();switchTab('messages')">Messages</button>
     <button class="ghost-btn" onclick="closeOverflow();switchTab('history')">History</button>
     <button class="ghost-btn" onclick="closeOverflow();openAllergyEditor()">Guest allergies</button>
+    <button class="ghost-btn" onclick="closeOverflow();openGuestNotesSheet()">Guest notes</button>
     <button class="ghost-btn" onclick="closeOverflow();logout()">Sign out</button>
     <button class="primary-btn" style="margin-top:0.8rem;" onclick="closeOverflow()">Close</button>
   </div>
@@ -1388,9 +1403,9 @@ function allStaffForLogin(){
   return Object.keys(byCode).map(function(k){ return byCode[k]; });
 }
 function defaultFloorFilter(){
-  var rooms=STATE.rooms||[];
   var mine=myStation();
-  if (mine && mine.room) return 'room:'+mine.room;
+  if (mine) return 'mine';
+  var rooms=STATE.rooms||[];
   if (rooms.length) return 'room:'+rooms[0].id;
   return 'all';
 }
@@ -1707,7 +1722,7 @@ function stationViewBox(st){
   }
   return {x:st.x||0,y:st.y||0,w:st.w||220,h:st.h||180};
 }
-function floorViewLocked(){ return !!focusedStation(); }
+function floorViewLocked(){ return true; }
 function stationCropBox(st){
   if (!st) return null;
   var box=stationViewBox(st);
@@ -2041,7 +2056,12 @@ function stationsAreBohOnly(){
   toast('Food Master Stations are created and edited in BOH only');
 }
 
+function roomName(id){
+  var rm=(STATE.rooms||[]).filter(function(r){ return r.id===id; })[0];
+  return rm ? (rm.name||id) : (id||'');
+}
 function renderTables() {
+  posEnsureDemoTurns();
   var c=document.getElementById('app-content');
   var rooms = Array.isArray(STATE.rooms) ? STATE.rooms : [];
   var stations = sortedStations();
@@ -2051,27 +2071,29 @@ function renderTables() {
   var mineCount = 0;
   allFloorObjects().forEach(function(o){ if (SEATABLE[o.type] && serverOwnsTable(o, STATE.currentServer)) mineCount++; });
 
-  var html='<div class="floor-wrap">';
+  var html='<div class="floor-wrap floor-fixed">';
   var mgr=isManager();
   var focusSt=focusedStation();
   var roomId=focusedRoomId();
-  html+='<div class="floor-head"><div><h2>'+(mgr?'Dining room':'Floor map')+'</h2>'+(focusSt?'':'<p>'+(mgr?'Same geometry as BOH. Open a room, or view one Food Master Station. Tap a table to write the order.':'The complete room as drawn in BOH. MY STATION locks your tables in place. FULL ROOM returns to the whole dining room.')+'</p>')+'</div><div style="font-size:0.8rem;color:var(--text-muted);text-align:right;">'+(STATE.currentServer?STATE.currentServer.name:'Server')+'</div></div>';
+  html+='<div class="floor-head"><div><h2>'+(focusSt?esc(stationLabel(focusSt)):(roomId?esc(roomName(roomId)||'Floor'):'Floor map'))+'</h2></div><div style="font-size:0.8rem;color:var(--text-muted);text-align:right;">'+(STATE.currentServer?STATE.currentServer.name:'Server')+'</div></div>';
 
   html+='<div class="floor-room-tabs">';
-  if (mgr) {
-    html+='<button class="floor-room-tab'+(STATE.floorFilter==='all'?' active':'')+'" onclick="setFloorFilter(\'all\')">All rooms</button>';
-  }
+  html+='<button class="floor-room-tab'+(STATE.floorFilter==='mine'?' active':'')+'" onclick="showMyStation()">My station'+(mineCount?' ('+mineCount+')':'')+'</button>';
+  stations.forEach(function(st){
+    var sid=st.id||stationNumber(st);
+    html+='<button class="floor-room-tab'+(STATE.floorFilter==='station:'+sid?' active':'')+'" onclick=\'setFloorFilter('+JSON.stringify('station:'+sid)+')\'>'+esc(stationLabel(st))+'</button>';
+  });
   rooms.forEach(function(rm){
     html+='<button class="floor-room-tab'+(STATE.floorFilter==='room:'+rm.id?' active':'')+'" onclick=\'setFloorFilter('+JSON.stringify('room:'+rm.id)+')\'>'+esc(rm.name||rm.id)+'</button>';
   });
-  html+='<button class="floor-room-tab'+(STATE.floorFilter==='mine'?' active':'')+'" onclick="showMyStation()">MY STATION'+(mineCount?' ('+mineCount+')':'')+'</button>';
-  html+='<button class="floor-room-tab'+(!focusSt && String(STATE.floorFilter||'').indexOf('room:')===0?' active':'')+'" onclick="showFullRoom()">FULL ROOM</button>';
-  html+='<button class="floor-room-tab" onclick="openStationEditor()">Stations'+(stations.length?' ('+stations.length+')':'')+'</button>';
+  if (mgr) {
+    html+='<button class="floor-room-tab'+(STATE.floorFilter==='all'?' active':'')+'" onclick="setFloorFilter(\'all\')">All rooms</button>';
+  }
   html+='</div>';
 
   if (objs.length) {
     if (focusSt && STATE.floorFilter!=='all') objs=cropFloorToStation(objs, focusSt);
-    var maxX=1200, maxY=800;
+    var maxX=80, maxY=80;
     if (focusSt && STATE.floorFilter!=='all') {
       var crop=stationCropBox(focusSt);
       maxX=Math.max(220, crop?crop.w:220);
@@ -2086,7 +2108,7 @@ function renderTables() {
     objs.forEach(function(o){
       if (SEATABLE[o.type]) tableRects.push({x:o.x||0,y:o.y||0,w:o.w||70,h:o.h||70});
     });
-    html+='<div class="floor-stage'+(focusSt?' station-locked':'')+'" id="floor-stage">';
+    html+='<div class="floor-stage station-locked" id="floor-stage">';
     html+='<div class="floor-canvas" id="floor-canvas" style="width:'+maxX+'px;height:'+maxY+'px;">';
     objs.forEach(function(o){
       var left=o.x||0, top=o.y||0, width=o.w||70, height=o.h||70;
@@ -2098,27 +2120,29 @@ function renderTables() {
       style+='transform:rotate('+(o.rot||0)+'deg);';
       var tNum=tableKey(o);
       if (SEATABLE[o.type]) {
+        if (o.type==='couch') {
+          html+='<div class="floor-obj" style="'+style+'"><div class="f-couch"></div></div>';
+        } else {
         var hasCall=tableHasCall(tNum);
         var hasOrder=tableHasOrder(tNum);
-        var mine=serverOwnsTable(o, STATE.currentServer);
+        var busy=tableIsBusy(tNum, o);
         var stn=stationForTable(tNum, o);
-        var stnCol=stn?stationColor(stn):'';
-        var bg=hasCall?'rgba(230,80,80,0.28)':(hasOrder?'rgba(220,165,50,0.28)':(mine?'rgba(201,168,76,0.22)':'rgba(201,168,76,0.12)'));
-        var border=hasCall?'#E65050':(hasOrder?'#DCA532':(stnCol||(mine?'#C9A84C':'rgba(201,168,76,0.35)')));
-        var status=hasCall?'CALL':hasOrder?'Active':(o.status&&o.status!=='open'?o.status:'Open');
-        var statusColor=hasCall?'#E65050':hasOrder?'#DCA532':'#5FB48A';
         var inFocus=!focusSt || tableInStation(o, focusSt);
-        var extra=inFocus?'':(mine?'opacity:0.55;':'opacity:0.28;');
+        var extra=inFocus?'':('opacity:0.28;');
         var shape=o.shape||(o.type==='stool'?'round':(o.type==='outdoor'?'rect':'square'));
-        var note=tableNote(o);
-        var innerCls=o.type==='couch'?'f-couch':(o.type==='stool'?'f-stool':(o.type==='outdoor'?'f-outdoor':('f-table '+shape)));
+        var party=currentTurnParty(o);
+        var mark=tableHasGuestNotes(o);
+        var seated=tableSeatedAt(tNum, o);
+        var dwell=busy?dwellLabel(seated||Date.now()):'';
+        var innerCls=(o.type==='stool'?'f-stool':(o.type==='outdoor'?'f-outdoor':('f-table '+shape)))+(busy?' busy-tbl':' open-tbl');
         html+='<div class="floor-obj seatable" data-table="'+esc(String(tNum))+'" onclick=\'tapTable('+JSON.stringify(String(tNum))+')\' style="'+style+extra+'">'+
-          '<div class="'+innerCls+'" style="background:'+bg+';border-color:'+border+';color:#F3ECDC;">'+
+          '<div class="'+innerCls+'" style="'+(hasCall?'box-shadow:0 0 0 3px #E65050;':'')+'">'+
+            (mark?'<span class="f-star" title="Guest notes">*</span>':'')+
             '<span class="f-tnum">'+esc(String(tNum))+'</span>'+
-            '<span class="f-tsub">'+(o.seats||(o.type==='stool'?1:4))+' seats</span>'+
-            '<span class="floor-tstat" style="color:'+statusColor+'">'+status+'</span>'+
-            (note?'<span class="f-note">'+esc(note)+'</span>':'')+
+            '<span class="f-tsub">'+party+'</span>'+
+            (dwell?'<span class="f-dwell" data-seated="'+(seated||'')+'">'+dwell+'</span>':'')+
           '</div></div>';
+        }
       } else {
         html+=layoutObjectHtml(o, style);
       }
@@ -2130,7 +2154,7 @@ function renderTables() {
       html+='<div class="floor-station-tag" style="left:'+place.x+'px;top:'+place.y+'px;background:'+col+';">'+esc(place.text)+'</div>';
     });
     html+='</div></div>';
-    html+='<div class="floor-legend"><span><span class="floor-dot" style="background:#5FB48A"></span>Open</span><span><span class="floor-dot" style="background:#DCA532"></span>Active</span><span><span class="floor-dot" style="background:#E65050"></span>Call</span><span><span class="floor-dot" style="background:#C9A84C"></span>Yours / station</span></div>';
+    html+='<div class="floor-legend"><span><span class="floor-dot" style="background:#9BE3B8"></span>Available</span><span><span class="floor-dot" style="background:#1A2740"></span>Seated</span><span><span class="floor-dot" style="background:#E65050"></span>Call</span><span style="color:#C9A84C;font-weight:800;">*</span> Notes</div>';
   } else {
     html+='<p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:0.8rem;">'+(mgr?'No dining room from BOH yet. Add rooms on the BOH floor and Save Layout.':'No floor from BOH yet. Use a table number to start.')+'</p>';
     html+='<div class="table-grid">';
@@ -2140,7 +2164,7 @@ function renderTables() {
       var cls='table-card'+(hasCall?' has-call':'')+(hasOrder?' has-order':'');
       html+='<div class="'+cls+'" onclick="tapTable('+i+')">'+
         '<div class="table-num">'+i+'</div>'+
-        '<div class="table-status">'+(hasCall?'CALLING':hasOrder?'Active':'Open')+'</div>'+
+        '<div class="table-status">'+(hasCall?'CALLING':hasOrder?'':'')+'</div>'+
       '</div>';
     }
     html+='</div>';
@@ -2150,7 +2174,16 @@ function renderTables() {
   document.body.classList.remove('floor-drawing');
   paintChrome();
   bindFloorGestures();
-  requestAnimationFrame(function(){ if (!STATE.floorFitDone) floorResetView(); else applyFloorTransform(); });
+  requestAnimationFrame(function(){ floorResetView(); });
+  if (!STATE._dwellTick) {
+    STATE._dwellTick=setInterval(function(){
+      if (STATE.activeTab!=='tables' || !STATE.currentServer) return;
+      document.querySelectorAll('.f-dwell[data-seated]').forEach(function(el){
+        var t=+el.getAttribute('data-seated');
+        if (t) el.textContent=dwellLabel(t);
+      });
+    }, 15000);
+  }
 }
 
 function showMyStation(){
@@ -2180,6 +2213,110 @@ function tableNote(o){
   if (linked && linked.notes) notes.push(String(linked.notes));
   if (notes.length) parts.push(notes.join('; '));
   return parts.join(' \u00b7 ');
+}
+var DEMO_TABLE_TURNS={
+  '22':[
+    {time:'5:00 PM', name:'Harrison Chen', party:6, vip:false, notes:'Anniversary · prefer window'},
+    {time:'7:00 PM', name:'UK Prime Minister', party:4, vip:true, notes:'Security detail · quiet corner'}
+  ],
+  '8':[{time:'6:00 PM', name:'Maya Patel', party:2, vip:false, notes:'Gluten-free bread'}],
+  '7':[
+    {time:'5:30 PM', name:'Luis Ortega', party:4, vip:false, notes:''},
+    {time:'8:00 PM', name:'The Chen party', party:5, vip:false, notes:'High chair'}
+  ],
+  '1':[{time:'6:15 PM', name:'Sofia Alvarez', party:2, vip:false, notes:'Celebrating a promotion'}],
+  '23':[{time:'7:30 PM', name:'James Whitaker', party:8, vip:true, notes:'Wine pairing already discussed'}]
+};
+function posEnsureDemoTurns(){
+  var used={};
+  var originals=[];
+  var src=STATE.roomObjs;
+  if (Array.isArray(src)) originals=src;
+  else Object.keys(src||{}).forEach(function(id){ (src[id]||[]).forEach(function(o){ originals.push(o); }); });
+  originals.forEach(function(o){
+    if(!o || !SEATABLE[o.type] || o.type==='couch') return;
+    if(Array.isArray(o.turns)&&o.turns.length) return;
+    var key=String(o.num!=null?o.num:'');
+    if(DEMO_TABLE_TURNS[key] && !used[key]){ o._demoTurns=DEMO_TABLE_TURNS[key]; used[key]=1; }
+  });
+  var leftover=Object.keys(DEMO_TABLE_TURNS).filter(function(k){ return !used[k]; });
+  originals.forEach(function(o){
+    if(!leftover.length) return;
+    if(!o || !SEATABLE[o.type] || o.type==='couch') return;
+    if((Array.isArray(o.turns)&&o.turns.length) || o._demoTurns) return;
+    o._demoTurns=DEMO_TABLE_TURNS[leftover.shift()];
+  });
+}
+function tableTurns(o){
+  if(o && Array.isArray(o.turns) && o.turns.length) return o.turns;
+  if(o && o._demoTurns && o._demoTurns.length) return o._demoTurns;
+  return [];
+}
+function findFloorTable(tNum){
+  var hit=null;
+  allFloorObjects().forEach(function(o){
+    if (SEATABLE[o.type] && String(tableKey(o))===String(tNum)) hit=o;
+  });
+  return hit;
+}
+function tableIsBusy(tNum, o){
+  if (tableHasOrder(tNum) || tableHasCall(tNum)) return true;
+  var st=(o && o.status) || 'open';
+  return st!=='open' && st!=='dirty';
+}
+function tableSeatedAt(tNum, o){
+  var sess=STATE.tableSessions && STATE.tableSessions[String(tNum)];
+  if (sess && sess.seatedAt) return sess.seatedAt;
+  if (o && o.seatedAt) return o.seatedAt;
+  var times=[];
+  (STATE.orders||[]).forEach(function(ord){
+    if (String(ord.table)===String(tNum) && ord.status!=='cleared' && ord.status!=='paid') {
+      times.push(ord.sentAt||ord.createdAt||0);
+    }
+  });
+  if (!times.length) return 0;
+  return Math.min.apply(null, times.filter(Boolean)) || 0;
+}
+function dwellLabel(from){
+  if (!from) return '1m';
+  var m=Math.max(1, Math.floor((Date.now()-from)/60000));
+  if (m<60) return m+'m';
+  return Math.floor(m/60)+'h '+(m%60)+'m';
+}
+function currentTurnParty(o){
+  var turns=tableTurns(o);
+  if (turns.length && turns[0].party) return turns[0].party;
+  return o && o.seats ? o.seats : 2;
+}
+function tableHasGuestNotes(o){
+  if (!o) return false;
+  if (o.vip || o.guestName || (Array.isArray(o.notes)&&o.notes.length) || o.note || o.guestNote) return true;
+  return tableTurns(o).some(function(t){ return t && (t.name || t.notes); });
+}
+function guestNotesPanelHtml(tNum){
+  posEnsureDemoTurns();
+  var o=findFloorTable(tNum);
+  var turns=tableTurns(o);
+  var notes=[];
+  if (o) {
+    if (Array.isArray(o.notes)) notes=o.notes.filter(Boolean);
+    else if (o.note) notes=[String(o.note)];
+    else if (o.guestNote) notes=[String(o.guestNote)];
+  }
+  if (!turns.length && !notes.length && !(o&&o.guestName)) return '';
+  var html='<div class="guest-notes-panel"><h3>Guest notes</h3>';
+  if (o && o.guestName) html+='<div class="gn-row">'+(o.vip?'VIP · ':'')+esc(o.guestName)+'</div>';
+  turns.forEach(function(t){
+    html+='<div class="gn-row">'+(t.time?esc(t.time)+' · ':'')+(t.vip?'VIP · ':'')+esc(t.name||'Guest')+', '+(t.party||'?')+'ppl'+(t.notes?'<div class="gn-note">'+esc(t.notes)+'</div>':'')+'</div>';
+  });
+  notes.forEach(function(n){ html+='<div class="gn-note">'+esc(n)+'</div>'; });
+  html+='</div>';
+  return html;
+}
+function openGuestNotesSheet(){
+  var t=STATE.selectedTable;
+  var panel=guestNotesPanelHtml(t);
+  openSheet('<h2>Table '+esc(String(t))+' notes</h2>'+(panel||'<p class="sheet-sub">No guest notes on this table.</p>')+'<button class="ghost-btn" onclick="closeSheet()">Close</button>');
 }
 function stationShapeHtml(o, left, top, width, height){
   var col=o._color||stationColor(o);
@@ -2263,10 +2400,12 @@ function selectTable(t) {
 
 function showGuestCountSheet(t){
   var sess=sessionOf(t);
-  var n=sess.guestCount||2;
+  var n=sess.guestCount||currentTurnParty(findFloorTable(t))||2;
+  sess.guestCount=n;
   openSheet(
     '<h2>Table '+t+'</h2>'+
-    '<p class="sheet-sub">How many guests?</p>'+
+    guestNotesPanelHtml(t)+
+    '<p class="sheet-sub">How many guests this turn?</p>'+
     '<div class="qty-row">'+
       '<button type="button" onclick="bumpGuests(-1)">−</button>'+
       '<div id="guest-count-display" style="font-size:1.6rem;font-weight:800;min-width:2.5rem;text-align:center;">'+n+'</div>'+
@@ -2285,6 +2424,7 @@ function bumpGuests(d){
 function confirmGuests(){
   var sess=sessionOf(STATE.selectedTable);
   STATE.guestCount=sess.guestCount||2;
+  sess.seatedAt=sess.seatedAt||Date.now();
   STATE.activeSeat=1;
   STATE.hhMode='service';
   closeSheet();
@@ -2322,6 +2462,7 @@ function renderOrder() {
 
   var html='<div class="order-section">';
   if (!hh) html+='<h3>Table '+STATE.selectedTable+' — '+seatName(STATE.activeSeat)+'</h3>';
+  html+=guestNotesPanelHtml(STATE.selectedTable);
   html+=renderSeatBar();
   html+='<input class="search-box" id="menu-search" type="search" placeholder="Search food, bar, wine, retail…" value="'+(STATE.menuSearch||'').replace(/"/g,'&quot;')+'" oninput="STATE.menuSearch=this.value; renderOrder();">';
   html+='<div class="cat-pills">';
