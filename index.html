@@ -3278,6 +3278,7 @@ function holdUnsent(){
     : pool.filter(function(i){ return !i.held; });
   var n=0;
   targets.forEach(function(i){ i.held=true; n++; });
+  STATE.selectedLineIds={};
   toast(n? (n+' item(s) held — not fired'): (hasSelected?'Select unsent items to hold':'Nothing to hold'));
   persistCheck(ensureOpenCheck(STATE.selectedTable));
   renderOrder();
@@ -3663,6 +3664,10 @@ function sendOrder(opts) {
     : hasSelected
       ? pool.filter(function(i){ return selectedIds[i.lineId]; })
       : pool.filter(function(i){ return !i.held; });
+  if (hasSelected && opts.fireCourse==null) {
+    var onlyHeld=bundle.length && bundle.every(function(i){ return i.held; });
+    if (!onlyHeld) bundle=bundle.filter(function(i){ return !i.held; });
+  }
   if (!bundle.length) { toast(opts.fireCourse!=null?'Nothing held on that course':'Nothing to send'); return; }
 
   var regularItems=bundle.filter(function(i){return !i.isTasting&&!i.isPrixFixe&&!i.isPairing;});
