@@ -1645,6 +1645,13 @@ function listenBohList(docName, key){
     }
   }, function(){});
 }
+function mergeScaliniList(list, seed, dummyIds){
+  seed = seed && seed[0] ? JSON.parse(JSON.stringify(seed[0])) : null;
+  dummyIds = dummyIds || [];
+  list = (list||[]).filter(function(x){ return x && dummyIds.indexOf(x.id)<0; });
+  if (seed && !list.some(function(x){ return x.id===seed.id; })) list.unshift(seed);
+  return list.filter(function(x){ return x && x.active !== false; });
+}
 function loadData() {
   if (!fbReady) {
     seedOfflineCatalog();
@@ -1699,14 +1706,14 @@ function loadData() {
 
   // Real-time listeners for tasting & prix fixe menus from BOH
   fbDb.collection('boh_shared').doc('tasting_menus').onSnapshot(function(doc){
-    var list = (doc.exists && Array.isArray((doc.data()||{}).list)) ? doc.data().list.filter(function(t){ return t && t.active !== false; }) : [];
-    STATE.tastingMenus = list.length ? list : SEED_TASTING_MENUS;
+    var list = (doc.exists && Array.isArray((doc.data()||{}).list)) ? doc.data().list : [];
+    STATE.tastingMenus = mergeScaliniList(list, SEED_TASTING_MENUS, ['tm_chef7','tm_choc5','tm1','tm2']);
     refreshOrderView();
   }, function(){ STATE.tastingMenus = SEED_TASTING_MENUS; });
 
   fbDb.collection('boh_shared').doc('prix_fixe_menus').onSnapshot(function(doc){
-    var list = (doc.exists && Array.isArray((doc.data()||{}).list)) ? doc.data().list.filter(function(p){ return p && p.active !== false; }) : [];
-    STATE.prixFixeMenus = list.length ? list : SEED_PRIX_FIXE_MENUS;
+    var list = (doc.exists && Array.isArray((doc.data()||{}).list)) ? doc.data().list : [];
+    STATE.prixFixeMenus = mergeScaliniList(list, SEED_PRIX_FIXE_MENUS, ['pf_lunch','pf_brunch','pf1','pf2']);
     refreshOrderView();
   }, function(){ STATE.prixFixeMenus = SEED_PRIX_FIXE_MENUS; });
 
