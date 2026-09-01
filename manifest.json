@@ -2,7 +2,7 @@
   "name": "Epicurean POS",
   "short_name": "POS",
   "description": "Server POS — The Epicurean House @ The Chocolate Studio",
-  "start_url": "/epicurean-pos/now.html",
+  "start_url": "/epicurean-pos/?b=13",
   "scope": "/epicurean-pos/",
   "display": "standalone",
   "background_color": "#3B2314",
