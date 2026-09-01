@@ -18,6 +18,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <title>Epicurean POS</title>
+<!-- pos-build: hub-v11 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
@@ -4232,11 +4233,18 @@ if (document.readyState === 'loading') {
   init();
 }
 
-// Service worker registration removed to prevent stale caching
+// Drop stale POS shells, then register a cache-busting worker.
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.getRegistrations().then(function(registrations) {
-    for(var i=0; i<registrations.length; i++) registrations[i].unregister();
-  });
+    return Promise.all(registrations.map(function(r){ return r.unregister(); }));
+  }).then(function(){
+    if (!window.caches) return;
+    return caches.keys().then(function(keys){
+      return Promise.all(keys.map(function(k){ return caches.delete(k); }));
+    });
+  }).then(function(){
+    return navigator.serviceWorker.register('sw.js');
+  }).catch(function(){});
 }
 </script>
 </body>
