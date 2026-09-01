@@ -18,7 +18,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <title>Epicurean POS</title>
-<!-- pos-build: hub-v11 -->
+<!-- pos-build: hub-v12 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
@@ -282,7 +282,7 @@ body { font-family:var(--font); color:var(--text); background:var(--bg); -webkit
 .floor-room-tabs { display:flex; gap:8px; overflow-x:auto; padding-bottom:0.4rem; margin-bottom:0.75rem; -webkit-overflow-scrolling:touch; }
 .floor-room-tab { flex:0 0 auto; padding:0.45rem 0.8rem; border-radius:999px; border:1px solid var(--border); background:var(--surface); color:var(--text-secondary); font-size:0.78rem; cursor:pointer; }
 .floor-room-tab.active { border-color:var(--primary); background:var(--primary-glow); color:var(--text); font-weight:600; }
-.floor-stage { position:relative; width:100%; overflow:hidden; touch-action:none; background:#0F1B2D; border:1px solid rgba(201,168,76,0.3); border-radius:12px; box-shadow:inset 0 0 60px rgba(0,0,0,0.55); min-height:320px; height:min(78vh, 760px); }
+.floor-stage { position:relative; width:100%; overflow:hidden; touch-action:none; -webkit-user-select:none; user-select:none; background:#0F1B2D; border:1px solid rgba(201,168,76,0.3); border-radius:12px; box-shadow:inset 0 0 60px rgba(0,0,0,0.55); min-height:320px; height:min(78vh, 760px); }
 .floor-stage.station-locked { height:calc(100dvh - 9.5rem); min-height:420px; }
 .floor-wrap.floor-fixed { overflow:hidden; }
 .f-star { position:absolute; top:2px; right:5px; color:#C9A84C; font-size:0.95rem; font-weight:800; line-height:1; z-index:3; text-shadow:0 1px 2px rgba(0,0,0,0.6); }
@@ -779,6 +779,7 @@ body.hh-table .app-content, body.tableside .app-content {
 <div id="login-screen" class="screen active">
   <h1>Epicurean POS</h1>
   <p class="subtitle">Enter your 4-digit code</p>
+  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 12</p>
   <div class="pin-display" id="pin-display">
     <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
   </div>
@@ -2572,12 +2573,14 @@ function bindFloorGestures(){
     return Math.sqrt(dx*dx+dy*dy);
   }
   stage.addEventListener('pointerdown', function(e){
+    if (e.pointerType==='touch') return;
     try { stage.setPointerCapture(e.pointerId); } catch (err) {}
     pointers[e.pointerId]={x:e.clientX,y:e.clientY};
     moved=false;
     if (count()===2) lastDist=dist();
   });
   stage.addEventListener('pointermove', function(e){
+    if (e.pointerType==='touch') return;
     if (!pointers[e.pointerId]) return;
     var prev=pointers[e.pointerId];
     var dx=e.clientX-prev.x, dy=e.clientY-prev.y;
@@ -2613,12 +2616,68 @@ function bindFloorGestures(){
     if (e.cancelable) e.preventDefault();
   }, {passive:false});
   function endPtr(e){
+    if (e.pointerType==='touch') return;
     delete pointers[e.pointerId];
     if (count()<2) lastDist=0;
     if (moved) suppressClick=true;
   }
   stage.addEventListener('pointerup', endPtr);
   stage.addEventListener('pointercancel', endPtr);
+  function syncTouches(e){
+    pointers={};
+    for (var i=0;i<e.touches.length;i++){
+      var t=e.touches[i];
+      pointers['t'+t.identifier]={x:t.clientX,y:t.clientY};
+    }
+  }
+  stage.addEventListener('touchstart', function(e){
+    syncTouches(e);
+    moved=false;
+    if (count()===2) lastDist=dist();
+    if (e.cancelable) e.preventDefault();
+  }, {passive:false});
+  stage.addEventListener('touchmove', function(e){
+    if (!e.touches.length) return;
+    var t=e.touches[0];
+    var id='t'+t.identifier;
+    var prev=pointers[id];
+    if (floorViewLocked()) { syncTouches(e); return; }
+    if (count()===1 && prev) {
+      var dx=t.clientX-prev.x, dy=t.clientY-prev.y;
+      if (Math.abs(dx)+Math.abs(dy)>8) moved=true;
+      STATE.floorPanX += dx;
+      STATE.floorPanY += dy;
+      applyFloorTransform();
+    } else if (e.touches.length>=2) {
+      syncTouches(e);
+      var d=dist();
+      if (lastDist>0 && d>0) {
+        var factor=d/lastDist;
+        var rect=stage.getBoundingClientRect();
+        var ids=Object.keys(pointers);
+        var a=pointers[ids[0]], b=pointers[ids[1]];
+        var cx=((a.x+b.x)/2)-rect.left;
+        var cy=((a.y+b.y)/2)-rect.top;
+        var old=STATE.floorZoom||1;
+        var nz=Math.max(floorMinZoom(), Math.min(8, old*factor));
+        STATE.floorPanX = cx - (cx - STATE.floorPanX) * (nz/old);
+        STATE.floorPanY = cy - (cy - STATE.floorPanY) * (nz/old);
+        STATE.floorZoom=nz;
+        STATE.floorFitDone=true;
+        applyFloorTransform();
+      }
+      lastDist=d;
+    }
+    syncTouches(e);
+    if (e.cancelable) e.preventDefault();
+  }, {passive:false});
+  function endTouch(e){
+    syncTouches(e);
+    if (count()<2) lastDist=0;
+    if (moved) suppressClick=true;
+  }
+  stage.addEventListener('touchend', endTouch);
+  stage.addEventListener('touchcancel', endTouch);
   stage.addEventListener('click', function(e){
     if (!suppressClick) return;
     e.preventDefault();
@@ -4233,7 +4292,8 @@ if (document.readyState === 'loading') {
   init();
 }
 
-// Drop stale POS shells, then register a cache-busting worker.
+// Kill leftover POS service workers. Do not register a new one —
+// a cache-first worker is why handhelds kept showing Station 1/2.
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.getRegistrations().then(function(registrations) {
     return Promise.all(registrations.map(function(r){ return r.unregister(); }));
@@ -4242,8 +4302,6 @@ if ('serviceWorker' in navigator) {
     return caches.keys().then(function(keys){
       return Promise.all(keys.map(function(k){ return caches.delete(k); }));
     });
-  }).then(function(){
-    return navigator.serviceWorker.register('sw.js');
   }).catch(function(){});
 }
 </script>
