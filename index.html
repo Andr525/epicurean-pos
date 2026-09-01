@@ -18,7 +18,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <title>Epicurean POS</title>
-<!-- pos-build: hub-v14 -->
+<!-- pos-build: hub-v15 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
@@ -311,7 +311,14 @@ body { font-family:var(--font); color:var(--text); background:var(--bg); -webkit
 .floor-obj { position:absolute; box-sizing:border-box; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:0; overflow:visible; }
 .floor-obj.seatable { cursor:pointer; box-shadow:none; z-index:2; padding:0; overflow:visible; -webkit-tap-highlight-color:rgba(184,115,51,0.35); touch-action:none; }
 .floor-obj.seatable .busy-tbl { box-shadow:0 4px 12px rgba(0,0,0,0.35); }
-.floor-zoombar { display:flex; gap:8px; align-items:center; margin:0.55rem 0 0.7rem; }
+.floor-zoom-fab {
+  position:absolute; right:10px; bottom:10px; z-index:6; display:flex; flex-direction:column; gap:8px;
+  pointer-events:auto;
+}
+.floor-zoom-fab button {
+  width:44px; height:44px; border-radius:12px; border:1px solid rgba(243,236,220,0.35);
+  background:rgba(15,27,45,0.88); color:#F3ECDC; font-size:1.35rem; font-weight:700; cursor:pointer;
+}
 .floor-zoombar button {
   min-width:44px; min-height:44px; border-radius:12px; border:1px solid var(--border);
   background:var(--surface); color:var(--text); font-size:1.1rem; font-weight:700; cursor:pointer;
@@ -781,7 +788,7 @@ body.hh-table .app-content, body.tableside .app-content {
 <div id="login-screen" class="screen active">
   <h1>Epicurean POS</h1>
   <p class="subtitle">Enter your 4-digit code</p>
-  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 14</p>
+  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 15</p>
   <div class="pin-display" id="pin-display">
     <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
   </div>
@@ -2488,7 +2495,6 @@ function clampFloorPan(){
   var cw=(parseFloat(canvas.style.width)||canvas.offsetWidth||0)*z;
   var ch=(parseFloat(canvas.style.height)||canvas.offsetHeight||0)*z;
   if (!sw || !sh || !cw || !ch) return;
-  // Keep the room canvas covering the viewport. Never show empty space past the walls.
   if (cw>=sw) {
     STATE.floorPanX=Math.min(0, Math.max(sw-cw, STATE.floorPanX||0));
   } else {
@@ -2533,24 +2539,12 @@ function floorResetView(){
     applyFloorTransform();
     return;
   }
-  var cover=Math.max(sw/cw, sh/ch);
-  var z=Math.max(0.2, Math.min(8, cover));
+  var fit=Math.min(sw/cw, sh/ch);
+  var z=Math.max(0.2, Math.min(8, fit));
   STATE.floorMinZoom=z;
   STATE.floorZoom=z;
   STATE.floorPanX=(sw - cw*z)/2;
   STATE.floorPanY=(sh - ch*z)/2;
-  var st=focusedStation();
-  var sbox=st && stationViewBox(st);
-  if (sbox && sbox.w && sbox.h) {
-    var room=STATE.floorRoomBox||{x:0,y:0};
-    var origin=STATE.floorOrigin||{x:0,y:0};
-    var bx=(sbox.x||0)-(room.x||0)-(origin.x||0);
-    var by=(sbox.y||0)-(room.y||0)-(origin.y||0);
-    var staZ=Math.max(z, Math.min(8, Math.min(sw/(sbox.w+48), sh/(sbox.h+48))*0.92));
-    STATE.floorZoom=staZ;
-    STATE.floorPanX=sw/2 - (bx+sbox.w/2)*staZ;
-    STATE.floorPanY=sh/2 - (by+sbox.h/2)*staZ;
-  }
   STATE.floorFitDone=true;
   applyFloorTransform();
 }
@@ -2707,11 +2701,10 @@ function roomName(id){
 }
 function floorContentBox(objs){
   var list=objs||[];
-  var walls=list.filter(function(o){ return o && o.type==='wall'; });
-  var use=walls.length?walls:list;
   var minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
-  use.forEach(function(o){
-    var x=o.x||0, y=o.y||0, w=o.w||0, h=o.h||0;
+  list.forEach(function(o){
+    if (!o) return;
+    var x=o.x||0, y=o.y||0, w=Math.max(o.w||0, 1), h=Math.max(o.h||0, 1);
     minX=Math.min(minX,x);
     minY=Math.min(minY,y);
     maxX=Math.max(maxX,x+w);
@@ -2763,7 +2756,9 @@ function renderTables() {
         html+=layoutObjectHtml(o, style);
       }
     });
-    html+='</div></div>';
+    html+='</div>';
+    html+='<div class="floor-zoom-fab" onpointerdown="event.stopPropagation()" ontouchstart="event.stopPropagation()"><button type="button" onclick="event.stopPropagation();floorZoomBy(1.25)">+</button><button type="button" onclick="event.stopPropagation();floorZoomBy(1/1.25)">−</button></div>';
+    html+='</div>';
     html+='<div class="floor-legend"><span><span class="floor-dot" style="background:transparent;border:1.5px solid #F3ECDC;"></span>Open</span><span><span class="floor-dot" style="background:#3E9A68"></span>In service</span></div>';
   } else {
     html+='<p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:0.8rem;">No dining room from BOH yet. Add rooms on the BOH floor and Save Layout.</p>';
