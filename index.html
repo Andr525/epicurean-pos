@@ -286,12 +286,15 @@ body { font-family:var(--font); color:var(--text); background:var(--bg); -webkit
 .floor-wrap.floor-fixed { overflow:hidden; }
 .f-star { position:absolute; top:2px; right:5px; color:#C9A84C; font-size:0.95rem; font-weight:800; line-height:1; z-index:3; text-shadow:0 1px 2px rgba(0,0,0,0.6); }
 .f-dwell { position:absolute; bottom:3px; left:0; right:0; font-size:0.58rem; font-weight:800; color:#fff; letter-spacing:0.02em; text-shadow:0 1px 2px rgba(0,0,0,0.7); }
-.f-table.open-tbl, .f-stool.open-tbl, .f-outdoor.open-tbl { background:#9BE3B8 !important; border-color:#3E9A68 !important; color:#0d2a18 !important; }
-.f-table.open-tbl .f-tnum, .f-stool.open-tbl .f-tnum, .f-outdoor.open-tbl .f-tnum,
-.f-table.open-tbl .f-tsub, .f-stool.open-tbl .f-tsub, .f-outdoor.open-tbl .f-tsub { color:#0d2a18; }
-.f-table.busy-tbl, .f-stool.busy-tbl, .f-outdoor.busy-tbl { background:#1A2740 !important; border-color:#0b1220 !important; color:#fff !important; }
-.f-table.busy-tbl .f-tnum, .f-stool.busy-tbl .f-tnum, .f-outdoor.busy-tbl .f-tnum,
-.f-table.busy-tbl .f-tsub, .f-stool.busy-tbl .f-tsub, .f-outdoor.busy-tbl .f-tsub { color:#fff; }
+.f-table.open-tbl, .f-stool.open-tbl, .f-outdoor.open-tbl {
+  background:transparent !important; border:2.5px dashed rgba(243,236,220,0.88) !important;
+  color:#F3ECDC !important; box-shadow:none;
+}
+.f-table.open-tbl .f-tnum, .f-stool.open-tbl .f-tnum, .f-outdoor.open-tbl .f-tnum { color:#F3ECDC; }
+.f-table.busy-tbl, .f-stool.busy-tbl, .f-outdoor.busy-tbl {
+  background:#3E9A68 !important; border:2.5px solid #9BE3B8 !important; color:#0d2a18 !important;
+}
+.f-table.busy-tbl .f-tnum, .f-stool.busy-tbl .f-tnum, .f-outdoor.busy-tbl .f-tnum { color:#0d2a18; }
 .f-couch { width:100%; height:100%; background:#5a4126; border-radius:18px 18px 6px 6px; border:2px solid #3f2d18; }
 .guest-notes-panel { margin:0.7rem 0 1rem; padding:0.7rem 0.85rem; border:1px solid rgba(201,168,76,0.45); border-radius:12px; background:rgba(201,168,76,0.08); text-align:left; }
 .guest-notes-panel h3 { margin:0 0 0.4rem; font-size:0.85rem; color:var(--primary-light); }
@@ -303,7 +306,8 @@ body { font-family:var(--font); color:var(--text); background:var(--bg); -webkit
     linear-gradient(90deg,rgba(201,168,76,0.05) 1px,transparent 1px) 0 0/40px 40px;
 }
 .floor-obj { position:absolute; box-sizing:border-box; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:0.2rem; }
-.floor-obj.seatable { cursor:pointer; box-shadow:0 4px 12px rgba(0,0,0,0.4); z-index:2; -webkit-tap-highlight-color:rgba(184,115,51,0.35); touch-action:none; }
+.floor-obj.seatable { cursor:pointer; box-shadow:none; z-index:2; -webkit-tap-highlight-color:rgba(184,115,51,0.35); touch-action:none; }
+.floor-obj.seatable .busy-tbl { box-shadow:0 4px 12px rgba(0,0,0,0.35); }
 .floor-zoombar { display:flex; gap:8px; align-items:center; margin:0.55rem 0 0.7rem; }
 .floor-zoombar button {
   min-width:44px; min-height:44px; border-radius:12px; border:1px solid var(--border);
@@ -687,6 +691,41 @@ body.hh-table .app-content, body.tableside .app-content {
 }
 .even-split button.active { border-color:var(--primary); background:var(--primary-glow); color:var(--primary-light); }
 #print-root { display:none; }
+
+.mode-hub { padding:0.2rem 0 1.4rem; }
+.hub-top { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:1rem; }
+.hub-rest { font-size:1.05rem; font-weight:800; }
+.hub-user { font-size:0.78rem; color:var(--text-muted); margin-top:2px; }
+.hub-switch {
+  min-height:44px; padding:0.45rem 0.8rem; border-radius:12px; border:1px solid var(--border);
+  background:var(--surface-2); color:var(--text); font-weight:800; font-size:0.78rem; cursor:pointer;
+}
+.hub-sec { font-size:0.72rem; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-muted); margin:1rem 0 0.55rem; }
+.hub-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.hub-tile {
+  min-height:92px; border-radius:14px; border:1px solid var(--border);
+  background:var(--surface); color:var(--text); font-weight:800; font-size:0.88rem;
+  cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  text-align:center; padding:0.7rem 0.5rem; gap:6px;
+}
+.hub-tile:active { transform:scale(0.97); }
+.hub-tile.primary { border-color:var(--primary); background:linear-gradient(160deg,#4a2e1c,#24150e); color:#f3d5b8; }
+.hub-tile .ico { font-size:1.35rem; line-height:1; }
+.hub-tile.muted { color:var(--text-secondary); font-weight:700; }
+.switch-list { display:flex; flex-direction:column; gap:8px; max-height:55vh; overflow-y:auto; }
+.switch-row {
+  width:100%; text-align:left; min-height:56px; padding:0.7rem 0.85rem; border-radius:12px;
+  border:1px solid var(--border); background:var(--surface-2); color:var(--text); cursor:pointer;
+}
+.switch-row b { display:block; font-size:0.92rem; }
+.switch-row span { font-size:0.75rem; color:var(--text-muted); }
+.svc-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:0.55rem; }
+.svc-head h2 { margin:0; font-size:1.05rem; color:var(--text); }
+.svc-head .meta { font-size:0.75rem; color:var(--text-muted); }
+.hh-back, .hh-more {
+  min-width:44px; min-height:44px; border:1px solid var(--border); border-radius:12px;
+  background:var(--surface-2); color:var(--text); font-size:1.1rem; cursor:pointer;
+}
 @media print {
   body * { visibility:hidden !important; }
   #print-root, #print-root * { visibility:visible !important; }
@@ -721,6 +760,7 @@ body.hh-table .app-content, body.tableside .app-content {
 <div id="hh-overflow" class="call-alert">
   <div class="call-alert-card" style="border-color:var(--border);text-align:left;">
     <h2 style="color:var(--text);font-size:1rem;margin-bottom:0.8rem;">Table tools</h2>
+    <button class="ghost-btn" onclick="closeOverflow();openSwitchUser()">Switch user</button>
     <button class="ghost-btn" onclick="closeOverflow();openMoveTableSheet()">Move / transfer table</button>
     <button class="ghost-btn" onclick="closeOverflow();openCombineSheet()">Combine tables</button>
     <button class="ghost-btn" onclick="closeOverflow();openGuestsSheet()">Change guest count</button>
@@ -757,7 +797,10 @@ body.hh-table .app-content, body.tableside .app-content {
   <div class="app-content" id="app-content"></div>
   <div id="hh-bar"></div>
   <div class="app-nav">
-    <button class="nav-btn active" data-tab="tables" onclick="switchTab('tables')">
+    <button class="nav-btn active" data-tab="hub" onclick="switchTab('hub')">
+      <span class="nav-icon">⌂</span><span class="nav-label">Home</span>
+    </button>
+    <button class="nav-btn" data-tab="tables" onclick="openTableService()">
       <span class="nav-icon">🪑</span><span class="nav-label">Tables</span>
     </button>
     <button class="nav-btn" data-tab="order" onclick="switchTab('order')">
@@ -948,7 +991,7 @@ var STATE = {
   calls: [],
   messages: [],
   currentOrder: [],
-  activeTab: 'tables',
+  activeTab: 'hub',
   orderCat: null,
   tipPercent: 18,
   customTip: 0,
@@ -1775,7 +1818,7 @@ function attemptLogin() {
   document.getElementById('user-name').textContent=staff.name;
   document.getElementById('user-role').textContent=staff.role;
   showScreen('app-screen');
-  switchTab('tables');
+  switchTab('hub');
   initSquare();
   paintChrome();
 }
@@ -1786,11 +1829,142 @@ function switchTab(tab) {
   STATE.activeTab=tab;
   if (tab!=='order') STATE.hhMode='service';
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
-  if (tab==='tables') renderTables();
+  if (tab==='hub') renderHub();
+  else if (tab==='tables') renderTables();
   else if (tab==='order') renderOrder();
   else if (tab==='messages') renderMessages();
   else if (tab==='history') renderHistory();
   paintChrome();
+}
+function openTableService(){
+  STATE.floorFilter=defaultFloorFilter();
+  STATE.floorFitDone=false;
+  switchTab('tables');
+}
+function staffForStation(st){
+  if (!st) return null;
+  var list=allStaffForLogin();
+  return list.find(function(s){
+    return serverOwnsStation(st, s) || staffMatchesRef(s, st.server) || (st.serverCode && String(s.code)===String(st.serverCode));
+  }) || null;
+}
+function stationRoster(){
+  var rows=[];
+  var seen={};
+  sortedStations().forEach(function(st){
+    var staff=staffForStation(st);
+    var name=foodMasterName(st) || (staff&&staff.name) || 'Unassigned';
+    var code=st.serverCode || (staff&&staff.code) || '';
+    var key=String(code||name)+':'+(st.id||stationNumber(st));
+    if (seen[key]) return;
+    seen[key]=1;
+    rows.push({ st:st, staff:staff, name:name, code:code });
+  });
+  allStaffForLogin().forEach(function(s){
+    if (!s || seen[String(s.code)]) return;
+    if (!/food master|front of house|manager/i.test(s.role||'')) return;
+    seen[String(s.code)]=1;
+    rows.push({ st:null, staff:s, name:s.name, code:s.code });
+  });
+  return rows;
+}
+function renderHub(){
+  var c=document.getElementById('app-content');
+  var who=STATE.currentServer||{};
+  var html='<div class="mode-hub">';
+  html+='<div class="hub-top"><div><div class="hub-rest">Epicurean House</div>';
+  html+='<div class="hub-user">'+esc(who.name||'Food Master')+' · '+esc(who.role||'')+'</div></div>';
+  html+='<button type="button" class="hub-switch" onclick="openSwitchUser()">Switch user</button></div>';
+  html+='<div class="hub-sec">Mode</div><div class="hub-grid">';
+  html+='<button type="button" class="hub-tile primary" onclick="openTableService()"><span class="ico">🪑</span>Table Service</button>';
+  html+='<button type="button" class="hub-tile muted" onclick="toast(\'Start from Table Service\')"><span class="ico">🧾</span>Quick Order</button>';
+  html+='<button type="button" class="hub-tile" onclick="switchTab(\'messages\')"><span class="ico">💬</span>Messages</button>';
+  html+='<button type="button" class="hub-tile" onclick="switchTab(\'history\')"><span class="ico">📋</span>History</button>';
+  html+='<button type="button" class="hub-tile muted" onclick="toast(\'Kitchen Display stays on the KDS iPad\')"><span class="ico">🖥️</span>Kitchen</button>';
+  html+='<button type="button" class="hub-tile" onclick="openClockApp()"><span class="ico">⏱</span>Time Clock</button>';
+  html+='</div>';
+  html+='<div class="hub-sec">My account</div><div class="hub-grid">';
+  html+='<button type="button" class="hub-tile" onclick="openSwitchUser()"><span class="ico">⇄</span>Switch user</button>';
+  html+='<button type="button" class="hub-tile" onclick="logout()"><span class="ico">↩</span>Sign out</button>';
+  html+='</div>';
+  if (isManager()) {
+    html+='<div class="hub-sec">Manager</div><div class="hub-grid">';
+    html+='<button type="button" class="hub-tile muted" onclick="toast(\'Reports stay in BOH\')"><span class="ico">📊</span>Sales reports</button>';
+    html+='<button type="button" class="hub-tile muted" onclick="toast(\'Menu and tables are edited in BOH\')"><span class="ico">⚙️</span>Setup</button>';
+    html+='</div>';
+  }
+  html+='</div>';
+  c.innerHTML=html;
+  paintChrome();
+}
+function openClockApp(){
+  try { window.open('https://andr525.github.io/epicurean-clock/','_blank'); }
+  catch(e){ toast('Open the Clock app'); }
+}
+function openSwitchUser(){
+  var rows=stationRoster();
+  var html='<h2>Switch user</h2><p class="sheet-sub">Names assigned to each station. Enter that Food Master’s PIN to open their tables.</p><div class="switch-list">';
+  if (!rows.length) html+='<p class="sheet-sub">No station assignments from BOH yet.</p>';
+  rows.forEach(function(row, i){
+    var stName=row.st ? ('Station '+(stationNumber(row.st)||'') ).trim() : (row.staff&&row.staff.role||'Staff');
+    html+='<button type="button" class="switch-row" onclick="beginSwitchUser('+i+')"><b>'+esc(row.name)+'</b><span>'+esc(stName)+' · enter PIN to switch</span></button>';
+  });
+  html+='</div><button class="ghost-btn" onclick="closeSheet()">Cancel</button>';
+  STATE._switchRoster=rows;
+  openSheet(html);
+}
+function beginSwitchUser(idx){
+  var row=(STATE._switchRoster||[])[idx];
+  if (!row) return;
+  if (row.staff && STATE.currentServer && String(row.staff.code)===String(STATE.currentServer.code)) {
+    closeSheet();
+    openTableService();
+    return;
+  }
+  function paint(){
+    var buf=(STATE._switchPin&&STATE._switchPin.buf)||'';
+    var dots='';
+    for (var i=0;i<4;i++) dots+='<div class="pin-dot'+(i<buf.length?' filled':'')+'"></div>';
+    openSheet(
+      '<h2>'+esc(row.name)+'</h2><p class="sheet-sub">Enter this Food Master’s 4-digit PIN to use their station.</p>'+
+      '<div class="pin-display" style="margin:0.8rem 0;">'+dots+'</div>'+
+      '<div class="numpad" style="margin:0 auto;">'+
+        [1,2,3,4,5,6,7,8,9,'','0','C'].map(function(k){
+          if (k==='') return '<div></div>';
+          return '<button type="button" class="numpad-btn" onclick="hubPinKey(\''+k+'\')">'+k+'</button>';
+        }).join('')+
+      '</div>'+
+      '<p id="hub-pin-err" style="color:var(--danger);min-height:1.2rem;margin-top:0.6rem;"></p>'+
+      '<button class="ghost-btn" onclick="openSwitchUser()">Back</button>'
+    );
+  }
+  STATE._switchPin={ row:row, buf:'', paint:paint };
+  paint();
+}
+function hubPinKey(k){
+  var s=STATE._switchPin; if(!s) return;
+  if (k==='C') s.buf='';
+  else if (s.buf.length<4) s.buf+=k;
+  if (s.buf.length===4) {
+    var code=String((s.row.staff&&s.row.staff.code)||s.row.code||'');
+    if (code && s.buf===code) {
+      var staff=s.row.staff || allStaffForLogin().find(function(x){ return String(x.code)===code; });
+      if (!staff) { toast('No login for that station'); return; }
+      STATE.currentServer=staff;
+      STATE.floorFilter=defaultFloorFilter();
+      STATE.floorFitDone=false;
+      document.getElementById('user-name').textContent=staff.name;
+      document.getElementById('user-role').textContent=staff.role;
+      closeSheet();
+      toast('Signed in as '+staff.name);
+      openTableService();
+      return;
+    }
+    var err=document.getElementById('hub-pin-err');
+    if (err) err.textContent='Wrong PIN';
+    s.buf='';
+  }
+  if (s.paint) s.paint();
 }
 
 // ─── Tables (BOH Dining Room Layout & Audit) ───────────────────
@@ -2078,7 +2252,7 @@ function stationViewBox(st){
   }
   return {x:st.x||0,y:st.y||0,w:st.w||220,h:st.h||180};
 }
-function floorViewLocked(){ return true; }
+function floorViewLocked(){ return false; }
 function stationCropBox(st){
   if (!st) return null;
   var box=stationViewBox(st);
@@ -2279,7 +2453,29 @@ function setFloorFilter(filter){
 function applyFloorTransform(){
   var c=document.getElementById('floor-canvas');
   if (!c) return;
+  clampFloorPan();
   c.style.transform='translate('+STATE.floorPanX+'px,'+STATE.floorPanY+'px) scale('+STATE.floorZoom+')';
+}
+function clampFloorPan(){
+  var stage=document.getElementById('floor-stage');
+  var canvas=document.getElementById('floor-canvas');
+  if (!stage || !canvas) return;
+  var sw=stage.clientWidth || stage.getBoundingClientRect().width || 0;
+  var sh=stage.clientHeight || stage.getBoundingClientRect().height || 0;
+  var z=STATE.floorZoom||1;
+  var cw=(parseFloat(canvas.style.width)||canvas.offsetWidth||0)*z;
+  var ch=(parseFloat(canvas.style.height)||canvas.offsetHeight||0)*z;
+  if (!sw || !sh || !cw || !ch) return;
+  if (cw>=sw) {
+    STATE.floorPanX=Math.min(0, Math.max(sw-cw, STATE.floorPanX));
+  } else {
+    STATE.floorPanX=(sw-cw)/2;
+  }
+  if (ch>=sh) {
+    STATE.floorPanY=Math.min(0, Math.max(sh-ch, STATE.floorPanY));
+  } else {
+    STATE.floorPanY=(sh-ch)/2;
+  }
 }
 function floorMinZoom(){ return STATE.floorMinZoom || 1; }
 function floorZoomBy(factor){
@@ -2318,6 +2514,17 @@ function floorResetView(){
   STATE.floorZoom=z;
   STATE.floorPanX=(sw - cw*z)/2;
   STATE.floorPanY=(sh - ch*z)/2;
+  var st=focusedStation();
+  var box=st && stationViewBox(st);
+  if (box && box.w && box.h) {
+    var origin=STATE.floorOrigin||{x:0,y:0};
+    var bx=(box.x||0)-(origin.x||0);
+    var by=(box.y||0)-(origin.y||0);
+    var staZ=Math.max(z, Math.min(8, Math.min(sw/(box.w+48), sh/(box.h+48))*0.92));
+    STATE.floorZoom=staZ;
+    STATE.floorPanX=sw/2 - (bx+box.w/2)*staZ;
+    STATE.floorPanY=sh/2 - (by+box.h/2)*staZ;
+  }
   STATE.floorFitDone=true;
   applyFloorTransform();
 }
@@ -2368,11 +2575,9 @@ function bindFloorGestures(){
     }
     if (Math.abs(dx)+Math.abs(dy)>8) moved=true;
     if (count()===1) {
-      if ((STATE.floorZoom||1) > floorMinZoom()+0.02) {
-        STATE.floorPanX += dx;
-        STATE.floorPanY += dy;
-        applyFloorTransform();
-      }
+      STATE.floorPanX += dx;
+      STATE.floorPanY += dy;
+      applyFloorTransform();
     } else if (count()>=2) {
       var d=dist();
       if (lastDist>0 && d>0) {
@@ -2417,62 +2622,28 @@ function roomName(id){
   return rm ? (rm.name||id) : (id||'');
 }
 function renderTables() {
-  posEnsureDemoTurns();
   var c=document.getElementById('app-content');
-  var rooms = Array.isArray(STATE.rooms) ? STATE.rooms : [];
-  var stations = sortedStations();
-  var raw = visibleFloorObjects();
-  raw = raw.concat(visibleStationOverlays(raw));
+  var raw = visibleFloorObjects().filter(function(o){
+    return o && o.type!=='section' && o.type!=='waiterstation' && !o._stationBorder;
+  });
   var objs = normalizeFloor(raw);
-  var mineCount = 0;
-  allFloorObjects().forEach(function(o){ if (SEATABLE[o.type] && serverOwnsTable(o, STATE.currentServer)) mineCount++; });
-
   var html='<div class="floor-wrap floor-fixed">';
-  var mgr=isManager();
-  var focusSt=focusedStation();
-  var roomId=focusedRoomId();
-  html+='<div class="floor-head"><div><h2>'+(focusSt?esc(stationLabel(focusSt)):(roomId?esc(roomName(roomId)||'Floor'):'Floor map'))+'</h2></div><div style="font-size:0.8rem;color:var(--text-muted);text-align:right;">'+(STATE.currentServer?STATE.currentServer.name:'Server')+'</div></div>';
-
-  html+='<div class="floor-room-tabs">';
-  html+='<button class="floor-room-tab'+(STATE.floorFilter==='mine'?' active':'')+'" onclick="showMyStation()">My station'+(mineCount?' ('+mineCount+')':'')+'</button>';
-  stations.forEach(function(st){
-    var sid=st.id||stationNumber(st);
-    html+='<button class="floor-room-tab'+(STATE.floorFilter==='station:'+sid?' active':'')+'" onclick=\'setFloorFilter('+JSON.stringify('station:'+sid)+')\'>'+esc(stationLabel(st))+'</button>';
-  });
-  rooms.forEach(function(rm){
-    html+='<button class="floor-room-tab'+(STATE.floorFilter==='room:'+rm.id?' active':'')+'" onclick=\'setFloorFilter('+JSON.stringify('room:'+rm.id)+')\'>'+esc(rm.name||rm.id)+'</button>';
-  });
-  if (mgr) {
-    html+='<button class="floor-room-tab'+(STATE.floorFilter==='all'?' active':'')+'" onclick="setFloorFilter(\'all\')">All rooms</button>';
-  }
-  html+='</div>';
+  var who=STATE.currentServer||{};
+  html+='<div class="svc-head"><div><button class="hh-back" style="margin-bottom:0.35rem;" onclick="switchTab(\'hub\')">←</button>';
+  html+='<h2>Table Service</h2><div class="meta">'+esc(who.name||'Food Master')+'</div></div>';
+  html+='<button type="button" class="hub-switch" onclick="openSwitchUser()">Switch user</button></div>';
 
   if (objs.length) {
-    if (focusSt && STATE.floorFilter!=='all') objs=cropFloorToStation(objs, focusSt);
     var maxX=80, maxY=80;
-    if (focusSt && STATE.floorFilter!=='all') {
-      var crop=stationCropBox(focusSt);
-      maxX=Math.max(220, crop?crop.w:220);
-      maxY=Math.max(180, crop?crop.h:180);
-    } else {
-      objs.forEach(function(o){
-        maxX=Math.max(maxX, (o.x||0)+(o.w||80)+24);
-        maxY=Math.max(maxY, (o.y||0)+(o.h||80)+24);
-      });
-    }
-    var tableRects=[];
     objs.forEach(function(o){
-      if (SEATABLE[o.type]) tableRects.push({x:o.x||0,y:o.y||0,w:o.w||70,h:o.h||70});
+      maxX=Math.max(maxX, (o.x||0)+(o.w||80)+24);
+      maxY=Math.max(maxY, (o.y||0)+(o.h||80)+24);
     });
-    html+='<div class="floor-stage station-locked" id="floor-stage">';
+    html+='<div class="floor-stage" id="floor-stage">';
     html+='<div class="floor-canvas" id="floor-canvas" style="width:'+maxX+'px;height:'+maxY+'px;">';
     objs.forEach(function(o){
       var left=o.x||0, top=o.y||0, width=o.w||70, height=o.h||70;
       var style='left:'+left+'px;top:'+top+'px;width:'+width+'px;height:'+height+'px;';
-      if (o.type==='section' || o.type==='waiterstation' || o._stationBorder) {
-        html+=stationShapeHtml(o, left, top, width, height);
-        return;
-      }
       style+='transform:rotate('+(o.rot||0)+'deg);';
       var tNum=tableKey(o);
       if (SEATABLE[o.type]) {
@@ -2480,48 +2651,25 @@ function renderTables() {
           html+='<div class="floor-obj" style="'+style+'"><div class="f-couch"></div></div>';
         } else {
         var hasCall=tableHasCall(tNum);
-        var hasOrder=tableHasOrder(tNum);
-        var busy=tableIsBusy(tNum, o);
-        var stn=stationForTable(tNum, o);
-        var inFocus=!focusSt || tableInStation(o, focusSt);
-        var extra=inFocus?'':('opacity:0.28;');
+        var busy=tableInService(tNum);
         var shape=o.shape||(o.type==='stool'?'round':(o.type==='outdoor'?'rect':'square'));
-        var party=currentTurnParty(o);
-        var mark=tableHasGuestNotes(o);
-        var seated=tableSeatedAt(tNum, o);
-        var dwell=busy?dwellLabel(seated||Date.now()):'';
         var innerCls=(o.type==='stool'?'f-stool':(o.type==='outdoor'?'f-outdoor':('f-table '+shape)))+(busy?' busy-tbl':' open-tbl');
-        html+='<div class="floor-obj seatable" data-table="'+esc(String(tNum))+'" onclick=\'tapTable('+JSON.stringify(String(tNum))+')\' style="'+style+extra+'">'+
+        html+='<div class="floor-obj seatable" data-table="'+esc(String(tNum))+'" onclick=\'tapTable('+JSON.stringify(String(tNum))+')\' style="'+style+'">'+
           '<div class="'+innerCls+'" style="'+(hasCall?'box-shadow:0 0 0 3px #E65050;':'')+'">'+
-            (mark?'<span class="f-star" title="Guest notes">*</span>':'')+
             '<span class="f-tnum">'+esc(String(tNum))+'</span>'+
-            '<span class="f-tsub">'+party+'</span>'+
-            (dwell?'<span class="f-dwell" data-seated="'+(seated||'')+'">'+dwell+'</span>':'')+
           '</div></div>';
         }
       } else {
         html+=layoutObjectHtml(o, style);
       }
     });
-    objs.forEach(function(o){
-      if (!(o.type==='waiterstation' || o._stationBorder)) return;
-      var place=stationNamePlacement(o, tableRects, maxX, maxY);
-      var col=o._color||stationColor(o);
-      html+='<div class="floor-station-tag" style="left:'+place.x+'px;top:'+place.y+'px;background:'+col+';">'+esc(place.text)+'</div>';
-    });
     html+='</div></div>';
-    html+='<div class="floor-legend"><span><span class="floor-dot" style="background:#9BE3B8"></span>Available</span><span><span class="floor-dot" style="background:#1A2740"></span>Seated</span><span><span class="floor-dot" style="background:#E65050"></span>Call</span><span style="color:#C9A84C;font-weight:800;">*</span> Notes</div>';
+    html+='<div class="floor-legend"><span><span class="floor-dot" style="background:transparent;border:1px dashed #F3ECDC;"></span>Open</span><span><span class="floor-dot" style="background:#3E9A68"></span>In service</span></div>';
   } else {
-    html+='<p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:0.8rem;">'+(mgr?'No dining room from BOH yet. Add rooms on the BOH floor and Save Layout.':'No floor from BOH yet. Use a table number to start.')+'</p>';
+    html+='<p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:0.8rem;">No dining room from BOH yet. Add rooms on the BOH floor and Save Layout.</p>';
     html+='<div class="table-grid">';
     for (var i=1;i<=20;i++) {
-      var hasCall=tableHasCall(i);
-      var hasOrder=tableHasOrder(i);
-      var cls='table-card'+(hasCall?' has-call':'')+(hasOrder?' has-order':'');
-      html+='<div class="'+cls+'" onclick="tapTable('+i+')">'+
-        '<div class="table-num">'+i+'</div>'+
-        '<div class="table-status">'+(hasCall?'CALLING':hasOrder?'':'')+'</div>'+
-      '</div>';
+      html+='<div class="table-card" onclick="tapTable('+i+')"><div class="table-num">'+i+'</div></div>';
     }
     html+='</div>';
   }
@@ -2531,15 +2679,6 @@ function renderTables() {
   paintChrome();
   bindFloorGestures();
   requestAnimationFrame(function(){ floorResetView(); });
-  if (!STATE._dwellTick) {
-    STATE._dwellTick=setInterval(function(){
-      if (STATE.activeTab!=='tables' || !STATE.currentServer) return;
-      document.querySelectorAll('.f-dwell[data-seated]').forEach(function(el){
-        var t=+el.getAttribute('data-seated');
-        if (t) el.textContent=dwellLabel(t);
-      });
-    }, 15000);
-  }
 }
 
 function showMyStation(){
@@ -2570,42 +2709,9 @@ function tableNote(o){
   if (notes.length) parts.push(notes.join('; '));
   return parts.join(' \u00b7 ');
 }
-var DEMO_TABLE_TURNS={
-  '22':[
-    {time:'5:00 PM', name:'Harrison Chen', party:6, vip:false, notes:'Anniversary · prefer window'},
-    {time:'7:00 PM', name:'UK Prime Minister', party:4, vip:true, notes:'Security detail · quiet corner'}
-  ],
-  '8':[{time:'6:00 PM', name:'Maya Patel', party:2, vip:false, notes:'Gluten-free bread'}],
-  '7':[
-    {time:'5:30 PM', name:'Luis Ortega', party:4, vip:false, notes:''},
-    {time:'8:00 PM', name:'The Chen party', party:5, vip:false, notes:'High chair'}
-  ],
-  '1':[{time:'6:15 PM', name:'Sofia Alvarez', party:2, vip:false, notes:'Celebrating a promotion'}],
-  '23':[{time:'7:30 PM', name:'James Whitaker', party:8, vip:true, notes:'Wine pairing already discussed'}]
-};
-function posEnsureDemoTurns(){
-  var used={};
-  var originals=[];
-  var src=STATE.roomObjs;
-  if (Array.isArray(src)) originals=src;
-  else Object.keys(src||{}).forEach(function(id){ (src[id]||[]).forEach(function(o){ originals.push(o); }); });
-  originals.forEach(function(o){
-    if(!o || !SEATABLE[o.type] || o.type==='couch') return;
-    if(Array.isArray(o.turns)&&o.turns.length) return;
-    var key=String(o.num!=null?o.num:'');
-    if(DEMO_TABLE_TURNS[key] && !used[key]){ o._demoTurns=DEMO_TABLE_TURNS[key]; used[key]=1; }
-  });
-  var leftover=Object.keys(DEMO_TABLE_TURNS).filter(function(k){ return !used[k]; });
-  originals.forEach(function(o){
-    if(!leftover.length) return;
-    if(!o || !SEATABLE[o.type] || o.type==='couch') return;
-    if((Array.isArray(o.turns)&&o.turns.length) || o._demoTurns) return;
-    o._demoTurns=DEMO_TABLE_TURNS[leftover.shift()];
-  });
-}
+function posEnsureDemoTurns(){ /* demo reservations removed — only live BOH turns */ }
 function tableTurns(o){
   if(o && Array.isArray(o.turns) && o.turns.length) return o.turns;
-  if(o && o._demoTurns && o._demoTurns.length) return o._demoTurns;
   return [];
 }
 function findFloorTable(tNum){
@@ -2616,9 +2722,15 @@ function findFloorTable(tNum){
   return hit;
 }
 function tableIsBusy(tNum, o){
-  if (tableHasOrder(tNum) || tableHasCall(tNum)) return true;
-  var st=(o && o.status) || 'open';
-  return st!=='open' && st!=='dirty';
+  return tableInService(tNum);
+}
+function tableInService(tNum){
+  if (tableHasOrder(tNum) || unsentFor(tNum).length) return true;
+  var sess=STATE.tableSessions && STATE.tableSessions[String(tNum)];
+  if (!sess) return false;
+  if (sess.seatedAt) return true;
+  var chk=sess.checkId && STATE.checks[sess.checkId];
+  return !!(chk && chk.status==='open');
 }
 function tableSeatedAt(tNum, o){
   var sess=STATE.tableSessions && STATE.tableSessions[String(tNum)];
@@ -2640,8 +2752,6 @@ function dwellLabel(from){
   return Math.floor(m/60)+'h '+(m%60)+'m';
 }
 function currentTurnParty(o){
-  var turns=tableTurns(o);
-  if (turns.length && turns[0].party) return turns[0].party;
   return o && o.seats ? o.seats : 2;
 }
 function tableHasGuestNotes(o){
@@ -2650,7 +2760,6 @@ function tableHasGuestNotes(o){
   return tableTurns(o).some(function(t){ return t && (t.name || t.notes); });
 }
 function guestNotesPanelHtml(tNum){
-  posEnsureDemoTurns();
   var o=findFloorTable(tNum);
   var turns=tableTurns(o);
   var notes=[];
@@ -2735,6 +2844,13 @@ function beginAssignStation(){ stationsAreBohOnly(); }
 function toggleStationTable(){ stationsAreBohOnly(); }
 
 function selectTable(t) {
+  var obj=findFloorTable(t);
+  var st=stationForTable(t, obj);
+  if (obj && st && !isManager() && !serverOwnsTable(obj)) {
+    STATE._switchRoster=[{ st:st, staff:staffForStation(st), name:foodMasterName(st)||'Food Master', code:st.serverCode||'' }];
+    beginSwitchUser(0);
+    return;
+  }
   STATE.selectedTable = t;
   if (fbReady) {
     STATE.calls.filter(function(cl){ return String(cl.table)===String(t) && cl.status==='active'; }).forEach(function(cl){
@@ -2765,8 +2881,7 @@ function showGuestCountSheet(t){
   sess.guestCount=n;
   openSheet(
     '<h2>Table '+t+'</h2>'+
-    guestNotesPanelHtml(t)+
-    '<p class="sheet-sub">How many guests this turn?</p>'+
+    '<p class="sheet-sub">How many guests? Then start the table.</p>'+
     '<div class="qty-row">'+
       '<button type="button" onclick="bumpGuests(-1)">−</button>'+
       '<div id="guest-count-display" style="font-size:1.6rem;font-weight:800;min-width:2.5rem;text-align:center;">'+n+'</div>'+
