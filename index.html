@@ -18,7 +18,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <title>Epicurean POS</title>
-<!-- pos-build: hub-v13 -->
+<!-- pos-build: hub-v14 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
@@ -290,8 +290,8 @@ body { font-family:var(--font); color:var(--text); background:var(--bg); -webkit
 .f-star { position:absolute; top:2px; right:5px; color:#C9A84C; font-size:0.95rem; font-weight:800; line-height:1; z-index:3; text-shadow:0 1px 2px rgba(0,0,0,0.6); }
 .f-dwell { position:absolute; bottom:3px; left:0; right:0; font-size:0.58rem; font-weight:800; color:#fff; letter-spacing:0.02em; text-shadow:0 1px 2px rgba(0,0,0,0.7); }
 .f-table.open-tbl, .f-stool.open-tbl, .f-outdoor.open-tbl {
-  background:transparent !important; border:2.5px dashed rgba(243,236,220,0.88) !important;
-  color:#F3ECDC !important; box-shadow:none;
+  background:transparent !important; border:2.5px solid rgba(243,236,220,0.95) !important;
+  color:#F3ECDC !important; box-shadow:none; overflow:visible;
 }
 .f-table.open-tbl .f-tnum, .f-stool.open-tbl .f-tnum, .f-outdoor.open-tbl .f-tnum { color:#F3ECDC; }
 .f-table.busy-tbl, .f-stool.busy-tbl, .f-outdoor.busy-tbl {
@@ -303,13 +303,13 @@ body { font-family:var(--font); color:var(--text); background:var(--bg); -webkit
 .guest-notes-panel h3 { margin:0 0 0.4rem; font-size:0.85rem; color:var(--primary-light); }
 .guest-notes-panel .gn-row { font-size:0.82rem; margin:0.25rem 0; color:var(--text); }
 .guest-notes-panel .gn-note { font-size:0.75rem; color:var(--text-muted); margin-left:0.4rem; }
-.floor-canvas { position:absolute; left:0; top:0; transform-origin:0 0; will-change:transform;
+.floor-canvas { position:absolute; left:0; top:0; transform-origin:0 0; will-change:transform; overflow:hidden;
   background:
     linear-gradient(rgba(201,168,76,0.05) 1px,transparent 1px) 0 0/40px 40px,
     linear-gradient(90deg,rgba(201,168,76,0.05) 1px,transparent 1px) 0 0/40px 40px;
 }
-.floor-obj { position:absolute; box-sizing:border-box; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:0.2rem; }
-.floor-obj.seatable { cursor:pointer; box-shadow:none; z-index:2; -webkit-tap-highlight-color:rgba(184,115,51,0.35); touch-action:none; }
+.floor-obj { position:absolute; box-sizing:border-box; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:0; overflow:visible; }
+.floor-obj.seatable { cursor:pointer; box-shadow:none; z-index:2; padding:0; overflow:visible; -webkit-tap-highlight-color:rgba(184,115,51,0.35); touch-action:none; }
 .floor-obj.seatable .busy-tbl { box-shadow:0 4px 12px rgba(0,0,0,0.35); }
 .floor-zoombar { display:flex; gap:8px; align-items:center; margin:0.55rem 0 0.7rem; }
 .floor-zoombar button {
@@ -367,7 +367,7 @@ body.hh-on.floor-drawing .floor-stage { outline:2px dashed var(--primary); }
 .f-station-ico:after { content:''; position:absolute; left:4px; right:4px; top:12px; height:1.5px; background:#1a1306; }
 .f-couch { width:100%; height:100%; background:#5a4126; border-radius:18px 18px 6px 6px; border:2px solid #3f2d18; }
 .f-stool { width:100%; height:100%; border-radius:50%; border:2.5px solid; display:flex; flex-direction:column; align-items:center; justify-content:center; font-weight:700; position:relative; }
-.f-outdoor { width:100%; height:100%; border-radius:10px; border:2px dashed; display:flex; flex-direction:column; align-items:center; justify-content:center; font-weight:700; }
+.f-outdoor { width:100%; height:100%; border-radius:10px; border:2.5px solid; display:flex; flex-direction:column; align-items:center; justify-content:center; font-weight:700; }
 .f-zone { width:100%; height:100%; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:11px; font-weight:700; text-align:center; padding:6px; }
 .f-curve { width:100%; height:100%; background:#1D3250; border-radius:50% 50% 0 0 / 100% 100% 0 0; border:2px solid rgba(201,168,76,0.4); border-bottom:none; }
 .f-exit { width:100%; height:100%; background:#1a2430; border:2px solid #E07A6B; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#E07A6B; }
@@ -781,7 +781,7 @@ body.hh-table .app-content, body.tableside .app-content {
 <div id="login-screen" class="screen active">
   <h1>Epicurean POS</h1>
   <p class="subtitle">Enter your 4-digit code</p>
-  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 13</p>
+  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 14</p>
   <div class="pin-display" id="pin-display">
     <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
   </div>
@@ -2483,19 +2483,24 @@ function clampFloorPan(){
   var sw=stage.clientWidth || stage.getBoundingClientRect().width || 0;
   var sh=stage.clientHeight || stage.getBoundingClientRect().height || 0;
   var z=STATE.floorZoom||1;
+  var minZ=floorMinZoom();
+  if (z<minZ) { z=minZ; STATE.floorZoom=z; }
   var cw=(parseFloat(canvas.style.width)||canvas.offsetWidth||0)*z;
   var ch=(parseFloat(canvas.style.height)||canvas.offsetHeight||0)*z;
   if (!sw || !sh || !cw || !ch) return;
+  // Keep the room canvas covering the viewport. Never show empty space past the walls.
   if (cw>=sw) {
-    STATE.floorPanX=Math.min(0, Math.max(sw-cw, STATE.floorPanX));
+    STATE.floorPanX=Math.min(0, Math.max(sw-cw, STATE.floorPanX||0));
   } else {
     STATE.floorPanX=(sw-cw)/2;
   }
   if (ch>=sh) {
-    STATE.floorPanY=Math.min(0, Math.max(sh-ch, STATE.floorPanY));
+    STATE.floorPanY=Math.min(0, Math.max(sh-ch, STATE.floorPanY||0));
   } else {
     STATE.floorPanY=(sh-ch)/2;
   }
+  STATE.floorPanX=Math.round(STATE.floorPanX);
+  STATE.floorPanY=Math.round(STATE.floorPanY);
 }
 function floorMinZoom(){ return STATE.floorMinZoom || 1; }
 function floorZoomBy(factor){
@@ -2528,22 +2533,23 @@ function floorResetView(){
     applyFloorTransform();
     return;
   }
-  var fit=Math.min(sw/cw, sh/ch);
-  var z=Math.max(0.2, Math.min(8, fit*0.995));
+  var cover=Math.max(sw/cw, sh/ch);
+  var z=Math.max(0.2, Math.min(8, cover));
   STATE.floorMinZoom=z;
   STATE.floorZoom=z;
   STATE.floorPanX=(sw - cw*z)/2;
   STATE.floorPanY=(sh - ch*z)/2;
   var st=focusedStation();
-  var box=st && stationViewBox(st);
-  if (box && box.w && box.h) {
+  var sbox=st && stationViewBox(st);
+  if (sbox && sbox.w && sbox.h) {
+    var room=STATE.floorRoomBox||{x:0,y:0};
     var origin=STATE.floorOrigin||{x:0,y:0};
-    var bx=(box.x||0)-(origin.x||0);
-    var by=(box.y||0)-(origin.y||0);
-    var staZ=Math.max(z, Math.min(8, Math.min(sw/(box.w+48), sh/(box.h+48))*0.92));
+    var bx=(sbox.x||0)-(room.x||0)-(origin.x||0);
+    var by=(sbox.y||0)-(room.y||0)-(origin.y||0);
+    var staZ=Math.max(z, Math.min(8, Math.min(sw/(sbox.w+48), sh/(sbox.h+48))*0.92));
     STATE.floorZoom=staZ;
-    STATE.floorPanX=sw/2 - (bx+box.w/2)*staZ;
-    STATE.floorPanY=sh/2 - (by+box.h/2)*staZ;
+    STATE.floorPanX=sw/2 - (bx+sbox.w/2)*staZ;
+    STATE.floorPanY=sh/2 - (by+sbox.h/2)*staZ;
   }
   STATE.floorFitDone=true;
   applyFloorTransform();
@@ -2699,12 +2705,32 @@ function roomName(id){
   var rm=(STATE.rooms||[]).filter(function(r){ return r.id===id; })[0];
   return rm ? (rm.name||id) : (id||'');
 }
+function floorContentBox(objs){
+  var list=objs||[];
+  var walls=list.filter(function(o){ return o && o.type==='wall'; });
+  var use=walls.length?walls:list;
+  var minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+  use.forEach(function(o){
+    var x=o.x||0, y=o.y||0, w=o.w||0, h=o.h||0;
+    minX=Math.min(minX,x);
+    minY=Math.min(minY,y);
+    maxX=Math.max(maxX,x+w);
+    maxY=Math.max(maxY,y+h);
+  });
+  if (!isFinite(minX)) return {x:0,y:0,w:400,h:300};
+  return {x:minX,y:minY,w:Math.max(80,maxX-minX),h:Math.max(80,maxY-minY)};
+}
 function renderTables() {
   var c=document.getElementById('app-content');
   var raw = visibleFloorObjects().filter(function(o){
     return o && o.type!=='section' && o.type!=='waiterstation' && !o._stationBorder;
   });
   var objs = normalizeFloor(raw);
+  var box=floorContentBox(objs);
+  STATE.floorRoomBox=box;
+  objs=objs.map(function(o){
+    return Object.assign({}, o, {x:(o.x||0)-box.x, y:(o.y||0)-box.y});
+  });
   var html='<div class="floor-wrap floor-fixed">';
   var who=STATE.currentServer||{};
   html+='<div class="svc-head"><div><button class="hh-back" style="margin-bottom:0.35rem;" onclick="switchTab(\'hub\')">←</button>';
@@ -2712,11 +2738,7 @@ function renderTables() {
   html+='<button type="button" class="hub-switch" onclick="openSwitchUser()">Switch user</button></div>';
 
   if (objs.length) {
-    var maxX=80, maxY=80;
-    objs.forEach(function(o){
-      maxX=Math.max(maxX, (o.x||0)+(o.w||80)+24);
-      maxY=Math.max(maxY, (o.y||0)+(o.h||80)+24);
-    });
+    var maxX=box.w, maxY=box.h;
     html+='<div class="floor-stage" id="floor-stage">';
     html+='<div class="floor-canvas" id="floor-canvas" style="width:'+maxX+'px;height:'+maxY+'px;">';
     objs.forEach(function(o){
@@ -2742,7 +2764,7 @@ function renderTables() {
       }
     });
     html+='</div></div>';
-    html+='<div class="floor-legend"><span><span class="floor-dot" style="background:transparent;border:1px dashed #F3ECDC;"></span>Open</span><span><span class="floor-dot" style="background:#3E9A68"></span>In service</span></div>';
+    html+='<div class="floor-legend"><span><span class="floor-dot" style="background:transparent;border:1.5px solid #F3ECDC;"></span>Open</span><span><span class="floor-dot" style="background:#3E9A68"></span>In service</span></div>';
   } else {
     html+='<p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:0.8rem;">No dining room from BOH yet. Add rooms on the BOH floor and Save Layout.</p>';
     html+='<div class="table-grid">';
