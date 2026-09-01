@@ -1854,18 +1854,14 @@ function stationRoster(){
   var seen={};
   sortedStations().forEach(function(st){
     var staff=staffForStation(st);
-    var name=foodMasterName(st) || (staff&&staff.name) || 'Unassigned';
-    var code=st.serverCode || (staff&&staff.code) || '';
-    var key=String(code||name)+':'+(st.id||stationNumber(st));
+    var code=String(st.serverCode || (staff&&staff.code) || '').trim();
+    var name=((staff&&staff.name) || foodMasterName(st) || '').trim();
+    if (!name || /^\d+$/.test(name)) name=(staff&&staff.name)||'';
+    if (!name && !code) return;
+    var key=code || name;
     if (seen[key]) return;
     seen[key]=1;
-    rows.push({ st:st, staff:staff, name:name, code:code });
-  });
-  allStaffForLogin().forEach(function(s){
-    if (!s || seen[String(s.code)]) return;
-    if (!/food master|front of house|manager/i.test(s.role||'')) return;
-    seen[String(s.code)]=1;
-    rows.push({ st:null, staff:s, name:s.name, code:s.code });
+    rows.push({ st:st, staff:staff, name:name||('Food Master'), code:code });
   });
   return rows;
 }
@@ -1920,8 +1916,8 @@ function openSwitchUser(){
   var html='<h2>Switch user</h2><p class="sheet-sub">Names assigned to each station. Enter that Food Master’s PIN to open their tables.</p><div class="switch-list">';
   if (!rows.length) html+='<p class="sheet-sub">No station assignments from BOH yet.</p>';
   rows.forEach(function(row, i){
-    var stName=row.st ? ('Station '+(stationNumber(row.st)||'') ).trim() : (row.staff&&row.staff.role||'Staff');
-    html+='<button type="button" class="switch-row" onclick="beginSwitchUser('+i+')"><b>'+esc(row.name)+'</b><span>'+esc(stName)+' · enter PIN to switch</span></button>';
+    var mine=row.staff && STATE.currentServer && String(row.staff.code)===String(STATE.currentServer.code);
+    html+='<button type="button" class="switch-row" onclick="beginSwitchUser('+i+')"><b>'+esc(row.name)+'</b><span>'+(mine?'Signed in · tap to open tables':'Enter PIN to switch login')+'</span></button>';
   });
   html+='</div><button class="ghost-btn" onclick="closeSheet()">Cancel</button>';
   STATE._switchRoster=rows;
@@ -2293,8 +2289,10 @@ function rectsOverlap(a, b){
 }
 function foodMasterName(st){
   if (!st) return '';
+  var staff=staffForStation(st);
+  if (staff && staff.name) return String(staff.name);
   var n=String(st.server||st.name||'').trim();
-  if (n && !/^station\s*\d*$/i.test(n)) return n;
+  if (n && !/^station\s*\d*$/i.test(n) && !/^\d+$/.test(n)) return n;
   return '';
 }
 function stationNamePlacement(st, tableRects, canvasW, canvasH){
