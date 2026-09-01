@@ -713,6 +713,7 @@ body.hh-table .app-content, body.tableside .app-content {
 .hub-tile .ico { font-size:1.35rem; line-height:1; }
 .hub-tile.muted { color:var(--text-secondary); font-weight:700; }
 .switch-list { display:flex; flex-direction:column; gap:8px; max-height:55vh; overflow-y:auto; }
+.hub-roster { max-height:none; }
 .switch-row {
   width:100%; text-align:left; min-height:56px; padding:0.7rem 0.85rem; border-radius:12px;
   border:1px solid var(--border); background:var(--surface-2); color:var(--text); cursor:pointer;
@@ -1868,6 +1869,18 @@ function stationRoster(){
   });
   return rows;
 }
+function hubStationListHtml(){
+  var rows=stationRoster();
+  var html='<div class="hub-sec">Assigned Food Masters</div><div class="switch-list hub-roster">';
+  if (!rows.length) html+='<p class="sheet-sub">No station assignments from BOH yet.</p>';
+  rows.forEach(function(row, i){
+    var mine=row.staff && STATE.currentServer && String(row.staff.code)===String(STATE.currentServer.code);
+    html+='<button type="button" class="switch-row" onclick="beginSwitchUser('+i+')"><b>'+esc(row.name)+'</b><span>'+(mine?'Signed in · tap to open tables':'Enter PIN to switch login')+'</span></button>';
+  });
+  html+='</div>';
+  STATE._switchRoster=rows;
+  return html;
+}
 function renderHub(){
   var c=document.getElementById('app-content');
   var who=STATE.currentServer||{};
@@ -1883,6 +1896,7 @@ function renderHub(){
   html+='<button type="button" class="hub-tile muted" onclick="toast(\'Kitchen Display stays on the KDS iPad\')"><span class="ico">🖥️</span>Kitchen</button>';
   html+='<button type="button" class="hub-tile" onclick="openClockApp()"><span class="ico">⏱</span>Time Clock</button>';
   html+='</div>';
+  html+=hubStationListHtml();
   html+='<div class="hub-sec">My account</div><div class="hub-grid">';
   html+='<button type="button" class="hub-tile" onclick="openSwitchUser()"><span class="ico">⇄</span>Switch user</button>';
   html+='<button type="button" class="hub-tile" onclick="logout()"><span class="ico">↩</span>Sign out</button>';
