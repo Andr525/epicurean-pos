@@ -18,7 +18,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <title>Epicurean POS</title>
-<!-- pos-build: hub-v16 -->
+<!-- pos-build: hub-v17 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
@@ -758,6 +758,16 @@ body.hh-table .app-content, body.tableside .app-content {
     <p id="call-alert-table" style="font-size:1.2rem;font-weight:700;margin:0.5rem 0;">Table 3</p>
     <p style="color:var(--text-muted);font-size:0.8rem;">Customer needs assistance</p>
     <button class="ack-btn" onclick="acknowledgeCall()">Got it — On my way</button>
+  </div>
+</div>
+<div id="ipad-order-alert" class="call-alert">
+  <div class="call-alert-card" style="max-width:420px;text-align:left;border-color:var(--info);">
+    <h2 style="color:var(--info);">iPad guest order</h2>
+    <p id="ipad-order-table" style="font-size:1.1rem;font-weight:700;margin:0.4rem 0;">Table</p>
+    <p style="color:var(--text-muted);font-size:0.72rem;margin:0 0 0.4rem;">English for Food Master</p>
+    <p id="ipad-order-en" style="font-size:0.95rem;color:var(--text);line-height:1.45;margin:0 0 0.6rem;"></p>
+    <p id="ipad-order-orig" style="font-size:0.72rem;color:var(--text-muted);line-height:1.4;margin:0;"></p>
+    <button class="ack-btn" onclick="acknowledgeIpadOrder()">Got it</button>
   </div>
 </div>
 
@@ -1745,6 +1755,7 @@ function loadData() {
     STATE.messages=[]; snap.forEach(d=>STATE.messages.push({id:d.id,...d.data()}));
     if (STATE.activeTab==='messages') renderMessages();
     updateMsgBadge();
+    maybeAlertIpadOrder();
   });
 }
 
@@ -1813,6 +1824,7 @@ function attemptLogin() {
   switchTab('hub');
   initSquare();
   paintChrome();
+  maybeAlertIpadOrder();
 }
 function logout() { STATE.currentServer=null; pin=''; updateDots(); document.body.classList.remove('hh-on','hh-table'); showScreen('login-screen'); }
 
@@ -4501,7 +4513,12 @@ function renderMessages() {
   var html='<h3 style="font-size:0.9rem;font-weight:600;color:var(--text-secondary);margin-bottom:1rem;">Messages — Table '+STATE.selectedTable+'</h3>';
   html+='<div class="msg-list">';
   msgs.forEach(m=>{
-    html+='<div class="msg-bubble '+(m.from==='server'?'from-server':'from-guest')+'">'+m.text+'</div>';
+    var body=esc(m.text||'');
+    if (m.kind==='ipad_order') {
+      body='<strong>iPad order (English)</strong><br>'+esc(m.text||'')+
+        (m.original && m.original!==m.text ? '<div style="margin-top:0.35rem;font-size:0.72rem;color:var(--text-muted);">Guest wrote ('+esc(m.langLabel||m.lang||'')+'): '+esc(m.original)+'</div>' : '');
+    }
+    html+='<div class="msg-bubble '+(m.from==='server'?'from-server':'from-guest')+'">'+body+'</div>';
   });
   html+='</div>';
   html+='<div class="msg-input-row"><input id="msg-input" type="text" placeholder="Message to table…"><button onclick="sendMsg()">Send</button></div>';
@@ -4516,10 +4533,55 @@ function sendMsg() {
   input.value=''; toast('Message sent');
 }
 function updateMsgBadge() {
-  var unread=STATE.messages.filter(m=>m.from==='guest'&&Date.now()-m.time<60000).length;
+  var unread=STATE.messages.filter(m=>m.from==='guest'&&!m.acked&&Date.now()-m.time<60000).length;
   var badge=document.getElementById('msg-badge');
   if (unread>0) { badge.textContent=unread; badge.classList.remove('hidden'); }
   else badge.classList.add('hidden');
+}
+
+var alertedIpadOrderId=null;
+function pendingIpadOrders(){
+  return STATE.messages.filter(function(m){
+    return m && m.kind==='ipad_order' && m.from==='guest' && !m.acked && (Date.now()-(m.time||0))<15*60*1000;
+  }).sort(function(a,b){ return (a.time||0)-(b.time||0); });
+}
+function maybeAlertIpadOrder(){
+  if (!STATE.currentServer) return;
+  var list=pendingIpadOrders();
+  if (!list.length) return;
+  var overlay=document.getElementById('ipad-order-alert');
+  if (overlay && overlay.classList.contains('show')) return;
+  showIpadOrderAlert(list[list.length-1]);
+}
+function showIpadOrderAlert(msg){
+  if (!msg) return;
+  alertedIpadOrderId=msg.id;
+  var tableEl=document.getElementById('ipad-order-table');
+  var enEl=document.getElementById('ipad-order-en');
+  var origEl=document.getElementById('ipad-order-orig');
+  if (tableEl) tableEl.textContent='Table '+msg.table;
+  if (enEl) enEl.textContent=msg.text||'';
+  if (origEl){
+    if (msg.original && msg.original!==msg.text) origEl.textContent='Guest wrote ('+(msg.langLabel||msg.lang||'')+'): '+msg.original;
+    else origEl.textContent='';
+  }
+  var overlay=document.getElementById('ipad-order-alert');
+  if (overlay) overlay.classList.add('show');
+  STATE.selectedTable=msg.table;
+  if (navigator.vibrate) navigator.vibrate([200,80,200]);
+  toast('iPad order — Table '+msg.table);
+}
+function acknowledgeIpadOrder(){
+  var overlay=document.getElementById('ipad-order-alert');
+  if (overlay) overlay.classList.remove('show');
+  var id=alertedIpadOrderId;
+  alertedIpadOrderId=null;
+  if (fbReady && id){
+    var hit=STATE.messages.filter(function(m){ return m.id===id; })[0];
+    if (hit) hit.acked=true;
+    fbDb.collection('messages').doc(id).update({acked:true}).catch(function(){});
+  }
+  maybeAlertIpadOrder();
 }
 
 // ─── History ────────────────────────────────────────────────────
