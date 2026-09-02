@@ -18,7 +18,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <title>Epicurean POS</title>
-<!-- pos-build: hub-v17 -->
+<!-- pos-build: hub-v18 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
@@ -1040,6 +1040,7 @@ var STATE = {
   retail: [],
   foodCats: [],
   foodItems: [],
+  menuPhotos: {},
   modGroups: [],
   floorFilter: 'all',
   floorZoom: 1,
@@ -1396,6 +1397,31 @@ function winePourMods(w){
   if (bottle>0) opts.push('Bottle $'+moneyOpt(bottle));
   return opts.length ? [{group:'Pour', options:opts}] : [];
 }
+function bohPhoto(id, fallback){
+  var u = (STATE.menuPhotos && id && STATE.menuPhotos[id]) || '';
+  return u || fallback || '';
+}
+function applyBohMenuPhotos(){
+  var map = STATE.menuPhotos || {};
+  function fill(obj, key){
+    if (!obj) return;
+    var u = map[key];
+    if (!u) return;
+    if (!obj.photoUrl) obj.photoUrl = u;
+    if (!obj.photo) obj.photo = u;
+  }
+  (STATE.foodItems || []).forEach(function(it){ fill(it, it.id); });
+  (STATE.menuItems || []).forEach(function(it){ fill(it, it.id); });
+  (STATE.prixFixeMenus || []).forEach(function(pf){
+    (pf.dishes || []).forEach(function(d){ fill(d, 'pfdish:' + pf.id + '|' + d.id); });
+    (pf.courses || []).forEach(function(c){
+      (c.options || []).forEach(function(o){ fill(o, 'pfdish:' + pf.id + '|' + (o.id || '')); });
+    });
+  });
+  (STATE.tastingMenus || []).forEach(function(tm){
+    (tm.courses || []).forEach(function(c){ fill(c, 'tmcourse:' + tm.id + '|' + c.id); });
+  });
+}
 function mapBohMenuItem(it){
   it = it || {};
   var cat = (it.catIds && it.catIds[0]) || it.category || '';
@@ -1403,7 +1429,7 @@ function mapBohMenuItem(it){
   var allergens = asList(it.allergens);
   return Object.assign({}, it, {
     category: cat,
-    photo: it.photoUrl || it.photo || '',
+    photo: bohPhoto(it.id, it.photoUrl || it.photo),
     description: it.desc || it.description || '',
     dietaryFlags: diet,
     dietary: diet,
@@ -1433,7 +1459,7 @@ function mapBarToPos(it, catId){
     modifiers: [],
     description: String(it.desc||it.description||''),
     desc: String(it.desc||it.description||''),
-    photo: it.photoUrl || it.photo || '',
+    photo: bohPhoto(it.id, it.photoUrl || it.photo),
     allergens: asList(it.allergens),
     dietaryFlags: asList(it.diet || it.dietary || it.dietaryFlags),
     source: 'bar',
@@ -1462,7 +1488,7 @@ function mapWineToPos(it, catId){
     modifiers: winePourMods(it),
     description: parts.join(' · '),
     desc: parts.join(' · '),
-    photo: it.photoUrl || it.photo || '',
+    photo: bohPhoto(it.id, it.photoUrl || it.photo),
     allergens: allergens,
     dietaryFlags: asList(it.diet || it.dietaryFlags),
     source: 'wine',
@@ -1485,7 +1511,7 @@ function mapRetailToPos(it, catId){
     modifiers: [],
     description: [it.category, it.unit].filter(Boolean).join(' · '),
     desc: [it.category, it.unit].filter(Boolean).join(' · '),
-    photo: it.photoUrl || it.photo || '',
+    photo: bohPhoto(it.id, it.photoUrl || it.photo),
     allergens: asList(it.allergens),
     dietaryFlags: asList(it.diet || it.dietaryFlags),
     source: 'retail',
@@ -1677,6 +1703,7 @@ function loadData() {
       if (d.cats || d.items || d.modGroups) {
         STATE.menuLive = true;
         applyFoodFromMenuDoc(d);
+        applyBohMenuPhotos();
         rebuildPosCatalog();
       } else if (!STATE.menuLive) {
         seedOfflineCatalog();
@@ -1689,6 +1716,12 @@ function loadData() {
   listenBohList('bar','bar');
   listenBohList('wines','wines');
   listenBohList('retail','retail');
+  fbDb.collection('boh_shared').doc('menu_photos').onSnapshot(function(doc){
+    STATE.menuPhotos = (doc.exists && doc.data() && doc.data().urls) ? doc.data().urls : {};
+    applyBohMenuPhotos();
+    rebuildPosCatalog();
+    refreshOrderView();
+  }, function(){});
 
   // Real-time listeners for BOH dining room layout tables
   fbDb.collection('boh_shared').doc('tables').onSnapshot(function(doc){
@@ -1718,12 +1751,14 @@ function loadData() {
   fbDb.collection('boh_shared').doc('tasting_menus').onSnapshot(function(doc){
     var list = (doc.exists && Array.isArray((doc.data()||{}).list)) ? doc.data().list : [];
     STATE.tastingMenus = mergeScaliniList(list, SEED_TASTING_MENUS, ['tm_chef7','tm_choc5','tm1','tm2']);
+    applyBohMenuPhotos();
     refreshOrderView();
   }, function(){ STATE.tastingMenus = SEED_TASTING_MENUS; });
 
   fbDb.collection('boh_shared').doc('prix_fixe_menus').onSnapshot(function(doc){
     var list = (doc.exists && Array.isArray((doc.data()||{}).list)) ? doc.data().list : [];
     STATE.prixFixeMenus = mergeScaliniList(list, SEED_PRIX_FIXE_MENUS, ['pf_lunch','pf_brunch','pf1','pf2']);
+    applyBohMenuPhotos();
     refreshOrderView();
   }, function(){ STATE.prixFixeMenus = SEED_PRIX_FIXE_MENUS; });
 
