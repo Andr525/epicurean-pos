@@ -18,7 +18,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <title>Epicurean POS</title>
-<!-- pos-build: hub-v18 -->
+<!-- pos-build: hub-v19 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
@@ -1364,7 +1364,11 @@ function bohList(data){
   return [];
 }
 function itemIsEightySixed(it){
-  return !!(it && (it.active===false || it.available===false || Number(it.stock)===0));
+  if (!it) return false;
+  if (it.active===false || it.available===false) return true;
+  if (it.ozOnHand!=null && Number(it.ozOnHand)<=0) return true;
+  if (it.stock!=null && Number(it.stock)===0) return true;
+  return false;
 }
 function moneyOpt(n){
   n=Number(n)||0;
@@ -1393,7 +1397,11 @@ function winePourMods(w){
   var opts=[];
   var glass=Number(w && w.glassPrice || 0);
   var bottle=Number(w && (w.bottlePrice || w.price) || 0);
-  if (glass>0) opts.push('Glass $'+moneyOpt(glass));
+  var btg=!!(w && (w.byTheGlass || glass>0));
+  if (btg && glass>0) {
+    opts.push('Glass 6 oz $'+moneyOpt(glass));
+    opts.push('Taste 2 oz $'+moneyOpt(Math.round(glass/3*100)/100));
+  }
   if (bottle>0) opts.push('Bottle $'+moneyOpt(bottle));
   return opts.length ? [{group:'Pour', options:opts}] : [];
 }
@@ -1463,6 +1471,8 @@ function mapBarToPos(it, catId){
     allergens: asList(it.allergens),
     dietaryFlags: asList(it.diet || it.dietary || it.dietaryFlags),
     source: 'bar',
+    stock: it.stock,
+    bottleOz: it.bottleOz,
     eightySixed: itemIsEightySixed(it),
     active: it.active !== false,
     unit: it.unit || ''
@@ -1478,7 +1488,7 @@ function mapWineToPos(it, catId){
   return {
     id: String(it.id || it.vin || ('wine-'+it.name)),
     code: String(it.vin || it.code || ''),
-    name: String(it.name||'').trim(),
+    name: String(it.name||'').trim()+(it.vintage && it.vintage!=='NV' ? ' '+it.vintage : '')+(it.size && it.size!=='750ml' ? ' ('+it.size+')' : ''),
     price: bottle || glass,
     category: catId,
     catIds: [catId],
@@ -1492,6 +1502,9 @@ function mapWineToPos(it, catId){
     allergens: allergens,
     dietaryFlags: asList(it.diet || it.dietaryFlags),
     source: 'wine',
+    stock: it.stock,
+    bottleOz: it.bottleOz || 25,
+    ozOnHand: it.ozOnHand,
     eightySixed: itemIsEightySixed(it),
     active: it.active !== false
   };
@@ -1681,6 +1694,91 @@ function listenBohList(docName, key){
     }
   }, function(){});
 }
+function flattenPosWines(){
+  var all=[], n=STATE._wineChunkCount||1;
+  for (var i=0;i<n;i++) all=all.concat(STATE._wineParts[i]||[]);
+  STATE.wines=all;
+  STATE.menuLive=true;
+  rebuildPosCatalog();
+  refreshOrderView();
+}
+function listenWines(){
+  fbDb.collection('boh_shared').doc('wines').onSnapshot(function(doc){
+    if (!doc.exists || !doc.data()) return;
+    var d=doc.data();
+    STATE._wineChunkCount=Number(d.chunkCount)||1;
+    STATE._wineParts=STATE._wineParts||[];
+    STATE._wineParts[0]=bohList(d);
+    if (STATE._wineChunkCount>1) {
+      for (var i=1;i<STATE._wineChunkCount;i++){
+        if (STATE._wineWatch && STATE._wineWatch[i]) continue;
+        STATE._wineWatch=STATE._wineWatch||{};
+        STATE._wineWatch[i]=true;
+        (function(n){
+          fbDb.collection('boh_shared').doc('wines_'+n).onSnapshot(function(s){
+            STATE._wineParts[n]=bohList(s.data()||{});
+            flattenPosWines();
+          }, function(){});
+        })(i);
+      }
+    }
+    flattenPosWines();
+  }, function(){});
+}
+function consumeWineSale(w, qty, ozEach){
+  if (!w) return;
+  qty=Math.max(1, Number(qty)||1);
+  var bottleOz=Number(w.bottleOz)||25;
+  var oz=ozEach!=null ? Number(ozEach)*qty : bottleOz*qty;
+  var on=w.ozOnHand!=null ? Number(w.ozOnHand) : (Number(w.stock)||0)*bottleOz;
+  on=Math.max(0, on-oz);
+  w.ozOnHand=Math.round(on*10)/10;
+  w.stock=Math.ceil(on/bottleOz);
+  if (w.stock<=0){ w.stock=0; w.openOz=0; }
+}
+function consumeBarSale(b, qty){
+  if (!b) return;
+  qty=Math.max(1, Number(qty)||1);
+  b.stock=Math.max(0, (Number(b.stock)||0)-qty);
+  if (b.ozOnHand!=null) b.ozOnHand=Math.max(0, Number(b.ozOnHand)-(Number(b.bottleOz)||25)*qty);
+}
+function posPourOz(line, w){
+  var mod=String((line&&line.selectedMod)||'');
+  if (/taste|2 oz/i.test(mod)) return 2;
+  if (/glass|6 oz/i.test(mod)) return 6;
+  return Number(w && w.bottleOz)||25;
+}
+function savePosWineItem(w){
+  if (!fbReady || !w) return;
+  var list=STATE.wines||[];
+  var idx=-1;
+  for (var i=0;i<list.length;i++){ if (list[i].id===w.id){ idx=i; break; } }
+  if (idx<0) return;
+  var CHUNK=250, c=Math.floor(idx/CHUNK);
+  var slice=list.slice(c*CHUNK,(c+1)*CHUNK);
+  var id=c===0?'wines':'wines_'+c;
+  var payload={list:slice, updatedAt:Date.now()};
+  if (c===0) payload.chunkCount=Math.max(1, Math.ceil(list.length/CHUNK));
+  fbDb.collection('boh_shared').doc(id).set(payload,{merge:true});
+}
+function consumePosInventory(lines){
+  (lines||[]).forEach(function(i){
+    var item=(STATE.menuItems||[]).filter(function(x){ return x.id===i.id; })[0];
+    var src=(item&&item.source)||i.source;
+    var qty=Math.max(1, parseInt(i.qty,10)||1);
+    if (src==='wine') {
+      var w=(STATE.wines||[]).filter(function(x){ return x.id===i.id; })[0];
+      if (w){ consumeWineSale(w, qty, posPourOz(i,w)); savePosWineItem(w); }
+    } else if (src==='bar') {
+      var b=(STATE.bar||[]).filter(function(x){ return x.id===i.id; })[0];
+      if (b){
+        consumeBarSale(b, qty);
+        if (fbReady) fbDb.collection('boh_shared').doc('bar').set({list:STATE.bar, updatedAt:Date.now()},{merge:true});
+      }
+    }
+  });
+  rebuildPosCatalog();
+}
 function mergeScaliniList(list, seed, dummyIds){
   seed = seed && seed[0] ? JSON.parse(JSON.stringify(seed[0])) : null;
   dummyIds = dummyIds || [];
@@ -1714,7 +1812,7 @@ function loadData() {
     refreshOrderView();
   }, function(){ if (!STATE.menuLive) seedOfflineCatalog(); });
   listenBohList('bar','bar');
-  listenBohList('wines','wines');
+  listenWines();
   listenBohList('retail','retail');
   fbDb.collection('boh_shared').doc('menu_photos').onSnapshot(function(doc){
     STATE.menuPhotos = (doc.exists && doc.data() && doc.data().urls) ? doc.data().urls : {};
@@ -3571,7 +3669,9 @@ function beginAddItem(itemId) {
     modifiers:item.modifiers||[],
     allergens:item.allergens||[],
     dietaryFlags:item.dietaryFlags||item.dietary||[],
-    description:item.description||item.desc||''
+    description:item.description||item.desc||'',
+    source:item.source||'menu',
+    bottleOz:item.bottleOz
   };
   if (item.modifiers&&item.modifiers.length) {
     renderModifierSheet();
@@ -4074,6 +4174,7 @@ function sendOrder(opts) {
   var check=STATE.checks[activeCheckId()] || ensureOpenCheck(STATE.selectedTable);
 
   if (regularItems.length) {
+    consumePosInventory(regularItems);
     var mapped=kitchenItemsFrom(regularItems);
     var order = {
       table: STATE.selectedTable,
