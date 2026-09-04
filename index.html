@@ -18,13 +18,13 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <title>Epicurean POS</title>
-<!-- pos-build: hub-v19 -->
+<!-- pos-build: scalini-print-v20 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js"></script>
-<script src="scalini-dining.js"></script>
+<script src="scalini-dining.js?v=print-115-btg"></script>
 <script async src="https://sandbox.web.squarecdn.com/v1/square.js"></script>
 <style>
 :root {
@@ -1589,6 +1589,14 @@ function rebuildPosCatalog(){
     var catId=resolveCatId(cats, 'wine', 'Wine');
     items.push(mapWineToPos(it, catId));
   });
+  var btg=(typeof EPICUREAN_SCALINI!=='undefined' && EPICUREAN_SCALINI.winesByGlass) || [];
+  if (btg.length) {
+    var glassCat=resolveCatId(cats, 'wine-glass', 'Wines by the Glass');
+    btg.forEach(function(w){
+      if (!w || !String(w.name||'').trim()) return;
+      items.push(mapWineToPos(Object.assign({byTheGlass:true, bottlePrice:0, price:w.glassPrice, scaliniOnly:true}, w), glassCat));
+    });
+  }
   var hasRetail=(STATE.retail||[]).some(function(it){ return it && it.visible!==false && String(it.name||'').trim(); });
   var retailCatId=hasRetail ? resolveCatId(cats, 'retail', 'Retail') : null;
   (STATE.retail||[]).forEach(function(it){
@@ -1780,8 +1788,12 @@ function consumePosInventory(lines){
   rebuildPosCatalog();
 }
 function mergeScaliniList(list, seed, dummyIds){
-  seed = seed && seed[0] ? JSON.parse(JSON.stringify(seed[0])) : null;
+  seed = seed && seed[0] ? seed[0] : null;
   dummyIds = dummyIds || [];
+  if (typeof EPICUREAN_SCALINI !== 'undefined' && typeof EPICUREAN_SCALINI.mergeList === 'function') {
+    return EPICUREAN_SCALINI.mergeList(list, seed, dummyIds);
+  }
+  seed = seed ? JSON.parse(JSON.stringify(seed)) : null;
   list = (list||[]).filter(function(x){ return x && dummyIds.indexOf(x.id)<0; });
   if (seed && !list.some(function(x){ return x.id===seed.id; })) list.unshift(seed);
   return list.filter(function(x){ return x && x.active !== false; });
@@ -1791,6 +1803,7 @@ function loadData() {
     seedOfflineCatalog();
     STATE.tastingMenus = SEED_TASTING_MENUS;
     STATE.prixFixeMenus = SEED_PRIX_FIXE_MENUS;
+    rebuildPosCatalog();
     return;
   }
 
