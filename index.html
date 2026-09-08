@@ -1412,8 +1412,9 @@ function resolveWineGlassCatId(cats){
 function winePourMods(w){
   var opts=[];
   var glass=Number(w && w.glassPrice || 0);
-  var bottle=Number(w && (w.bottlePrice || w.price) || 0);
-  var btg=!!(w && (w.byTheGlass || glass>0));
+  var bottle=Number(w && w.bottlePrice || 0);
+  var btg=!!(w && (w.byTheGlass || w.scaliniOnly || glass>0));
+  if (!btg && !bottle) bottle=Number(w && w.price || 0);
   if (btg && glass>0) {
     opts.push('Glass 6 oz $'+moneyOpt(glass));
     opts.push('Taste 2 oz $'+moneyOpt(Math.round(glass/3*100)/100));
