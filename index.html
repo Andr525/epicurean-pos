@@ -1505,7 +1505,13 @@ function mapWineToPos(it, catId){
   return {
     id: String(it.id || it.vin || ('wine-'+it.name)),
     code: String(it.vin || it.code || ''),
-    name: String(it.name||'').trim()+(it.vintage && it.vintage!=='NV' ? ' '+it.vintage : '')+(it.size && it.size!=='750ml' ? ' ('+it.size+')' : ''),
+    name: (function(){
+      var n=String(it.name||'').trim();
+      var v=(it.vintage && it.vintage!=='NV') ? String(it.vintage) : '';
+      if (v && n.indexOf(v)===-1) n += ' '+v;
+      if (it.size && it.size!=='750ml') n += ' ('+it.size+')';
+      return n;
+    })(),
     price: (btg && glass) ? glass : (bottle || glass || Number(it.price||0)),
     category: catId,
     catIds: [catId],
