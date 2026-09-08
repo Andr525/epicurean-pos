@@ -24,7 +24,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js"></script>
-<script src="scalini-dining.js?v=print-btg-20260909"></script>
+<script src="cellar.js?v=binwise-375-park-v1"></script>
+<script src="scalini-dining.js?v=cellar-btg-20260910"></script>
 <script async src="https://sandbox.web.squarecdn.com/v1/square.js"></script>
 <style>
 :root {
@@ -1721,28 +1722,68 @@ function seedOfflineCatalog(){
   STATE.foodItems = SEED_ITEMS.slice();
   STATE.menuCategories = SEED_CATEGORIES;
   STATE.menuItems = SEED_ITEMS;
+  ensurePosBinwiseCellar();
 }
 function listenBohList(docName, key){
   fbDb.collection('boh_shared').doc(docName).onSnapshot(function(doc){
     if (doc.exists && doc.data()) {
       STATE.menuLive = true;
       STATE[key] = bohList(doc.data());
+      if (key==='bar') ensurePosBinwiseCellar();
       rebuildPosCatalog();
       refreshOrderView();
     }
   }, function(){});
 }
+function clonePosCellar(list){ return JSON.parse(JSON.stringify(list||[])); }
+function ensurePosBinwiseCellar(){
+  var seed=typeof BINWISE_CELLAR!=='undefined' ? BINWISE_CELLAR : null;
+  if (!seed || !Array.isArray(seed.wines) || !seed.wines.length) return false;
+  var changed=false;
+  if ((STATE.wines||[]).length<50) {
+    STATE.wines=clonePosCellar(seed.wines).filter(function(w){
+      return w && w.visible!==false && w.active!==false && String(w.name||'').trim();
+    });
+    changed=true;
+  }
+  var bar=STATE.bar||[];
+  var hasBeer=bar.some(function(b){
+    var k=String((b&&b.kind)||'').toLowerCase();
+    return k==='beer' || k==='spirit' || k==='spirits';
+  });
+  if (!hasBeer) {
+    STATE.bar=bar.concat(clonePosCellar(seed.beers||[]), clonePosCellar(seed.spirits||[]));
+    changed=true;
+  }
+  return changed;
+}
 function flattenPosWines(){
   var all=[], n=STATE._wineChunkCount||1;
   for (var i=0;i<n;i++) all=all.concat(STATE._wineParts[i]||[]);
-  STATE.wines=all;
+  all=all.filter(function(w){ return w && w.visible!==false && String(w.name||'').trim(); });
+  if (all.length>=50) STATE.wines=all;
+  else ensurePosBinwiseCellar();
+  if (!(STATE.wines||[]).length) STATE.wines=all;
   STATE.menuLive=true;
   rebuildPosCatalog();
   refreshOrderView();
 }
 function listenWines(){
+  ensurePosBinwiseCellar();
+  if ((STATE.wines||[]).length) {
+    STATE.menuLive=true;
+    rebuildPosCatalog();
+    refreshOrderView();
+  }
+  if (!fbReady) return;
   fbDb.collection('boh_shared').doc('wines').onSnapshot(function(doc){
-    if (!doc.exists || !doc.data()) return;
+    if (!doc.exists || !doc.data()) {
+      ensurePosBinwiseCellar();
+      STATE.menuLive=true;
+      rebuildPosCatalog();
+      refreshOrderView();
+      return;
+    }
     var d=doc.data();
     STATE._wineChunkCount=Number(d.chunkCount)||1;
     STATE._wineParts=STATE._wineParts||[];
@@ -3366,10 +3407,25 @@ function renderMenuGrid(){
       html+='<button type="button" class="ts-tile prix" onclick="addTastingMenu('+JSON.stringify(String(tm.id))+')">'+esc(tm.name)+'<span class="price">$'+(Number(tm.price)||0).toFixed(2)+'</span></button>';
     });
   } else {
-    items.filter(function(i){
+    var catItems=items.filter(function(i){
       if (i.catIds && i.catIds.length) return i.catIds.indexOf(STATE.orderCat)>-1;
       return i.category===STATE.orderCat;
-    }).forEach(function(item){
+    });
+    var wineCat=false;
+    (STATE.menuCategories||[]).forEach(function(c){
+      if (c && c.id===STATE.orderCat) {
+        var n=String(c.name||c.id||'').toLowerCase();
+        wineCat = n==='wine' || (n.indexOf('wine')>=0 && n.indexOf('glass')<0);
+      }
+    });
+    if (STATE.orderCat==='wine') wineCat=true;
+    if (wineCat && catItems.length>60) {
+      var q=String(STATE._posWineFind||'').trim().toLowerCase();
+      html+='<div style="grid-column:1/-1"><input class="search-box" id="pos-wine-find" value="'+esc(STATE._posWineFind||'')+'" placeholder="Find a bottle ('+catItems.length+')" oninput="STATE._posWineFind=this.value;var s=this.selectionStart;renderOrder();var el=document.getElementById(\'pos-wine-find\');if(el){el.focus();try{el.setSelectionRange(s,s);}catch(e){}}"></div>';
+      if (q) catItems=catItems.filter(function(i){ return itemMatchesSearch(i,q); });
+      else catItems=catItems.slice(0,80);
+    }
+    catItems.forEach(function(item){
       var click=item.eightySixed ? 'toast("86 — not available")' : 'beginAddItem('+JSON.stringify(String(item.id))+')';
       html+='<button type="button" class="ts-tile'+(item.eightySixed?' sold':'')+'" onclick=\''+click+'\'>'+esc(item.name)+'<span class="price">$'+(Number(item.price)||0).toFixed(2)+'</span></button>';
     });
