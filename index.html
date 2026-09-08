@@ -18,13 +18,13 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <title>Epicurean POS</title>
-<!-- pos-build: scalini-print-v20 -->
+<!-- pos-build: scalini-print-v21 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js"></script>
-<script src="scalini-dining.js?v=print-115-btg2"></script>
+<script src="scalini-dining.js?v=print-btg-20260908"></script>
 <script async src="https://sandbox.web.squarecdn.com/v1/square.js"></script>
 <style>
 :root {
@@ -1393,6 +1393,22 @@ function resolveCatId(cats, wantId, wantName){
   cats.push({id:wantId, name:wantName});
   return wantId;
 }
+function resolveWineGlassCatId(cats){
+  var found=(cats||[]).find(function(c){
+    if (!c) return false;
+    var id=String(c.id||'').toLowerCase();
+    var n=String(c.name||'').toLowerCase();
+    if (id==='wine-glass' || id==='c_wine_glass') return true;
+    return (n.indexOf('wine')>=0 || n.indexOf('wines')>=0) && n.indexOf('glass')>=0;
+  });
+  if (found) {
+    found.name = 'Wines by the Glass';
+    found.visible = true;
+    return found.id;
+  }
+  cats.push({id:'wine-glass', name:'Wines by the Glass', visible:true, kind:'wine'});
+  return 'wine-glass';
+}
 function winePourMods(w){
   var opts=[];
   var glass=Number(w && w.glassPrice || 0);
@@ -1481,15 +1497,16 @@ function mapBarToPos(it, catId){
 function mapWineToPos(it, catId){
   it=it||{};
   var parts=[it.producer, it.vintage, it.region, it.varietal].filter(function(x){ return String(x||'').trim(); });
-  var bottle=Number(it.bottlePrice||it.price||0);
+  var bottle=Number(it.bottlePrice||0);
   var glass=Number(it.glassPrice||0);
+  var btg=!!(it.byTheGlass || it.scaliniOnly);
   var allergens=asList(it.allergens);
   if (!allergens.length) allergens=['Sulfites'];
   return {
     id: String(it.id || it.vin || ('wine-'+it.name)),
     code: String(it.vin || it.code || ''),
     name: String(it.name||'').trim()+(it.vintage && it.vintage!=='NV' ? ' '+it.vintage : '')+(it.size && it.size!=='750ml' ? ' ('+it.size+')' : ''),
-    price: bottle || glass,
+    price: (btg && glass) ? glass : (bottle || glass || Number(it.price||0)),
     category: catId,
     catIds: [catId],
     station: 'Bar',
@@ -1591,10 +1608,16 @@ function rebuildPosCatalog(){
   });
   var btg=(typeof EPICUREAN_SCALINI!=='undefined' && EPICUREAN_SCALINI.winesByGlass) || [];
   if (btg.length) {
-    var glassCat=resolveCatId(cats, 'wine-glass', 'Wines by the Glass');
+    var glassCat=resolveWineGlassCatId(cats);
+    items = items.filter(function(it){
+      if (!it) return false;
+      var id=String(it.id||'');
+      if (id.indexOf('btg_')===0 || it.scaliniOnly) return false;
+      return it.category!==glassCat && it.category!=='wine-glass';
+    });
     btg.forEach(function(w){
       if (!w || !String(w.name||'').trim()) return;
-      items.push(mapWineToPos(Object.assign({byTheGlass:true, bottlePrice:0, price:w.glassPrice, scaliniOnly:true}, w), glassCat));
+      items.push(mapWineToPos(Object.assign({}, w, {byTheGlass:true, scaliniOnly:true, price:w.glassPrice}), glassCat));
     });
   }
   var hasRetail=(STATE.retail||[]).some(function(it){ return it && it.visible!==false && String(it.name||'').trim(); });
