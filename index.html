@@ -1603,6 +1603,14 @@ function applyFoodFromMenuDoc(d){
 function rebuildPosCatalog(){
   var cats = (STATE.foodCats||[]).slice();
   var items = (STATE.foodItems||[]).slice();
+  if ((STATE.wines||[]).length>=50) {
+    items=items.filter(function(it){
+      if (!it) return false;
+      if (it.category==='wine') return false;
+      if ((it.catIds||[]).indexOf('wine')>=0) return false;
+      return true;
+    });
+  }
   (STATE.bar||[]).forEach(function(it){
     if (!it || it.visible===false || !String(it.name||'').trim()) return;
     var spec=barKindCat(it.kind);
