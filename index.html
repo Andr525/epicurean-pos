@@ -18,14 +18,14 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <title>Epicurean POS</title>
-<!-- pos-build: scalini-print-v21 -->
+<!-- pos-build: scalini-print-v22 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js"></script>
 <script src="cellar.js?v=binwise-375-park-v1"></script>
-<script src="scalini-dining.js?v=glass-dark-20260912"></script>
+<script src="scalini-dining.js?v=menu-ai-maps-20260913"></script>
 <script async src="https://sandbox.web.squarecdn.com/v1/square.js"></script>
 <style>
 :root {
@@ -1004,13 +1004,84 @@ function createNamedFirestoreAdapter(){
 }
 
 if (typeof fbReady !== 'undefined' && fbReady) fbDb = createNamedFirestoreAdapter();
+var POS_LAYOUT_KEY = 'eh_pos_layout';
+var SEED_ROOMS = [
+  {id:'main',    name:'Main Dining'},
+  {id:'bar',     name:'Bar'},
+  {id:'patio',   name:'Patio'},
+  {id:'private', name:'Private Room'}
+];
+var SEED_OBJS = {
+  main:[
+    {id:'t1', type:'table', shape:'round',  num:1, seats:2, x:80,  y:80,  w:70,  h:70,  status:'open', server:''},
+    {id:'t2', type:'table', shape:'round',  num:2, seats:2, x:220, y:80,  w:70,  h:70,  status:'open', server:''},
+    {id:'t3', type:'table', shape:'square', num:3, seats:4, x:80,  y:220, w:80,  h:80,  status:'open', server:''},
+    {id:'t4', type:'table', shape:'square', num:4, seats:4, x:240, y:220, w:80,  h:80,  status:'open', server:''},
+    {id:'t5', type:'table', shape:'round',  num:5, seats:6, x:440, y:150, w:96,  h:96,  status:'open', server:''},
+    {id:'t6', type:'table', shape:'rect',   num:6, seats:8, x:620, y:120, w:150, h:80,  status:'open', server:''},
+    {id:'t7', type:'table', shape:'square', num:7, seats:4, x:80,  y:360, w:80,  h:80,  status:'open', server:''},
+    {id:'t8', type:'table', shape:'square', num:8, seats:4, x:220, y:360, w:80,  h:80,  status:'open', server:''},
+    {id:'t9', type:'table', shape:'round',  num:9, seats:4, x:380, y:360, w:80,  h:80,  status:'open', server:''},
+    {id:'t10', type:'table', shape:'round', num:10, seats:4, x:540, y:360, w:80, h:80, status:'open', server:''},
+    {id:'t11', type:'table', shape:'round', num:11, seats:4, x:700, y:280, w:88, h:88, status:'open', server:'Andre Mendoza'},
+    {id:'t12', type:'table', shape:'square', num:12, seats:4, x:700, y:400, w:80, h:80, status:'open', server:''},
+    {id:'w1', type:'wall',  x:40, y:40, w:800, h:12, label:''},
+    {id:'h1', type:'host',  x:860, y:60, w:70, h:44, label:'Host'}
+  ],
+  bar:[
+    {id:'bar1', type:'bar', x:120, y:120, w:360, h:80, label:'Bar Counter'},
+    {id:'st1', type:'stool', num:'B1', seats:1, x:140, y:230, w:40, h:40, status:'open', server:''},
+    {id:'st2', type:'stool', num:'B2', seats:1, x:210, y:230, w:40, h:40, status:'open', server:''},
+    {id:'st3', type:'stool', num:'B3', seats:1, x:280, y:230, w:40, h:40, status:'open', server:''},
+    {id:'st4', type:'stool', num:'B4', seats:1, x:350, y:230, w:40, h:40, status:'open', server:''}
+  ],
+  patio:[
+    {id:'o1', type:'outdoor', num:'P1', seats:2, x:100, y:100, w:70, h:70, status:'open', server:''},
+    {id:'o2', type:'outdoor', num:'P2', seats:2, x:220, y:100, w:70, h:70, status:'open', server:''},
+    {id:'k1', type:'kiosk', x:400, y:100, w:80, h:80, label:'Kiosk'}
+  ],
+  private:[
+    {id:'pr1', type:'table', shape:'rect', num:20, seats:12, x:200, y:200, w:240, h:100, status:'open', server:''}
+  ]
+};
+var SEED_STATIONS = [
+  { id:'st_main_1', name:'Station 1', room:'main', server:'Andre Mendoza', serverCode:'3001', tableIds:['1','2','3','11'] }
+];
+function cloneJson(x){ return JSON.parse(JSON.stringify(x)); }
+function layoutHasFloor(rooms, roomObjs){
+  var hasRooms = Array.isArray(rooms) && rooms.length>0;
+  var hasObjs = false;
+  if (Array.isArray(roomObjs)) hasObjs = roomObjs.length>0;
+  else if (roomObjs && typeof roomObjs==='object') {
+    hasObjs = Object.keys(roomObjs).some(function(k){ return Array.isArray(roomObjs[k]) && roomObjs[k].length; });
+  }
+  return hasRooms && hasObjs;
+}
+function loadPosLayout(){
+  try {
+    var raw = localStorage.getItem(POS_LAYOUT_KEY);
+    if (raw) {
+      var d = JSON.parse(raw);
+      if (d && layoutHasFloor(d.rooms, d.roomObjs)) return d;
+    }
+  } catch (e) {}
+  return { rooms: cloneJson(SEED_ROOMS), roomObjs: cloneJson(SEED_OBJS), stations: cloneJson(SEED_STATIONS) };
+}
+function persistPosLayout(){
+  try {
+    localStorage.setItem(POS_LAYOUT_KEY, JSON.stringify({
+      rooms: STATE.rooms, roomObjs: STATE.roomObjs, stations: STATE.stations, savedAt: Date.now()
+    }));
+  } catch (e) {}
+}
+var _bootLayout = loadPosLayout();
 // ─── State ──────────────────────────────────────────────────────
 var STATE = {
   currentServer: null,
   selectedTable: 1,
   guestCount: 2,
-  rooms: [],
-  roomObjs: [],
+  rooms: _bootLayout.rooms,
+  roomObjs: _bootLayout.roomObjs,
   menuItems: [],
   menuCategories: [],
   tastingMenus: [],
@@ -1033,7 +1104,7 @@ var STATE = {
   tableSessions: {},
   pendingItem: null,
   pendingSend: null,
-  stations: [],
+  stations: _bootLayout.stations || [],
   staff: [],
   guests: [],
   bar: [],
@@ -1917,9 +1988,15 @@ function loadData() {
   fbDb.collection('boh_shared').doc('tables').onSnapshot(function(doc){
     if (doc.exists && doc.data()) {
       var d = doc.data();
-      if (d.rooms) STATE.rooms = d.rooms;
-      if (d.roomObjs) STATE.roomObjs = d.roomObjs;
-      STATE.stations = Array.isArray(d.stations) ? d.stations : [];
+      var nextRooms = d.rooms;
+      var nextObjs = d.roomObjs;
+      var nextStations = Array.isArray(d.stations) ? d.stations : [];
+      if (layoutHasFloor(nextRooms, nextObjs)) {
+        STATE.rooms = nextRooms;
+        STATE.roomObjs = nextObjs;
+        if (nextStations.length) STATE.stations = nextStations;
+        persistPosLayout();
+      }
       STATE.stations = mergeStationsFromFloor(STATE.stations, STATE.roomObjs);
       if (!STATE.floorRoom && STATE.rooms && STATE.rooms.length) STATE.floorRoom = STATE.rooms[0].id;
       if (STATE.currentServer && !STATE.floorFilter) STATE.floorFilter=defaultFloorFilter();
@@ -1954,7 +2031,7 @@ function loadData() {
 
   fbDb.collection('calls').onSnapshot(snap=>{
     STATE.calls=[]; snap.forEach(d=>STATE.calls.push({id:d.id,...d.data()}));
-    var active = STATE.calls.filter(c=>c.status==='active');
+    var active = STATE.calls.filter(function(c){ return c.status==='active' && callForThisServer(c); });
     if (active.length > 0 && STATE.currentServer) showCallAlert(active[0]);
     if (STATE.activeTab==='tables') renderTables();
   });
@@ -2046,7 +2123,7 @@ function attemptLogin() {
   document.getElementById('user-name').textContent=staff.name;
   document.getElementById('user-role').textContent=staff.role;
   showScreen('app-screen');
-  switchTab('hub');
+  openTableService();
   initSquare();
   paintChrome();
   maybeAlertIpadOrder();
@@ -2223,7 +2300,19 @@ function tableKey(o){
   return o.id || '';
 }
 function tableHasCall(tNum){
-  return STATE.calls.some(function(cl){ return String(cl.table)===String(tNum) && cl.status==='active'; });
+  return STATE.calls.some(function(cl){
+    return String(cl.table)===String(tNum) && cl.status==='active' && callForThisServer(cl);
+  });
+}
+function callForThisServer(call){
+  if (!call || !STATE.currentServer) return false;
+  if (isManager()) return true;
+  var tNum = call.table;
+  var obj = findFloorTable(tNum);
+  if (obj && serverOwnsTable(obj)) return true;
+  var st = stationForTable(tNum, obj);
+  if (st && serverOwnsStation(st)) return true;
+  return false;
 }
 function tableHasOrder(tNum){
   return STATE.orders.some(function(o2){ return String(o2.table)===String(tNum) && o2.status!=='cleared' && o2.status!=='paid'; });
