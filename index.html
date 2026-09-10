@@ -1307,12 +1307,22 @@ function closeSheet(){
   var el=document.getElementById('sheet-overlay');
   el.classList.remove('show'); el.innerHTML='';
   STATE.pendingItem=null; STATE.pendingSend=null;
+  STATE._sheetOpenedAt=0;
 }
 function openSheet(html){
   var el=document.getElementById('sheet-overlay');
   el.innerHTML='<div class="sheet">'+html+'</div>';
   el.classList.add('show');
+  STATE._sheetOpenedAt=Date.now();
 }
+document.addEventListener('click', function(e){
+  if (!STATE || !STATE._sheetOpenedAt) return;
+  if (Date.now()-STATE._sheetOpenedAt>=400) return;
+  var ov=document.getElementById('sheet-overlay');
+  if (!ov || !ov.classList.contains('show')) return;
+  e.preventDefault();
+  e.stopPropagation();
+}, true);
 function closeOverflow(){ document.getElementById('hh-overflow').classList.remove('show'); }
 function openOverflow(){ document.getElementById('hh-overflow').classList.add('show'); }
 function paintChrome(){
@@ -2578,20 +2588,28 @@ function stationCropBox(st){
   var pad=10;
   return {x:box.x-pad, y:box.y-pad, w:box.w+pad*2, h:box.h+pad*2};
 }
-function cropFloorToStation(objs, st){
-  var crop=stationCropBox(st);
+function stationTablesBox(st){
+  if (!st) return null;
+  var minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+  (roomObjectList(st.room)||[]).forEach(function(o){
+    if (!o || !SEATABLE[o.type] || tableIsCombinedAway(o)) return;
+    if (!tableInStation(o, st)) return;
+    minX=Math.min(minX, o.x||0);
+    minY=Math.min(minY, o.y||0);
+    maxX=Math.max(maxX, (o.x||0)+(o.w||70));
+    maxY=Math.max(maxY, (o.y||0)+(o.h||70));
+  });
+  if (!isFinite(minX)) return stationCropBox(st);
+  var pad=36;
+  return {x:minX-pad, y:minY-pad, w:Math.max(80, maxX-minX+pad*2), h:Math.max(80, maxY-minY+pad*2)};
+}
+function cropFloorToBox(objs, crop){
   if (!crop) return objs||[];
   return (objs||[]).filter(function(o){
-    if (o && (o._stationBorder || o.type==='waiterstation')) return true;
-    var ox=o.x||0, oy=o.y||0, ow=o.w||70, oh=o.h||70;
+    if (!o) return false;
+    var ox=o.x||0, oy=o.y||0, ow=Math.max(o.w||70, 1), oh=Math.max(o.h||70, 1);
     return ox+ow>=crop.x && oy+oh>=crop.y && ox<=crop.x+crop.w && oy<=crop.y+crop.h;
-  }).map(function(o){
-    var c=Object.assign({}, o, {x:(o.x||0)-crop.x, y:(o.y||0)-crop.y});
-    if (Array.isArray(o.points)) {
-      c.points=o.points.map(function(p){ return {x:(p.x||0)-crop.x, y:(p.y||0)-crop.y}; });
-    }
-    return c;
-  });
+  }).map(function(o){ return shiftFloorObj(o, crop.x, crop.y); });
 }
 function rectsOverlap(a, b){
   return a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y;
@@ -2854,7 +2872,7 @@ function floorFitStation(){
   var stage=document.getElementById('floor-stage');
   var canvas=document.getElementById('floor-canvas');
   if (!st || !stage || !canvas) { floorResetView(); return; }
-  var crop=stationCropBox(st);
+  var crop=stationTablesBox(st) || stationCropBox(st);
   var origin=STATE.floorRoomBox||{x:0,y:0};
   var x=(crop.x||0)-(origin.x||0);
   var y=(crop.y||0)-(origin.y||0);
@@ -2875,8 +2893,7 @@ function floorFitStation(){
   applyFloorTransform();
 }
 function restoreFloorView(){
-  if (focusedStation()) floorFitStation();
-  else floorResetView();
+  floorResetView();
 }
 function tapTable(tNum, ev){
   if (ev) { ev.preventDefault(); ev.stopPropagation(); }
@@ -3036,6 +3053,7 @@ function bindFloorGestures(){
     if (e.touches && e.touches.length) return;
     var tNum=tableAtClientPoint(x, y);
     if (tNum) {
+      if (e.cancelable) e.preventDefault();
       suppressClick=true;
       tapTable(tNum);
     }
@@ -3118,9 +3136,16 @@ function renderTables() {
   html+='</div>';
 
   if (objs.length) {
-    var box=floorContentBox(objs);
+    var focusCrop = focusSt ? (stationTablesBox(focusSt) || stationCropBox(focusSt)) : null;
+    var box;
+    if (focusCrop) {
+      objs = cropFloorToBox(objs, focusCrop);
+      box = {x:0,y:0,w:focusCrop.w,h:focusCrop.h};
+    } else {
+      box = floorContentBox(objs);
+      objs = objs.map(function(o){ return shiftFloorObj(o, box.x, box.y); });
+    }
     STATE.floorRoomBox=box;
-    objs=objs.map(function(o){ return shiftFloorObj(o, box.x, box.y); });
     var maxX=box.w, maxY=box.h;
     html+='<div class="floor-stage" id="floor-stage">';
     html+='<div class="floor-canvas" id="floor-canvas" style="width:'+maxX+'px;height:'+maxY+'px;">';
