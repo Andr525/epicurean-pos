@@ -18,7 +18,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <title>Epicurean POS</title>
-<!-- pos-build: scalini-print-v22 -->
+<!-- pos-build: scalini-print-v23 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
@@ -804,7 +804,7 @@ body.hh-table .app-content, body.tableside .app-content {
 <div id="login-screen" class="screen active">
   <h1>Epicurean POS</h1>
   <p class="subtitle">Enter your 4-digit code</p>
-  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 16</p>
+  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 23</p>
   <div class="pin-display" id="pin-display">
     <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
   </div>
@@ -1004,50 +1004,7 @@ function createNamedFirestoreAdapter(){
 }
 
 if (typeof fbReady !== 'undefined' && fbReady) fbDb = createNamedFirestoreAdapter();
-var POS_LAYOUT_KEY = 'eh_pos_layout';
-var SEED_ROOMS = [
-  {id:'main',    name:'Main Dining'},
-  {id:'bar',     name:'Bar'},
-  {id:'patio',   name:'Patio'},
-  {id:'private', name:'Private Room'}
-];
-var SEED_OBJS = {
-  main:[
-    {id:'t1', type:'table', shape:'round',  num:1, seats:2, x:80,  y:80,  w:70,  h:70,  status:'open', server:''},
-    {id:'t2', type:'table', shape:'round',  num:2, seats:2, x:220, y:80,  w:70,  h:70,  status:'open', server:''},
-    {id:'t3', type:'table', shape:'square', num:3, seats:4, x:80,  y:220, w:80,  h:80,  status:'open', server:''},
-    {id:'t4', type:'table', shape:'square', num:4, seats:4, x:240, y:220, w:80,  h:80,  status:'open', server:''},
-    {id:'t5', type:'table', shape:'round',  num:5, seats:6, x:440, y:150, w:96,  h:96,  status:'open', server:''},
-    {id:'t6', type:'table', shape:'rect',   num:6, seats:8, x:620, y:120, w:150, h:80,  status:'open', server:''},
-    {id:'t7', type:'table', shape:'square', num:7, seats:4, x:80,  y:360, w:80,  h:80,  status:'open', server:''},
-    {id:'t8', type:'table', shape:'square', num:8, seats:4, x:220, y:360, w:80,  h:80,  status:'open', server:''},
-    {id:'t9', type:'table', shape:'round',  num:9, seats:4, x:380, y:360, w:80,  h:80,  status:'open', server:''},
-    {id:'t10', type:'table', shape:'round', num:10, seats:4, x:540, y:360, w:80, h:80, status:'open', server:''},
-    {id:'t11', type:'table', shape:'round', num:11, seats:4, x:700, y:280, w:88, h:88, status:'open', server:'Andre Mendoza'},
-    {id:'t12', type:'table', shape:'square', num:12, seats:4, x:700, y:400, w:80, h:80, status:'open', server:''},
-    {id:'w1', type:'wall',  x:40, y:40, w:800, h:12, label:''},
-    {id:'h1', type:'host',  x:860, y:60, w:70, h:44, label:'Host'}
-  ],
-  bar:[
-    {id:'bar1', type:'bar', x:120, y:120, w:360, h:80, label:'Bar Counter'},
-    {id:'st1', type:'stool', num:'B1', seats:1, x:140, y:230, w:40, h:40, status:'open', server:''},
-    {id:'st2', type:'stool', num:'B2', seats:1, x:210, y:230, w:40, h:40, status:'open', server:''},
-    {id:'st3', type:'stool', num:'B3', seats:1, x:280, y:230, w:40, h:40, status:'open', server:''},
-    {id:'st4', type:'stool', num:'B4', seats:1, x:350, y:230, w:40, h:40, status:'open', server:''}
-  ],
-  patio:[
-    {id:'o1', type:'outdoor', num:'P1', seats:2, x:100, y:100, w:70, h:70, status:'open', server:''},
-    {id:'o2', type:'outdoor', num:'P2', seats:2, x:220, y:100, w:70, h:70, status:'open', server:''},
-    {id:'k1', type:'kiosk', x:400, y:100, w:80, h:80, label:'Kiosk'}
-  ],
-  private:[
-    {id:'pr1', type:'table', shape:'rect', num:20, seats:12, x:200, y:200, w:240, h:100, status:'open', server:''}
-  ]
-};
-var SEED_STATIONS = [
-  { id:'st_main_1', name:'Station 1', room:'main', server:'Andre Mendoza', serverCode:'3001', tableIds:['1','2','3','11'] }
-];
-function cloneJson(x){ return JSON.parse(JSON.stringify(x)); }
+var POS_LAYOUT_KEY = 'eh_pos_layout_live';
 function layoutHasFloor(rooms, roomObjs){
   var hasRooms = Array.isArray(rooms) && rooms.length>0;
   var hasObjs = false;
@@ -1062,15 +1019,16 @@ function loadPosLayout(){
     var raw = localStorage.getItem(POS_LAYOUT_KEY);
     if (raw) {
       var d = JSON.parse(raw);
-      if (d && layoutHasFloor(d.rooms, d.roomObjs)) return d;
+      if (d && d.fromBoh && layoutHasFloor(d.rooms, d.roomObjs)) return d;
     }
   } catch (e) {}
-  return { rooms: cloneJson(SEED_ROOMS), roomObjs: cloneJson(SEED_OBJS), stations: cloneJson(SEED_STATIONS) };
+  return { rooms: [], roomObjs: [], stations: [] };
 }
 function persistPosLayout(){
+  if (!layoutHasFloor(STATE.rooms, STATE.roomObjs)) return;
   try {
     localStorage.setItem(POS_LAYOUT_KEY, JSON.stringify({
-      rooms: STATE.rooms, roomObjs: STATE.roomObjs, stations: STATE.stations, savedAt: Date.now()
+      rooms: STATE.rooms, roomObjs: STATE.roomObjs, stations: STATE.stations, fromBoh: true, savedAt: Date.now()
     }));
   } catch (e) {}
 }
@@ -1988,16 +1946,11 @@ function loadData() {
   fbDb.collection('boh_shared').doc('tables').onSnapshot(function(doc){
     if (doc.exists && doc.data()) {
       var d = doc.data();
-      var nextRooms = d.rooms;
-      var nextObjs = d.roomObjs;
-      var nextStations = Array.isArray(d.stations) ? d.stations : [];
-      if (layoutHasFloor(nextRooms, nextObjs)) {
-        STATE.rooms = nextRooms;
-        STATE.roomObjs = nextObjs;
-        if (nextStations.length) STATE.stations = nextStations;
-        persistPosLayout();
-      }
+      if (d.rooms) STATE.rooms = d.rooms;
+      if (d.roomObjs) STATE.roomObjs = d.roomObjs;
+      if (Array.isArray(d.stations)) STATE.stations = d.stations;
       STATE.stations = mergeStationsFromFloor(STATE.stations, STATE.roomObjs);
+      persistPosLayout();
       if (!STATE.floorRoom && STATE.rooms && STATE.rooms.length) STATE.floorRoom = STATE.rooms[0].id;
       if (STATE.currentServer && !STATE.floorFilter) STATE.floorFilter=defaultFloorFilter();
       if (STATE.activeTab==='tables') renderTables();
@@ -2123,7 +2076,7 @@ function attemptLogin() {
   document.getElementById('user-name').textContent=staff.name;
   document.getElementById('user-role').textContent=staff.role;
   showScreen('app-screen');
-  openTableService();
+  switchTab('hub');
   initSquare();
   paintChrome();
   maybeAlertIpadOrder();
@@ -3011,34 +2964,78 @@ function floorContentBox(objs){
     minY=Math.min(minY,y);
     maxX=Math.max(maxX,x+w);
     maxY=Math.max(maxY,y+h);
+    if (Array.isArray(o.points)) {
+      o.points.forEach(function(p){
+        minX=Math.min(minX, p.x||0);
+        minY=Math.min(minY, p.y||0);
+        maxX=Math.max(maxX, p.x||0);
+        maxY=Math.max(maxY, p.y||0);
+      });
+    }
   });
   if (!isFinite(minX)) return {x:0,y:0,w:400,h:300};
   return {x:minX,y:minY,w:Math.max(80,maxX-minX),h:Math.max(80,maxY-minY)};
 }
+function shiftFloorObj(o, dx, dy){
+  var c=Object.assign({}, o, {x:(o.x||0)-dx, y:(o.y||0)-dy});
+  if (Array.isArray(o.points)) {
+    c.points=o.points.map(function(p){ return {x:(p.x||0)-dx, y:(p.y||0)-dy}; });
+  }
+  return c;
+}
 function renderTables() {
   var c=document.getElementById('app-content');
-  var raw = visibleFloorObjects().filter(function(o){
-    return o && o.type!=='section' && o.type!=='waiterstation' && !o._stationBorder;
-  });
+  var rooms = Array.isArray(STATE.rooms) ? STATE.rooms : [];
+  var stations = sortedStations();
+  var raw = visibleFloorObjects();
+  raw = raw.concat(visibleStationOverlays(raw));
   var objs = normalizeFloor(raw);
-  var box=floorContentBox(objs);
-  STATE.floorRoomBox=box;
-  objs=objs.map(function(o){
-    return Object.assign({}, o, {x:(o.x||0)-box.x, y:(o.y||0)-box.y});
-  });
+  var mineCount = 0;
+  allFloorObjects().forEach(function(o){ if (SEATABLE[o.type] && serverOwnsTable(o, STATE.currentServer)) mineCount++; });
+
   var html='<div class="floor-wrap floor-fixed">';
+  var mgr=isManager();
   var who=STATE.currentServer||{};
+  var focusSt=focusedStation();
+  var roomId=focusedRoomId();
   html+='<div class="svc-head"><div><button class="hh-back" style="margin-bottom:0.35rem;" onclick="switchTab(\'hub\')">←</button>';
-  html+='<h2>Table Service</h2><div class="meta">'+esc(who.name||'Food Master')+'</div></div>';
+  html+='<h2>'+(focusSt?esc(stationLabel(focusSt)):(roomId?esc(roomName(roomId)||'Table Service'):'Table Service'))+'</h2>';
+  html+='<div class="meta">'+esc(who.name||'Food Master')+'</div></div>';
   html+='<button type="button" class="hub-switch" onclick="openSwitchUser()">Switch user</button></div>';
 
+  html+='<div class="floor-room-tabs">';
+  html+='<button class="floor-room-tab'+(STATE.floorFilter==='mine'?' active':'')+'" onclick="showMyStation()">My station'+(mineCount?' ('+mineCount+')':'')+'</button>';
+  stations.forEach(function(st){
+    var sid=st.id||stationNumber(st);
+    html+='<button class="floor-room-tab'+(STATE.floorFilter==='station:'+sid?' active':'')+'" onclick=\'setFloorFilter('+JSON.stringify('station:'+sid)+')\'>'+esc(stationLabel(st))+'</button>';
+  });
+  rooms.forEach(function(rm){
+    html+='<button class="floor-room-tab'+(STATE.floorFilter==='room:'+rm.id?' active':'')+'" onclick=\'setFloorFilter('+JSON.stringify('room:'+rm.id)+')\'>'+esc(rm.name||rm.id)+'</button>';
+  });
+  if (mgr) {
+    html+='<button class="floor-room-tab'+(STATE.floorFilter==='all'?' active':'')+'" onclick="setFloorFilter(\'all\')">All rooms</button>';
+  }
+  html+='</div>';
+
   if (objs.length) {
+    if (focusSt && STATE.floorFilter!=='all') objs=cropFloorToStation(objs, focusSt);
+    var box=floorContentBox(objs);
+    STATE.floorRoomBox=box;
+    objs=objs.map(function(o){ return shiftFloorObj(o, box.x, box.y); });
     var maxX=box.w, maxY=box.h;
+    var tableRects=[];
+    objs.forEach(function(o){
+      if (SEATABLE[o.type]) tableRects.push({x:o.x||0,y:o.y||0,w:o.w||70,h:o.h||70});
+    });
     html+='<div class="floor-stage" id="floor-stage">';
     html+='<div class="floor-canvas" id="floor-canvas" style="width:'+maxX+'px;height:'+maxY+'px;">';
     objs.forEach(function(o){
       var left=o.x||0, top=o.y||0, width=o.w||70, height=o.h||70;
       var style='left:'+left+'px;top:'+top+'px;width:'+width+'px;height:'+height+'px;';
+      if (o.type==='section' || o.type==='waiterstation' || o._stationBorder) {
+        html+=stationShapeHtml(o, left, top, width, height);
+        return;
+      }
       style+='transform:rotate('+(o.rot||0)+'deg);';
       var tNum=tableKey(o);
       if (SEATABLE[o.type]) {
@@ -3046,27 +3043,48 @@ function renderTables() {
           html+='<div class="floor-obj" style="'+style+'"><div class="f-couch"></div></div>';
         } else {
         var hasCall=tableHasCall(tNum);
-        var busy=tableInService(tNum);
+        var busy=tableIsBusy(tNum, o);
+        var inFocus=!focusSt || tableInStation(o, focusSt);
+        var extra=inFocus?'':('opacity:0.28;');
         var shape=o.shape||(o.type==='stool'?'round':(o.type==='outdoor'?'rect':'square'));
+        var party=currentTurnParty(o);
+        var mark=tableHasGuestNotes(o);
+        var seated=tableSeatedAt(tNum, o);
+        var dwell=busy?dwellLabel(seated||Date.now()):'';
         var innerCls=(o.type==='stool'?'f-stool':(o.type==='outdoor'?'f-outdoor':('f-table '+shape)))+(busy?' busy-tbl':' open-tbl');
-        html+='<div class="floor-obj seatable" data-table="'+esc(String(tNum))+'" onclick=\'tapTable('+JSON.stringify(String(tNum))+')\' style="'+style+'">'+
+        html+='<div class="floor-obj seatable" data-table="'+esc(String(tNum))+'" onclick=\'tapTable('+JSON.stringify(String(tNum))+')\' style="'+style+extra+'">'+
           '<div class="'+innerCls+'" style="'+(hasCall?'box-shadow:0 0 0 3px #E65050;':'')+'">'+
+            (mark?'<span class="f-star" title="Guest notes">*</span>':'')+
             '<span class="f-tnum">'+esc(String(tNum))+'</span>'+
+            '<span class="f-tsub">'+party+'</span>'+
+            (dwell?'<span class="f-dwell" data-seated="'+(seated||'')+'">'+dwell+'</span>':'')+
           '</div></div>';
         }
       } else {
         html+=layoutObjectHtml(o, style);
       }
     });
+    objs.forEach(function(o){
+      if (!(o.type==='waiterstation' || o._stationBorder)) return;
+      var place=stationNamePlacement(o, tableRects, maxX, maxY);
+      var col=o._color||stationColor(o);
+      html+='<div class="floor-station-tag" style="left:'+place.x+'px;top:'+place.y+'px;background:'+col+';">'+esc(place.text)+'</div>';
+    });
     html+='</div>';
     html+='<div class="floor-zoom-fab" onpointerdown="event.stopPropagation()" ontouchstart="event.stopPropagation()"><button type="button" onclick="event.stopPropagation();floorZoomBy(1.25)">+</button><button type="button" onclick="event.stopPropagation();floorZoomBy(1/1.25)">−</button></div>';
     html+='</div>';
-    html+='<div class="floor-legend"><span><span class="floor-dot" style="background:transparent;border:1.5px solid #F3ECDC;"></span>Open</span><span><span class="floor-dot" style="background:#3E9A68"></span>In service</span></div>';
+    html+='<div class="floor-legend"><span><span class="floor-dot" style="background:#9BE3B8"></span>Available</span><span><span class="floor-dot" style="background:#1A2740"></span>Seated</span><span><span class="floor-dot" style="background:#E65050"></span>Call</span><span style="color:#C9A84C;font-weight:800;">*</span> Notes</div>';
   } else {
-    html+='<p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:0.8rem;">No dining room from BOH yet. Add rooms on the BOH floor and Save Layout.</p>';
+    html+='<p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:0.8rem;">'+(mgr?'No dining room from BOH yet. Add rooms on the BOH floor and Save Layout.':'No floor from BOH yet. Use a table number to start.')+'</p>';
     html+='<div class="table-grid">';
     for (var i=1;i<=20;i++) {
-      html+='<div class="table-card" onclick="tapTable('+i+')"><div class="table-num">'+i+'</div></div>';
+      var hasCall=tableHasCall(i);
+      var hasOrder=tableHasOrder(i);
+      var cls='table-card'+(hasCall?' has-call':'')+(hasOrder?' has-order':'');
+      html+='<div class="'+cls+'" onclick="tapTable('+i+')">'+
+        '<div class="table-num">'+i+'</div>'+
+        '<div class="table-status">'+(hasCall?'CALLING':hasOrder?'':'')+'</div>'+
+      '</div>';
     }
     html+='</div>';
   }
@@ -3076,6 +3094,15 @@ function renderTables() {
   paintChrome();
   bindFloorGestures();
   requestAnimationFrame(function(){ floorResetView(); });
+  if (!STATE._dwellTick) {
+    STATE._dwellTick=setInterval(function(){
+      if (STATE.activeTab!=='tables' || !STATE.currentServer) return;
+      document.querySelectorAll('.f-dwell[data-seated]').forEach(function(el){
+        var t=+el.getAttribute('data-seated');
+        if (t) el.textContent=dwellLabel(t);
+      });
+    }, 15000);
+  }
 }
 
 function showMyStation(){
