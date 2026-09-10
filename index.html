@@ -18,7 +18,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <title>Epicurean POS</title>
-<!-- pos-build: scalini-print-v23 -->
+<!-- pos-build: scalini-print-v24 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
@@ -290,7 +290,7 @@ body { font-family:var(--font); color:var(--text); background:var(--bg); -webkit
 .floor-room-tabs { display:flex; gap:8px; overflow-x:auto; padding-bottom:0.4rem; margin-bottom:0.75rem; -webkit-overflow-scrolling:touch; }
 .floor-room-tab { flex:0 0 auto; padding:0.45rem 0.8rem; border-radius:999px; border:1px solid var(--border); background:var(--surface); color:var(--text-secondary); font-size:0.78rem; cursor:pointer; }
 .floor-room-tab.active { border-color:var(--primary); background:var(--primary-glow); color:var(--text); font-weight:600; }
-.floor-stage { position:relative; width:100%; overflow:hidden; touch-action:none; -webkit-user-select:none; user-select:none; background:#0F1B2D; border:1px solid rgba(201,168,76,0.3); border-radius:12px; box-shadow:inset 0 0 60px rgba(0,0,0,0.55); min-height:320px; height:min(78vh, 760px); }
+.floor-stage { position:relative; width:100%; overflow:hidden; touch-action:none; -webkit-user-select:none; user-select:none; background:#0F1B2D; border:1px solid rgba(201,168,76,0.3); border-radius:12px; box-shadow:inset 0 0 60px rgba(0,0,0,0.55); min-height:420px; height:calc(100dvh - 10.5rem); }
 .floor-stage.station-locked { height:calc(100dvh - 9.5rem); min-height:420px; }
 .floor-wrap.floor-fixed { overflow:hidden; }
 .f-star { position:absolute; top:2px; right:5px; color:#C9A84C; font-size:0.95rem; font-weight:800; line-height:1; z-index:3; text-shadow:0 1px 2px rgba(0,0,0,0.6); }
@@ -804,7 +804,7 @@ body.hh-table .app-content, body.tableside .app-content {
 <div id="login-screen" class="screen active">
   <h1>Epicurean POS</h1>
   <p class="subtitle">Enter your 4-digit code</p>
-  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 23</p>
+  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 24</p>
   <div class="pin-display" id="pin-display">
     <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
   </div>
@@ -2060,10 +2060,6 @@ function allStaffForLogin(){
   return Object.keys(byCode).map(function(k){ return byCode[k]; });
 }
 function defaultFloorFilter(){
-  var mine=myStation();
-  if (mine) return 'mine';
-  var rooms=STATE.rooms||[];
-  if (rooms.length) return 'room:'+rooms[0].id;
   return 'all';
 }
 function attemptLogin() {
@@ -2642,12 +2638,8 @@ function stationForTable(tNum, obj){
   })||null;
 }
 function visibleFloorObjects(){
-  var filter=STATE.floorFilter||'all';
-  if (filter==='all' && isManager()) return allFloorObjects();
-  var rid=focusedRoomId();
-  if (!rid) return allFloorObjects();
-  return roomObjectList(rid).filter(function(o){ return o && o.type!=='waiterstation'; }).map(function(o){
-    return Object.assign({}, o, {_room:rid});
+  return allFloorObjects().filter(function(o){
+    return o && o.type!=='section' && o.type!=='waiterstation' && !o._stationBorder;
   });
 }
 var STATION_COLORS=['#C9A84C','#9BC4E2','#5FB48A','#E0A36B','#B98AD8','#E07A6B'];
@@ -2985,57 +2977,24 @@ function shiftFloorObj(o, dx, dy){
 }
 function renderTables() {
   var c=document.getElementById('app-content');
-  var rooms = Array.isArray(STATE.rooms) ? STATE.rooms : [];
-  var stations = sortedStations();
   var raw = visibleFloorObjects();
-  raw = raw.concat(visibleStationOverlays(raw));
   var objs = normalizeFloor(raw);
-  var mineCount = 0;
-  allFloorObjects().forEach(function(o){ if (SEATABLE[o.type] && serverOwnsTable(o, STATE.currentServer)) mineCount++; });
-
+  var box=floorContentBox(objs);
+  STATE.floorRoomBox=box;
+  objs=objs.map(function(o){ return shiftFloorObj(o, box.x, box.y); });
   var html='<div class="floor-wrap floor-fixed">';
-  var mgr=isManager();
   var who=STATE.currentServer||{};
-  var focusSt=focusedStation();
-  var roomId=focusedRoomId();
   html+='<div class="svc-head"><div><button class="hh-back" style="margin-bottom:0.35rem;" onclick="switchTab(\'hub\')">←</button>';
-  html+='<h2>'+(focusSt?esc(stationLabel(focusSt)):(roomId?esc(roomName(roomId)||'Table Service'):'Table Service'))+'</h2>';
-  html+='<div class="meta">'+esc(who.name||'Food Master')+'</div></div>';
+  html+='<h2>Table Service</h2><div class="meta">'+esc(who.name||'Food Master')+'</div></div>';
   html+='<button type="button" class="hub-switch" onclick="openSwitchUser()">Switch user</button></div>';
 
-  html+='<div class="floor-room-tabs">';
-  html+='<button class="floor-room-tab'+(STATE.floorFilter==='mine'?' active':'')+'" onclick="showMyStation()">My station'+(mineCount?' ('+mineCount+')':'')+'</button>';
-  stations.forEach(function(st){
-    var sid=st.id||stationNumber(st);
-    html+='<button class="floor-room-tab'+(STATE.floorFilter==='station:'+sid?' active':'')+'" onclick=\'setFloorFilter('+JSON.stringify('station:'+sid)+')\'>'+esc(stationLabel(st))+'</button>';
-  });
-  rooms.forEach(function(rm){
-    html+='<button class="floor-room-tab'+(STATE.floorFilter==='room:'+rm.id?' active':'')+'" onclick=\'setFloorFilter('+JSON.stringify('room:'+rm.id)+')\'>'+esc(rm.name||rm.id)+'</button>';
-  });
-  if (mgr) {
-    html+='<button class="floor-room-tab'+(STATE.floorFilter==='all'?' active':'')+'" onclick="setFloorFilter(\'all\')">All rooms</button>';
-  }
-  html+='</div>';
-
   if (objs.length) {
-    if (focusSt && STATE.floorFilter!=='all') objs=cropFloorToStation(objs, focusSt);
-    var box=floorContentBox(objs);
-    STATE.floorRoomBox=box;
-    objs=objs.map(function(o){ return shiftFloorObj(o, box.x, box.y); });
     var maxX=box.w, maxY=box.h;
-    var tableRects=[];
-    objs.forEach(function(o){
-      if (SEATABLE[o.type]) tableRects.push({x:o.x||0,y:o.y||0,w:o.w||70,h:o.h||70});
-    });
     html+='<div class="floor-stage" id="floor-stage">';
     html+='<div class="floor-canvas" id="floor-canvas" style="width:'+maxX+'px;height:'+maxY+'px;">';
     objs.forEach(function(o){
       var left=o.x||0, top=o.y||0, width=o.w||70, height=o.h||70;
       var style='left:'+left+'px;top:'+top+'px;width:'+width+'px;height:'+height+'px;';
-      if (o.type==='section' || o.type==='waiterstation' || o._stationBorder) {
-        html+=stationShapeHtml(o, left, top, width, height);
-        return;
-      }
       style+='transform:rotate('+(o.rot||0)+'deg);';
       var tNum=tableKey(o);
       if (SEATABLE[o.type]) {
@@ -3043,48 +3002,27 @@ function renderTables() {
           html+='<div class="floor-obj" style="'+style+'"><div class="f-couch"></div></div>';
         } else {
         var hasCall=tableHasCall(tNum);
-        var busy=tableIsBusy(tNum, o);
-        var inFocus=!focusSt || tableInStation(o, focusSt);
-        var extra=inFocus?'':('opacity:0.28;');
+        var busy=tableInService(tNum);
         var shape=o.shape||(o.type==='stool'?'round':(o.type==='outdoor'?'rect':'square'));
-        var party=currentTurnParty(o);
-        var mark=tableHasGuestNotes(o);
-        var seated=tableSeatedAt(tNum, o);
-        var dwell=busy?dwellLabel(seated||Date.now()):'';
         var innerCls=(o.type==='stool'?'f-stool':(o.type==='outdoor'?'f-outdoor':('f-table '+shape)))+(busy?' busy-tbl':' open-tbl');
-        html+='<div class="floor-obj seatable" data-table="'+esc(String(tNum))+'" onclick=\'tapTable('+JSON.stringify(String(tNum))+')\' style="'+style+extra+'">'+
+        html+='<div class="floor-obj seatable" data-table="'+esc(String(tNum))+'" onclick=\'tapTable('+JSON.stringify(String(tNum))+')\' style="'+style+'">'+
           '<div class="'+innerCls+'" style="'+(hasCall?'box-shadow:0 0 0 3px #E65050;':'')+'">'+
-            (mark?'<span class="f-star" title="Guest notes">*</span>':'')+
             '<span class="f-tnum">'+esc(String(tNum))+'</span>'+
-            '<span class="f-tsub">'+party+'</span>'+
-            (dwell?'<span class="f-dwell" data-seated="'+(seated||'')+'">'+dwell+'</span>':'')+
           '</div></div>';
         }
       } else {
         html+=layoutObjectHtml(o, style);
       }
     });
-    objs.forEach(function(o){
-      if (!(o.type==='waiterstation' || o._stationBorder)) return;
-      var place=stationNamePlacement(o, tableRects, maxX, maxY);
-      var col=o._color||stationColor(o);
-      html+='<div class="floor-station-tag" style="left:'+place.x+'px;top:'+place.y+'px;background:'+col+';">'+esc(place.text)+'</div>';
-    });
     html+='</div>';
     html+='<div class="floor-zoom-fab" onpointerdown="event.stopPropagation()" ontouchstart="event.stopPropagation()"><button type="button" onclick="event.stopPropagation();floorZoomBy(1.25)">+</button><button type="button" onclick="event.stopPropagation();floorZoomBy(1/1.25)">−</button></div>';
     html+='</div>';
-    html+='<div class="floor-legend"><span><span class="floor-dot" style="background:#9BE3B8"></span>Available</span><span><span class="floor-dot" style="background:#1A2740"></span>Seated</span><span><span class="floor-dot" style="background:#E65050"></span>Call</span><span style="color:#C9A84C;font-weight:800;">*</span> Notes</div>';
+    html+='<div class="floor-legend"><span><span class="floor-dot" style="background:transparent;border:1.5px solid #F3ECDC;"></span>Open</span><span><span class="floor-dot" style="background:#3E9A68"></span>In service</span></div>';
   } else {
-    html+='<p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:0.8rem;">'+(mgr?'No dining room from BOH yet. Add rooms on the BOH floor and Save Layout.':'No floor from BOH yet. Use a table number to start.')+'</p>';
+    html+='<p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:0.8rem;">No dining room from BOH yet. Add rooms on the BOH floor and Save Layout.</p>';
     html+='<div class="table-grid">';
     for (var i=1;i<=20;i++) {
-      var hasCall=tableHasCall(i);
-      var hasOrder=tableHasOrder(i);
-      var cls='table-card'+(hasCall?' has-call':'')+(hasOrder?' has-order':'');
-      html+='<div class="'+cls+'" onclick="tapTable('+i+')">'+
-        '<div class="table-num">'+i+'</div>'+
-        '<div class="table-status">'+(hasCall?'CALLING':hasOrder?'':'')+'</div>'+
-      '</div>';
+      html+='<div class="table-card" onclick="tapTable('+i+')"><div class="table-num">'+i+'</div></div>';
     }
     html+='</div>';
   }
@@ -3094,15 +3032,6 @@ function renderTables() {
   paintChrome();
   bindFloorGestures();
   requestAnimationFrame(function(){ floorResetView(); });
-  if (!STATE._dwellTick) {
-    STATE._dwellTick=setInterval(function(){
-      if (STATE.activeTab!=='tables' || !STATE.currentServer) return;
-      document.querySelectorAll('.f-dwell[data-seated]').forEach(function(el){
-        var t=+el.getAttribute('data-seated');
-        if (t) el.textContent=dwellLabel(t);
-      });
-    }, 15000);
-  }
 }
 
 function showMyStation(){
