@@ -18,7 +18,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <title>Epicurean POS</title>
-<!-- pos-build: scalini-print-v25 -->
+<!-- pos-build: scalini-print-v26 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
@@ -312,7 +312,7 @@ body { font-family:var(--font); color:var(--text); background:var(--bg); -webkit
     linear-gradient(90deg,rgba(201,168,76,0.05) 1px,transparent 1px) 0 0/40px 40px;
 }
 .floor-obj { position:absolute; box-sizing:border-box; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:0; overflow:visible; }
-.floor-obj.seatable { cursor:pointer; box-shadow:none; z-index:2; padding:0; overflow:visible; -webkit-tap-highlight-color:rgba(184,115,51,0.35); touch-action:none; }
+.floor-obj.seatable { cursor:pointer; box-shadow:none; z-index:6; padding:0; overflow:visible; -webkit-tap-highlight-color:rgba(184,115,51,0.35); touch-action:manipulation; pointer-events:auto; }
 .floor-obj.seatable .busy-tbl { box-shadow:0 4px 12px rgba(0,0,0,0.35); }
 .floor-zoom-fab {
   position:absolute; right:10px; bottom:10px; z-index:6; display:flex; flex-direction:column; gap:8px;
@@ -801,7 +801,7 @@ body.hh-table .app-content, body.tableside .app-content {
 <div id="login-screen" class="screen active">
   <h1>Epicurean POS</h1>
   <p class="subtitle">Enter your 4-digit code</p>
-  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 25</p>
+  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 26</p>
   <div class="pin-display" id="pin-display">
     <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
   </div>
@@ -1002,6 +1002,7 @@ function createNamedFirestoreAdapter(){
 
 if (typeof fbReady !== 'undefined' && fbReady) fbDb = createNamedFirestoreAdapter();
 var POS_LAYOUT_KEY = 'eh_pos_layout_live';
+var POS_COMBINE_KEY = 'eh_pos_table_combines';
 function layoutHasFloor(rooms, roomObjs){
   var hasRooms = Array.isArray(rooms) && rooms.length>0;
   var hasObjs = false;
@@ -1028,6 +1029,17 @@ function persistPosLayout(){
       rooms: STATE.rooms, roomObjs: STATE.roomObjs, stations: STATE.stations, fromBoh: true, savedAt: Date.now()
     }));
   } catch (e) {}
+}
+function loadTableCombines(){
+  try {
+    var raw = localStorage.getItem(POS_COMBINE_KEY);
+    var list = raw ? JSON.parse(raw) : [];
+    return Array.isArray(list) ? list : [];
+  } catch (e) {}
+  return [];
+}
+function persistTableCombines(){
+  try { localStorage.setItem(POS_COMBINE_KEY, JSON.stringify(STATE.tableCombines||[])); } catch (e) {}
 }
 var _bootLayout = loadPosLayout();
 // ─── State ──────────────────────────────────────────────────────
@@ -1070,6 +1082,8 @@ var STATE = {
   menuPhotos: {},
   modGroups: [],
   floorFilter: 'all',
+  floorUserPicked: false,
+  tableCombines: loadTableCombines(),
   floorZoom: 1,
   floorPanX: 0,
   floorPanY: 0,
@@ -1912,9 +1926,10 @@ function applyBohTables(d){
   if ((!STATE.rooms || !STATE.rooms.length) && STATE.roomObjs && typeof STATE.roomObjs==='object' && !Array.isArray(STATE.roomObjs)) {
     STATE.rooms = Object.keys(STATE.roomObjs).map(function(id){ return {id:id, name:id}; });
   }
+  reapplyCombines();
   persistPosLayout();
   if (!STATE.floorRoom && STATE.rooms && STATE.rooms.length) STATE.floorRoom = STATE.rooms[0].id;
-  if (STATE.currentServer && !STATE.floorFilter) STATE.floorFilter = defaultFloorFilter();
+  if (STATE.currentServer && !STATE.floorUserPicked) STATE.floorFilter = defaultFloorFilter();
   if (STATE.activeTab==='tables') renderTables();
 }
 function loadData() {
@@ -2061,6 +2076,7 @@ function allStaffForLogin(){
   return Object.keys(byCode).map(function(k){ return byCode[k]; });
 }
 function defaultFloorFilter(){
+  if (myStation()) return 'mine';
   var rooms=STATE.rooms||[];
   if (rooms.length) return 'room:'+rooms[0].id;
   if (STATE.roomObjs && !Array.isArray(STATE.roomObjs)) {
@@ -2074,6 +2090,7 @@ function attemptLogin() {
   if (!staff) { document.getElementById('pin-error').textContent='Invalid code'; pin=''; updateDots(); return; }
   document.getElementById('pin-error').textContent='';
   STATE.currentServer=staff;
+  STATE.floorUserPicked=false;
   STATE.floorFilter=defaultFloorFilter();
   STATE.floorFitDone=false;
   document.getElementById('user-name').textContent=staff.name;
@@ -2323,6 +2340,25 @@ function allFloorObjects(){
     });
   });
   return packed;
+}
+function eachLiveFloorObject(fn){
+  var objs=STATE.roomObjs;
+  if (Array.isArray(objs)) { objs.forEach(fn); return; }
+  if (objs && typeof objs==='object') {
+    Object.keys(objs).forEach(function(id){
+      (Array.isArray(objs[id])?objs[id]:[]).forEach(fn);
+    });
+  }
+}
+function liveFloorTable(tNum){
+  var hit=null;
+  eachLiveFloorObject(function(o){
+    if (o && SEATABLE[o.type] && String(tableKey(o))===String(tNum)) hit=o;
+  });
+  return hit;
+}
+function tableIsCombinedAway(o){
+  return !!(o && (o.hidden || o.combinedInto));
 }
 function parseStationNumber(raw){
   raw=String(raw==null?'':raw).trim();
@@ -2646,16 +2682,20 @@ function stationForTable(tNum, obj){
 }
 function visibleFloorObjects(){
   var filter=STATE.floorFilter||'all';
-  if (filter==='all') return allFloorObjects().filter(function(o){
+  var list;
+  if (filter==='all') list = allFloorObjects().filter(function(o){
     return o && o.type!=='section' && o.type!=='waiterstation' && !o._stationBorder;
   });
-  var rid=focusedRoomId();
-  if (!rid) return allFloorObjects().filter(function(o){
-    return o && o.type!=='section' && o.type!=='waiterstation' && !o._stationBorder;
-  });
-  return roomObjectList(rid).filter(function(o){ return o && o.type!=='waiterstation' && o.type!=='section'; }).map(function(o){
-    return Object.assign({}, o, {_room:rid});
-  });
+  else {
+    var rid=focusedRoomId();
+    if (!rid) list = allFloorObjects().filter(function(o){
+      return o && o.type!=='section' && o.type!=='waiterstation' && !o._stationBorder;
+    });
+    else list = roomObjectList(rid).filter(function(o){ return o && o.type!=='waiterstation' && o.type!=='section'; }).map(function(o){
+      return Object.assign({}, o, {_room:rid});
+    });
+  }
+  return list.filter(function(o){ return !tableIsCombinedAway(o); });
 }
 var STATION_COLORS=['#C9A84C','#9BC4E2','#5FB48A','#E0A36B','#B98AD8','#E07A6B'];
 function stationColor(st){
@@ -2732,6 +2772,7 @@ function worldToRoom(wx){
 }
 function setFloorFilter(filter){
   STATE.floorFilter=filter;
+  STATE.floorUserPicked=true;
   STATE.floorFitDone=false;
   STATE.stationAssignId=null;
   STATE.stationDraw=null;
@@ -2808,6 +2849,35 @@ function floorResetView(){
   STATE.floorFitDone=true;
   applyFloorTransform();
 }
+function floorFitStation(){
+  var st=focusedStation();
+  var stage=document.getElementById('floor-stage');
+  var canvas=document.getElementById('floor-canvas');
+  if (!st || !stage || !canvas) { floorResetView(); return; }
+  var crop=stationCropBox(st);
+  var origin=STATE.floorRoomBox||{x:0,y:0};
+  var x=(crop.x||0)-(origin.x||0);
+  var y=(crop.y||0)-(origin.y||0);
+  var w=Math.max(40, crop.w||0);
+  var h=Math.max(40, crop.h||0);
+  var sw=stage.clientWidth || stage.getBoundingClientRect().width || 0;
+  var sh=stage.clientHeight || stage.getBoundingClientRect().height || 0;
+  var cw=parseFloat(canvas.style.width)||canvas.offsetWidth||0;
+  var ch=parseFloat(canvas.style.height)||canvas.offsetHeight||0;
+  if (!sw || !sh || !cw || !ch) { floorResetView(); return; }
+  STATE.floorMinZoom=Math.max(0.2, Math.min(8, Math.min(sw/cw, sh/ch)));
+  var z=Math.min(sw/w, sh/h);
+  z=Math.max(STATE.floorMinZoom, Math.min(8, z));
+  STATE.floorZoom=z;
+  STATE.floorPanX=(sw - w*z)/2 - x*z;
+  STATE.floorPanY=(sh - h*z)/2 - y*z;
+  STATE.floorFitDone=true;
+  applyFloorTransform();
+}
+function restoreFloorView(){
+  if (focusedStation()) floorFitStation();
+  else floorResetView();
+}
 function tapTable(tNum, ev){
   if (ev) { ev.preventDefault(); ev.stopPropagation(); }
   tNum=String(tNum||'');
@@ -2822,6 +2892,11 @@ function stageToCanvas(e, stage){
     y:(e.clientY-rect.top-STATE.floorPanY)/z
   };
 }
+function tableAtClientPoint(clientX, clientY){
+  var el=document.elementFromPoint(clientX, clientY);
+  var table=el && el.closest ? el.closest('[data-table]') : null;
+  return table ? table.getAttribute('data-table') : '';
+}
 function bindFloorGestures(){
   var stage=document.getElementById('floor-stage');
   if (!stage || stage._bound) return;
@@ -2830,6 +2905,7 @@ function bindFloorGestures(){
   var lastDist=0;
   var moved=false;
   var suppressClick=false;
+  var tapX=0, tapY=0;
   function count(){ return Object.keys(pointers).length; }
   function dist(){
     var ids=Object.keys(pointers);
@@ -2879,7 +2955,7 @@ function bindFloorGestures(){
       }
       lastDist=d;
     }
-    if (e.cancelable) e.preventDefault();
+    if (moved && e.cancelable) e.preventDefault();
   }, {passive:false});
   function endPtr(e){
     if (e.pointerType==='touch') return;
@@ -2899,8 +2975,12 @@ function bindFloorGestures(){
   stage.addEventListener('touchstart', function(e){
     syncTouches(e);
     moved=false;
+    if (e.touches.length===1) {
+      tapX=e.touches[0].clientX;
+      tapY=e.touches[0].clientY;
+    }
     if (count()===2) lastDist=dist();
-    if (e.cancelable) e.preventDefault();
+    if (e.touches.length>=2 && e.cancelable) e.preventDefault();
   }, {passive:false});
   stage.addEventListener('touchmove', function(e){
     if (!e.touches.length) return;
@@ -2911,10 +2991,13 @@ function bindFloorGestures(){
     if (count()===1 && prev) {
       var dx=t.clientX-prev.x, dy=t.clientY-prev.y;
       if (Math.abs(dx)+Math.abs(dy)>8) moved=true;
-      STATE.floorPanX += dx;
-      STATE.floorPanY += dy;
-      applyFloorTransform();
+      if (moved) {
+        STATE.floorPanX += dx;
+        STATE.floorPanY += dy;
+        applyFloorTransform();
+      }
     } else if (e.touches.length>=2) {
+      moved=true;
       syncTouches(e);
       var d=dist();
       if (lastDist>0 && d>0) {
@@ -2935,15 +3018,34 @@ function bindFloorGestures(){
       lastDist=d;
     }
     syncTouches(e);
-    if (e.cancelable) e.preventDefault();
+    if ((moved || e.touches.length>=2) && e.cancelable) e.preventDefault();
   }, {passive:false});
   function endTouch(e){
+    var wasMoved=moved;
+    var x=tapX, y=tapY;
+    if (!wasMoved && e.changedTouches && e.changedTouches[0]) {
+      x=e.changedTouches[0].clientX;
+      y=e.changedTouches[0].clientY;
+    }
+    syncTouches(e);
+    if (count()<2) lastDist=0;
+    if (wasMoved) {
+      suppressClick=true;
+      return;
+    }
+    if (e.touches && e.touches.length) return;
+    var tNum=tableAtClientPoint(x, y);
+    if (tNum) {
+      suppressClick=true;
+      tapTable(tNum);
+    }
+  }
+  stage.addEventListener('touchend', endTouch);
+  stage.addEventListener('touchcancel', function(e){
     syncTouches(e);
     if (count()<2) lastDist=0;
     if (moved) suppressClick=true;
-  }
-  stage.addEventListener('touchend', endTouch);
-  stage.addEventListener('touchcancel', endTouch);
+  });
   stage.addEventListener('click', function(e){
     if (!suppressClick) return;
     e.preventDefault();
@@ -2989,31 +3091,26 @@ function shiftFloorObj(o, dx, dy){
   return c;
 }
 function renderTables() {
+  reapplyCombines();
   var c=document.getElementById('app-content');
   var rooms = Array.isArray(STATE.rooms) ? STATE.rooms : [];
-  var stations = sortedStations();
-  var raw = visibleFloorObjects();
-  raw = raw.concat(visibleStationOverlays(raw));
-  var objs = normalizeFloor(raw);
+  var objs = normalizeFloor(visibleFloorObjects());
   var mineCount = 0;
-  allFloorObjects().forEach(function(o){ if (SEATABLE[o.type] && serverOwnsTable(o, STATE.currentServer)) mineCount++; });
+  allFloorObjects().forEach(function(o){ if (SEATABLE[o.type] && !tableIsCombinedAway(o) && serverOwnsTable(o, STATE.currentServer)) mineCount++; });
 
   var html='<div class="floor-wrap floor-fixed">';
   var mgr=isManager();
   var who=STATE.currentServer||{};
   var focusSt=focusedStation();
   var roomId=focusedRoomId();
-  html+='<div class="floor-head"><div><h2>'+(focusSt?esc(stationLabel(focusSt)):(roomId?esc(roomName(roomId)||'Floor'):'Floor map'))+'</h2></div>';
+  var headTitle=STATE.floorFilter==='mine' ? 'My station' : (focusSt?stationLabel(focusSt):(roomId?roomName(roomId)||'Floor':'Floor map'));
+  html+='<div class="floor-head"><div><h2>'+esc(headTitle)+'</h2></div>';
   html+='<div style="font-size:0.8rem;color:var(--text-muted);text-align:right;">'+esc(who.name||'Food Master')+'</div></div>';
 
   html+='<div class="floor-room-tabs">';
   html+='<button class="floor-room-tab'+(STATE.floorFilter==='mine'?' active':'')+'" onclick="showMyStation()">My station'+(mineCount?' ('+mineCount+')':'')+'</button>';
-  stations.forEach(function(st){
-    var sid=st.id||stationNumber(st);
-    html+='<button class="floor-room-tab'+(STATE.floorFilter==='station:'+sid?' active':'')+'" onclick=\'setFloorFilter('+JSON.stringify('station:'+sid)+')\'>'+esc(stationLabel(st))+'</button>';
-  });
   rooms.forEach(function(rm){
-    html+='<button class="floor-room-tab'+(STATE.floorFilter==='room:'+rm.id?' active':'')+'" onclick=\'setFloorFilter('+JSON.stringify('room:'+rm.id)+')\'>'+esc(rm.name||rm.id)+'</button>';
+    html+='<button class="floor-room-tab'+(STATE.floorFilter==='room:'+rm.id?' active':'')+'" onclick=\'setFloorFilter('+JSON.stringify('room:'+rm.id)+')\'>'+esc((rm.name||rm.id)+' · full floor')+'</button>';
   });
   if (mgr) {
     html+='<button class="floor-room-tab'+(STATE.floorFilter==='all'?' active':'')+'" onclick="setFloorFilter(\'all\')">All rooms</button>';
@@ -3025,24 +3122,17 @@ function renderTables() {
     STATE.floorRoomBox=box;
     objs=objs.map(function(o){ return shiftFloorObj(o, box.x, box.y); });
     var maxX=box.w, maxY=box.h;
-    var tableRects=[];
-    objs.forEach(function(o){
-      if (SEATABLE[o.type]) tableRects.push({x:o.x||0,y:o.y||0,w:o.w||70,h:o.h||70});
-    });
-    html+='<div class="floor-stage station-locked" id="floor-stage">';
+    html+='<div class="floor-stage" id="floor-stage">';
     html+='<div class="floor-canvas" id="floor-canvas" style="width:'+maxX+'px;height:'+maxY+'px;">';
     objs.forEach(function(o){
       var left=o.x||0, top=o.y||0, width=o.w||70, height=o.h||70;
       var style='left:'+left+'px;top:'+top+'px;width:'+width+'px;height:'+height+'px;';
-      if (o.type==='section' || o.type==='waiterstation' || o._stationBorder) {
-        html+=stationShapeHtml(o, left, top, width, height);
-        return;
-      }
+      if (o.type==='section' || o.type==='waiterstation' || o._stationBorder) return;
       style+='transform:rotate('+(o.rot||0)+'deg);';
       var tNum=tableKey(o);
       if (SEATABLE[o.type]) {
         if (o.type==='couch') {
-          html+='<div class="floor-obj" style="'+style+'"><div class="f-couch"></div></div>';
+          html+='<div class="floor-obj seatable" data-table="'+esc(String(tNum))+'" onclick=\'tapTable('+JSON.stringify(String(tNum))+')\' style="'+style+'"><div class="f-couch"></div></div>';
         } else {
         var hasCall=tableHasCall(tNum);
         var busy=tableIsBusy(tNum, o);
@@ -3059,12 +3149,6 @@ function renderTables() {
         html+=layoutObjectHtml(o, style);
       }
     });
-    objs.forEach(function(o){
-      if (!(o.type==='waiterstation' || o._stationBorder)) return;
-      var place=stationNamePlacement(o, tableRects, maxX, maxY);
-      var col=o._color||stationColor(o);
-      html+='<div class="floor-station-tag" style="left:'+place.x+'px;top:'+place.y+'px;background:'+col+';">'+esc(place.text)+'</div>';
-    });
     html+='</div>';
     html+='<div class="floor-zoom-fab" onpointerdown="event.stopPropagation()" ontouchstart="event.stopPropagation()"><button type="button" onclick="event.stopPropagation();floorZoomBy(1.25)">+</button><button type="button" onclick="event.stopPropagation();floorZoomBy(1/1.25)">−</button></div>';
     html+='</div>';
@@ -3077,7 +3161,7 @@ function renderTables() {
   document.body.classList.remove('floor-drawing');
   paintChrome();
   bindFloorGestures();
-  requestAnimationFrame(function(){ floorResetView(); });
+  requestAnimationFrame(function(){ restoreFloorView(); });
 }
 
 function showMyStation(){
@@ -3243,13 +3327,8 @@ function beginAssignStation(){ stationsAreBohOnly(); }
 function toggleStationTable(){ stationsAreBohOnly(); }
 
 function selectTable(t) {
+  t = resolveTableNumber(t);
   var obj=findFloorTable(t);
-  var st=stationForTable(t, obj);
-  if (obj && st && !isManager() && !serverOwnsTable(obj)) {
-    STATE._switchRoster=[{ st:st, staff:staffForStation(st), name:foodMasterName(st)||'Food Master', code:st.serverCode||'' }];
-    beginSwitchUser(0);
-    return;
-  }
   STATE.selectedTable = t;
   if (fbReady) {
     STATE.calls.filter(function(cl){ return String(cl.table)===String(t) && cl.status==='active'; }).forEach(function(cl){
@@ -3258,7 +3337,7 @@ function selectTable(t) {
   }
   var hasCheck = tableHasOrder(t) || unsentFor(t).length || (sessionOf(t).checkId && STATE.checks[sessionOf(t).checkId]);
   var sess = sessionOf(t);
-  STATE.guestCount = sess.guestCount || 2;
+  STATE.guestCount = sess.guestCount || (obj && obj.seats) || 2;
   if (hasCheck) {
     if (!sess.seatedAt) sess.seatedAt = tableSeatedAt(t, findFloorTable(t)) || Date.now();
     ensureOpenCheck(t);
@@ -3287,6 +3366,7 @@ function showGuestCountSheet(t){
       '<button type="button" onclick="bumpGuests(1)">+</button>'+
     '</div>'+
     '<button class="primary-btn" onclick="confirmGuests()">Start table</button>'+
+    '<button class="ghost-btn" onclick="openCombineSheet()">Combine with another table</button>'+
     '<button class="ghost-btn" onclick="closeSheet()">Cancel</button>'
   );
 }
@@ -4216,45 +4296,139 @@ function transferCheckTo(newTable){
   toast('Moved to table '+newTable);
 }
 function openCombineSheet(){
-  var html='<h2>Combine tables</h2><p class="sheet-sub">Merge another table’s check into this one.</p><div class="chip-row">';
+  var html='<h2>Combine tables</h2><p class="sheet-sub">Put two tables together. The new number is the lower one — 4 and 5 become table 4.</p><div class="chip-row">';
   var any=false;
-  Object.keys(STATE.tableSessions).forEach(function(t){
-    if (String(t)===String(STATE.selectedTable)) return;
-    var sess=STATE.tableSessions[t];
-    if (!sess.checkId && !unsentFor(t).length && !tableHasOrder(t)) return;
+  combineCandidates(STATE.selectedTable).forEach(function(row){
     any=true;
-    html+='<button class="chip" onclick="combineTableFrom(\''+t+'\')">Table '+esc(String(t))+'</button>';
+    html+='<button class="chip" onclick=\'combineTables('+JSON.stringify(String(STATE.selectedTable))+','+JSON.stringify(String(row.n))+')\'>Table '+esc(String(row.n))+(row.seats?' · '+row.seats+' seats':'')+'</button>';
   });
-  if (!any) html+='<p class="sheet-sub">No other open tables.</p>';
+  if (!any) html+='<p class="sheet-sub">No other tables on the floor.</p>';
   html+='</div><button class="ghost-btn" onclick="closeSheet()">Cancel</button>';
   openSheet(html);
 }
-function combineTableFrom(otherTable){
-  var dest=ensureOpenCheck(STATE.selectedTable);
-  var srcSess=sessionOf(otherTable);
-  tableCheckIds(otherTable).forEach(function(id){
+function tableNumValue(n){
+  var m=String(n==null?'':n).match(/(\d+)/);
+  if (!m) return Number.POSITIVE_INFINITY;
+  return parseInt(m[1], 10);
+}
+function lowerTableNumber(a, b){
+  var na=tableNumValue(a), nb=tableNumValue(b);
+  if (na===nb) return String(a);
+  return na<nb ? String(a) : String(b);
+}
+function resolveTableNumber(tNum){
+  var n=String(tNum||'');
+  var guard=0;
+  while (n && guard++<12) {
+    var live=liveFloorTable(n);
+    if (live && live.combinedInto && String(live.combinedInto)!==n) { n=String(live.combinedInto); continue; }
+    break;
+  }
+  return n;
+}
+function combineCandidates(fromNum){
+  var list=[];
+  eachLiveFloorObject(function(o){
+    if (!o || !SEATABLE[o.type] || tableIsCombinedAway(o)) return;
+    var n=String(tableKey(o));
+    if (!n || n===String(fromNum)) return;
+    list.push({ n:n, seats:o.seats||2 });
+  });
+  list.sort(function(a,b){ return tableNumValue(a.n)-tableNumValue(b.n); });
+  return list;
+}
+function applyCombineToObject(keep, drop){
+  if (!keep || !drop) return;
+  if (drop.hidden && String(drop.combinedInto)===String(tableKey(keep))) return;
+  keep.seats=(keep.seats||2)+(drop.seats||2);
+  var kx=keep.x||0, ky=keep.y||0, kw=keep.w||70, kh=keep.h||70;
+  var dx=drop.x||0, dy=drop.y||0, dw=drop.w||70, dh=drop.h||70;
+  var minX=Math.min(kx, dx), minY=Math.min(ky, dy);
+  var maxX=Math.max(kx+kw, dx+dw), maxY=Math.max(ky+kh, dy+dh);
+  keep.x=minX;
+  keep.y=minY;
+  keep.w=Math.max(kw, maxX-minX);
+  keep.h=Math.max(kh, maxY-minY);
+  drop.hidden=true;
+  drop.combinedInto=tableKey(keep);
+}
+function reapplyCombines(){
+  (STATE.tableCombines||[]).forEach(function(c){
+    if (!c || c.keep==null || c.drop==null) return;
+    applyCombineToObject(liveFloorTable(c.keep), liveFloorTable(c.drop));
+  });
+}
+function mergeChecksIntoTable(srcTable, destTable){
+  destTable=String(destTable);
+  srcTable=String(srcTable);
+  if (srcTable===destTable) return;
+  var srcIds=tableCheckIds(srcTable);
+  var srcHas = srcIds.length || unsentFor(srcTable).length || tableHasOrder(srcTable);
+  var destHas = tableCheckIds(destTable).length || unsentFor(destTable).length || tableHasOrder(destTable);
+  var srcSess=STATE.tableSessions[srcTable];
+  var destSess=sessionOf(destTable);
+  if (srcSess) {
+    destSess.guestCount=Math.max(destSess.guestCount||0, srcSess.guestCount||0) || destSess.guestCount;
+    destSess.seatedAt=destSess.seatedAt||srcSess.seatedAt;
+    destSess.allergies=destSess.allergies||srcSess.allergies;
+  }
+  delete STATE.tableSessions[srcTable];
+  if (!srcHas && !destHas) return;
+  var dest=ensureOpenCheck(destTable);
+  srcIds.forEach(function(id){
     var ch=STATE.checks[id];
     if (!ch) return;
-    (ch.guest && ch.guest.items || []).forEach(function(){});
     ch.status='merged';
     ch.mergedInto=dest.id;
     persistCheck(ch);
   });
   STATE.currentOrder.forEach(function(i){
-    if (String(i.table)===String(otherTable)) { i.table=STATE.selectedTable; i.checkId=dest.id; }
+    if (String(i.table)===srcTable) { i.table=destTable; i.checkId=dest.id; }
   });
   STATE.orders.forEach(function(o){
-    if (String(o.table)===String(otherTable) && o.status==='new') {
-      o.table=STATE.selectedTable;
+    if (String(o.table)===srcTable && o.status==='new') {
+      o.table=destTable;
       o.checkId=dest.id;
       (o.items||[]).forEach(function(i){ i.checkId=dest.id; });
     }
   });
-  delete STATE.tableSessions[String(otherTable)];
   persistCheck(dest);
+}
+function combineTables(a, b){
+  a=resolveTableNumber(a);
+  b=resolveTableNumber(b);
+  if (!a || !b || a===b) { toast('Pick two different tables'); return; }
+  var keep=lowerTableNumber(a, b);
+  var drop=String(keep)===String(a) ? b : a;
+  var keepObj=liveFloorTable(keep);
+  var dropObj=liveFloorTable(drop);
+  if (!keepObj || !dropObj) { toast('Those tables are not on the floor'); return; }
+  applyCombineToObject(keepObj, dropObj);
+  STATE.tableCombines=STATE.tableCombines||[];
+  var already=STATE.tableCombines.some(function(c){ return String(c.keep)===String(keep) && String(c.drop)===String(drop); });
+  if (!already) STATE.tableCombines.push({ keep:String(keep), drop:String(drop), at:Date.now() });
+  persistTableCombines();
+  persistPosLayout();
+  mergeChecksIntoTable(drop, keep);
+  var seats=keepObj.seats||2;
+  var sess=sessionOf(keep);
+  sess.guestCount=seats;
+  STATE.guestCount=seats;
+  STATE.selectedTable=keep;
+  var stayOnOrder=STATE.activeTab==='order';
   closeSheet();
-  renderOrder();
-  toast('Combined table '+otherTable+' into '+STATE.selectedTable);
+  if (stayOnOrder) {
+    ensureOpenCheck(keep);
+    STATE.viewCheckId=sessionOf(keep).checkId;
+    renderOrder();
+    paintChrome();
+  } else {
+    renderTables();
+  }
+  toast('Tables '+a+' + '+b+' → table '+keep+' · '+seats+' seats');
+}
+function combineTableFrom(otherTable){
+  combineTables(STATE.selectedTable, otherTable);
 }
 function openGuestsSheet(){
   var sess=sessionOf(STATE.selectedTable);
