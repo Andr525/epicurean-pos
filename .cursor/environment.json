@@ -1,0 +1,10 @@
+{
+  "name": "Epicurean House",
+  "install": "python3 --version",
+  "repositoryDependencies": [
+    "github.com/Andr525/epicurean-boh",
+    "github.com/Andr525/epicurean-kitchen",
+    "github.com/Andr525/epicurean-clock",
+    "github.com/Andr525/epicurean-names"
+  ]
+}
