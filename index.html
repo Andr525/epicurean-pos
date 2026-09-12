@@ -3561,7 +3561,7 @@ function renderPrixFixeRows(q){
   var html='';
   (STATE.prixFixeMenus||[]).forEach(function(pf){
     if (q && !itemMatchesSearch(pf, q)) return;
-    html+='<div class="menu-item-row tasting-row" onclick="openPrixFixeSelector('+JSON.stringify(String(pf.id))+')">'+
+    html+='<div class="menu-item-row tasting-row" onclick=\'openPrixFixeSelector('+JSON.stringify(String(pf.id))+')\'>'+
       '<div class="item-info"><div class="item-name">◈ '+esc(pf.name)+'</div>'+
       '<div class="item-meta">'+(pf.courses?pf.courses.length:0)+' courses · Welcome fires one by one</div></div>'+
       '<div class="item-price">$'+(Number(pf.price)||0).toFixed(2)+'</div></div>';
@@ -3674,7 +3674,7 @@ function renderMenuGrid(){
     });
   } else if (STATE.orderCat==='__prixfixe__') {
     (STATE.prixFixeMenus||[]).forEach(function(pf){
-      html+='<button type="button" class="ts-tile prix" onclick="openPrixFixeSelector('+JSON.stringify(String(pf.id))+')">'+esc(pf.name)+'<span class="price">$'+(Number(pf.price)||0).toFixed(2)+'</span></button>';
+      html+='<button type="button" class="ts-tile prix" onclick=\'openPrixFixeSelector('+JSON.stringify(String(pf.id))+')\'>'+esc(pf.name)+'<span class="price">$'+(Number(pf.price)||0).toFixed(2)+'</span></button>';
     });
   } else if (STATE.orderCat==='__tasting__') {
     (STATE.tastingMenus||[]).forEach(function(tm){
@@ -3703,7 +3703,7 @@ function renderMenuGrid(){
       var click=item.eightySixed ? 'toast("86 — not available")' : 'beginAddItem('+JSON.stringify(String(item.id))+')';
       var wine=isPosWineItem(item);
       html+='<button type="button" class="ts-tile'+(item.eightySixed?' sold':'')+(wine?' wine':'')+'" onclick=\''+click+'\'>'+esc(item.name)+'<span class="price">$'+(Number(item.price)||0).toFixed(2)+'</span>';
-      if (wine && !item.eightySixed) html+='<span class="wine-notes-btn" onclick="event.preventDefault();event.stopPropagation();explainPosWine('+JSON.stringify(String(item.id))+')">Notes · pair</span>';
+      if (wine && !item.eightySixed) html+='<span class="wine-notes-btn" onclick=\'event.preventDefault();event.stopPropagation();explainPosWine('+JSON.stringify(String(item.id))+')\'>Notes · pair</span>';
       html+='</button>';
     });
   }
@@ -4025,7 +4025,7 @@ function openPrixFixeSelector(pfId) {
     });
     html+='</div></div>';
   });
-  html+='<div class="pf-sel-actions"><button class="send-btn" onclick="confirmPrixFixe('+JSON.stringify(String(pf.id))+')">Add to Order</button>'+
+  html+='<div class="pf-sel-actions"><button class="send-btn" onclick=\'confirmPrixFixe('+JSON.stringify(String(pf.id))+')\'>Add to Order</button>'+
     '<button class="cancel-pay-btn" onclick="closePfSelector()">Cancel</button></div></div>';
   ov.innerHTML=html;
   ov.classList.add('show');
@@ -4225,7 +4225,7 @@ function explainPosWine(itemId){
   }
   html+='</p>';
   html+=wineGuideHtml(item);
-  html+='<button class="primary-btn" onclick="closeSheet();beginAddItem('+JSON.stringify(String(item.id))+')">Add this pour</button>';
+  html+='<button class="primary-btn" onclick=\'closeSheet();beginAddItem('+JSON.stringify(String(item.id))+')\'>Add this pour</button>';
   html+='<button class="ghost-btn" onclick="closeSheet()">Close</button>';
   openSheet(html);
 }
