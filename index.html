@@ -18,7 +18,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <title>Epicurean POS</title>
-<!-- pos-build: scalini-print-v27 -->
+<!-- pos-build: scalini-print-v28 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
@@ -93,9 +93,9 @@ body { font-family:var(--font); color:var(--text); background:var(--bg); -webkit
 .fire-btn { width:100%; padding:0.6rem; border:none; border-radius:var(--radius-sm); background:linear-gradient(135deg,#dc2626,#ea580c); color:white; font-weight:600; font-size:0.8rem; cursor:pointer; margin-top:0.4rem; transition:transform 0.12s var(--ease); }
 .fire-btn:active { transform:scale(0.97); }
 /* Prix Fixe Selector Overlay */
-#pf-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.8); display:none; align-items:center; justify-content:center; z-index:200; padding:1rem; }
-#pf-overlay.show { display:flex; }
-.pf-selector { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:1.5rem; max-width:560px; width:100%; max-height:80vh; overflow-y:auto; }
+#pf-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.8); display:none; align-items:center; justify-content:center; z-index:9000; padding:1rem; padding-bottom:calc(1rem + env(safe-area-inset-bottom)); pointer-events:none; }
+#pf-overlay.show { display:flex; pointer-events:auto; }
+.pf-selector { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:1.5rem; max-width:560px; width:100%; max-height:80vh; overflow-y:auto; position:relative; z-index:1; }
 .pf-opt-desc { display:block; font-size:0.72rem; color:var(--text-muted); margin-left:1.4rem; margin-top:0.15rem; }
 .pf-auto-list { margin:0 0 1rem; padding-left:1.1rem; color:var(--text-secondary); font-size:0.82rem; }
 .pf-auto-list li { margin:0.25rem 0; }
@@ -110,6 +110,24 @@ body { font-family:var(--font); color:var(--text); background:var(--bg); -webkit
 .pf-opt-label input { accent-color:var(--primary); }
 .pf-upcharge { color:var(--warning); font-weight:600; font-size:0.75rem; }
 .pf-sel-actions { display:flex; gap:0.5rem; margin-top:1.2rem; }
+.pf-temp-row { display:flex; flex-wrap:wrap; gap:6px; margin:0.35rem 0 0.55rem 1.4rem; }
+.pf-temp-row .chip { min-height:36px; padding:0.35rem 0.7rem; font-size:0.78rem; }
+.wine-notes-btn {
+  margin-top:0.35rem; font-size:0.68rem; font-weight:700; letter-spacing:0.04em;
+  color:#E8D5A3; text-transform:uppercase; border:1px solid rgba(201,168,76,0.45);
+  border-radius:8px; padding:0.2rem 0.45rem; background:rgba(28,20,12,0.55);
+}
+.wine-fm-card {
+  background:var(--surface-2); border:1px solid var(--border); border-radius:12px;
+  padding:0.75rem 0.8rem; margin:0.35rem 0 0.9rem; text-align:left;
+}
+.wine-fm-card .wine-fm-kicker {
+  font-size:0.62rem; letter-spacing:0.08em; text-transform:uppercase;
+  color:var(--primary-light); font-weight:800; margin-bottom:0.35rem;
+}
+.wine-fm-card .wine-fm-like { font-size:0.84rem; line-height:1.4; margin:0 0 0.55rem; color:var(--text); }
+.wine-fm-row { font-size:0.78rem; line-height:1.35; margin:0.28rem 0; color:var(--text-secondary); }
+.wine-fm-row b { color:var(--primary-light); font-weight:800; display:inline; }
 
 /* APP SHELL */
 .app-header {
@@ -806,7 +824,7 @@ body.hh-table .app-content, body.tableside .app-content {
 <div id="login-screen" class="screen active">
   <h1>Epicurean POS</h1>
   <p class="subtitle">Enter your 4-digit code</p>
-  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 27</p>
+  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 28</p>
   <div class="pin-display" id="pin-display">
     <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
   </div>
@@ -1586,7 +1604,17 @@ function mapWineToPos(it, catId){
     bottleOz: it.bottleOz || 25,
     ozOnHand: it.ozOnHand,
     eightySixed: itemIsEightySixed(it),
-    active: it.active !== false
+    active: it.active !== false,
+    producer: it.producer || '',
+    vintage: it.vintage || '',
+    region: it.region || '',
+    country: it.country || '',
+    varietal: it.varietal || it.grape || '',
+    grape: it.grape || it.varietal || '',
+    byTheGlass: btg,
+    scaliniOnly: !!it.scaliniOnly,
+    glassPrice: glass,
+    bottlePrice: bottle
   };
 }
 function mapRetailToPos(it, catId){
@@ -1952,7 +1980,7 @@ function loadData() {
   if (!fbReady) {
     seedOfflineCatalog();
     STATE.tastingMenus = SEED_TASTING_MENUS;
-    STATE.prixFixeMenus = SEED_PRIX_FIXE_MENUS;
+    STATE.prixFixeMenus = (SEED_PRIX_FIXE_MENUS||[]).map(hydratePrixFixeMenu);
     rebuildPosCatalog();
     return;
   }
@@ -2009,10 +2037,10 @@ function loadData() {
 
   fbDb.collection('boh_shared').doc('prix_fixe_menus').onSnapshot(function(doc){
     var list = (doc.exists && Array.isArray((doc.data()||{}).list)) ? doc.data().list : [];
-    STATE.prixFixeMenus = mergeScaliniList(list, SEED_PRIX_FIXE_MENUS, ['pf_lunch','pf_brunch','pf1','pf2']);
+    STATE.prixFixeMenus = mergeScaliniList(list, SEED_PRIX_FIXE_MENUS, ['pf_lunch','pf_brunch','pf1','pf2']).map(hydratePrixFixeMenu);
     applyBohMenuPhotos();
     refreshOrderView();
-  }, function(){ STATE.prixFixeMenus = SEED_PRIX_FIXE_MENUS; });
+  }, function(){ STATE.prixFixeMenus = (SEED_PRIX_FIXE_MENUS||[]).map(hydratePrixFixeMenu); });
 
   fbDb.collection('calls').onSnapshot(snap=>{
     STATE.calls=[]; snap.forEach(d=>STATE.calls.push({id:d.id,...d.data()}));
@@ -3673,7 +3701,10 @@ function renderMenuGrid(){
     }
     catItems.forEach(function(item){
       var click=item.eightySixed ? 'toast("86 — not available")' : 'beginAddItem('+JSON.stringify(String(item.id))+')';
-      html+='<button type="button" class="ts-tile'+(item.eightySixed?' sold':'')+'" onclick=\''+click+'\'>'+esc(item.name)+'<span class="price">$'+(Number(item.price)||0).toFixed(2)+'</span></button>';
+      var wine=isPosWineItem(item);
+      html+='<button type="button" class="ts-tile'+(item.eightySixed?' sold':'')+(wine?' wine':'')+'" onclick=\''+click+'\'>'+esc(item.name)+'<span class="price">$'+(Number(item.price)||0).toFixed(2)+'</span>';
+      if (wine && !item.eightySixed) html+='<span class="wine-notes-btn" onclick="event.preventDefault();event.stopPropagation();explainPosWine('+JSON.stringify(String(item.id))+')">Notes · pair</span>';
+      html+='</button>';
     });
   }
   html+='</div></div>';
@@ -3712,6 +3743,10 @@ function filterCat(catId) {
   STATE.hhMode='service';
   STATE.checkFocus=false;
   renderOrder();
+  if (catId==='__prixfixe__') {
+    var menus=(STATE.prixFixeMenus||[]).map(hydratePrixFixeMenu).filter(function(p){ return p && p.id; });
+    if (menus.length===1) openPrixFixeSelector(menus[0].id);
+  }
 }
 
 // ─── Tasting & Prix Fixe Ordering ──────────────────────────────
@@ -3899,12 +3934,59 @@ function guestAllergyHits(allergens){
   return flagged;
 }
 
+function seedPrixFixeMenu(){
+  return (SEED_PRIX_FIXE_MENUS && SEED_PRIX_FIXE_MENUS[0]) ? JSON.parse(JSON.stringify(SEED_PRIX_FIXE_MENUS[0])) : null;
+}
+function prixFixeHasChoices(pf){
+  return ((pf && pf.courses) || []).some(function(c){
+    return pfCourseMode(c)==='choose' && (c.options||[]).length;
+  });
+}
+function hydratePrixFixeMenu(pf){
+  if (!pf) return pf;
+  if ((!pf.courses || !pf.courses.length) && pf.courseGroups && pf.courseGroups.length) pf.courses=pf.courseGroups;
+  var seed=seedPrixFixeMenu();
+  if (!seed) return pf;
+  if (pf.id && pf.id!==seed.id) return pf;
+  if (!prixFixeHasChoices(pf)) {
+    pf.courses=seed.courses;
+    if (seed.dishes) pf.dishes=seed.dishes;
+    if (seed.courseGroups) pf.courseGroups=seed.courseGroups;
+    if (!pf.name) pf.name=seed.name;
+    if (!pf.price) pf.price=seed.price;
+    return pf;
+  }
+  (pf.courses||[]).forEach(function(c){
+    if ((c.options||[]).length) return;
+    var sc=(seed.courses||[]).filter(function(x){ return x.label===c.label || x.id===c.id; })[0];
+    if (sc && sc.options) c.options=JSON.parse(JSON.stringify(sc.options));
+  });
+  return pf;
+}
+function findPrixFixeMenu(pfId){
+  var list=STATE.prixFixeMenus||[];
+  var pf=list.filter(function(p){ return p && p.id===pfId; })[0];
+  if (!pf && SEED_PRIX_FIXE_MENUS) pf=SEED_PRIX_FIXE_MENUS.filter(function(p){ return p && p.id===pfId; })[0];
+  if (!pf && list.length===1) pf=list[0];
+  return hydratePrixFixeMenu(pf);
+}
+function prixFixeTempOptions(kind){
+  if (kind==='steak') return ['Rare','Medium Rare','Medium','Medium Well','Well Done'];
+  if (kind==='pork') return ['Medium','Medium Well','Well Done'];
+  if (kind==='salmon') return ['Rare','Medium Rare','Medium','Well Done'];
+  return [];
+}
+
 function openPrixFixeSelector(pfId) {
-  var pf=STATE.prixFixeMenus.find(function(p){ return p.id===pfId; });
-  if (!pf) return;
+  var pf=findPrixFixeMenu(pfId);
+  if (!pf) { toast('Prix fixe menu is not loaded'); return; }
+  var ov=document.getElementById('pf-overlay');
+  if (!ov) { toast('Cannot open the prix fixe menu'); return; }
+  var courses=pf.courses||[];
   var html='<div class="pf-selector"><h3>'+esc(pf.name)+' — $'+(Number(pf.price)||0).toFixed(2)+'</h3>';
-  html+='<p class="pf-sel-sub">Welcome bites come automatically and fire to the kitchen one by one. Choose primo and main now. Dessert is taken after the main.</p>';
-  pf.courses.forEach(function(c,ci){
+  html+='<p class="pf-sel-sub">Welcome bites come automatically and fire to the kitchen one by one. Choose primo and main now. Ask temperature on steak, salmon, and pork. Dessert is taken after the main.</p>';
+  if (!courses.length) html+='<p class="pf-sel-sub">No courses on this menu yet.</p>';
+  courses.forEach(function(c,ci){
     var mode=pfCourseMode(c);
     if (mode==='auto' || c.fireEach){
       html+='<div class="pf-course-select"><label>'+esc(c.label)+' — automatic</label><ul class="pf-auto-list">';
@@ -3926,34 +4008,69 @@ function openPrixFixeSelector(pfId) {
     }
     html+='<div class="pf-course-select"><label>'+esc(c.label)+'</label><div class="pf-options">';
     (c.options||[]).forEach(function(o,oi){
+      var hits=guestAllergyHits(o.allergens);
+      var temps=prixFixeTempOptions(o.askTemp);
       html+='<label class="pf-opt-label"><input type="radio" name="pf-course-'+ci+'" value="'+oi+'"'+(oi===0?' checked':'')+'>'+
         esc(o.name)+(o.upcharge>0?' <span class="pf-upcharge">+$'+Number(o.upcharge).toFixed(0)+'</span>':'')+
         (o.cookNote?' <span class="pf-upcharge">'+esc(o.cookNote)+'</span>':'')+
+        (hits.length?' <span class="allergy-flag">⚠ '+esc(hits.join(', '))+'</span>':'')+
         '</label>'+(o.desc?'<span class="pf-opt-desc">'+esc(o.desc)+'</span>':'');
+      if (temps.length){
+        html+='<div class="pf-temp-row">';
+        temps.forEach(function(t,ti){
+          html+='<label class="chip"><input type="radio" name="pf-temp-'+ci+'-'+oi+'" value="'+esc(t)+'"'+(ti===0?' checked':'')+'> '+esc(t)+'</label>';
+        });
+        html+='</div>';
+      }
     });
     html+='</div></div>';
   });
-  html+='<div class="pf-sel-actions"><button class="send-btn" onclick="confirmPrixFixe(\''+pfId+'\')">Add to Order</button>'+
+  html+='<div class="pf-sel-actions"><button class="send-btn" onclick="confirmPrixFixe('+JSON.stringify(String(pf.id))+')">Add to Order</button>'+
     '<button class="cancel-pay-btn" onclick="closePfSelector()">Cancel</button></div></div>';
-  document.getElementById('pf-overlay').innerHTML=html;
-  document.getElementById('pf-overlay').classList.add('show');
+  ov.innerHTML=html;
+  ov.classList.add('show');
 }
 
 function closePfSelector() {
-  document.getElementById('pf-overlay').classList.remove('show');
+  var ov=document.getElementById('pf-overlay');
+  if (ov) { ov.classList.remove('show'); ov.innerHTML=''; }
 }
 
 function confirmPrixFixe(pfId) {
-  var pf=STATE.prixFixeMenus.find(function(p){ return p.id===pfId; });
+  var pf=findPrixFixeMenu(pfId);
   if (!pf) return;
   var picked={};
-  pf.courses.forEach(function(c,ci){
+  var temps={};
+  var missingTemp='';
+  (pf.courses||[]).forEach(function(c,ci){
     var mode=pfCourseMode(c);
     if (mode!=='choose') return;
     var radios=document.querySelectorAll('input[name="pf-course-'+ci+'"]');
-    radios.forEach(function(r,i){ if(r.checked) picked[ci]=i; });
+    radios.forEach(function(r){ if(r.checked) picked[ci]=parseInt(r.value,10)||0; });
+    var opt=(c.options||[])[picked[ci]||0];
+    if (opt && opt.askTemp){
+      var tEl=document.querySelector('input[name="pf-temp-'+ci+'-'+(picked[ci]||0)+'"]:checked');
+      if (tEl) temps[ci]=tEl.value;
+      else missingTemp=opt.name;
+    }
   });
+  if (missingTemp) { toast('Choose temperature for '+missingTemp); return; }
+  if (Object.keys(picked).length < (pf.courses||[]).filter(function(c){ return pfCourseMode(c)==='choose'; }).length) {
+    toast('Choose primo and main');
+    return;
+  }
   var selections=buildPrixFixeSelections(pf, picked);
+  selections.forEach(function(s,si){
+    var ci=-1;
+    (pf.courses||[]).forEach(function(c,i){
+      if (pfCourseMode(c)==='choose' && (c.label===s.course || c.name===s.course)) ci=i;
+    });
+    if (ci>=0 && temps[ci]) {
+      s.selectedTemp=temps[ci];
+      s.cookNote=(s.cookNote?s.cookNote+'; ':'')+'Temp: '+temps[ci];
+      s.choice=s.choice+' · '+temps[ci];
+    }
+  });
   var totalUpcharge=selections.reduce(function(s,x){ return s+(x.pending?0:(Number(x.upcharge)||0)); },0);
   var choiceStr=selections.filter(function(s){ return !s.pending; }).map(function(s){ return s.choice; }).join(', ');
   STATE.currentOrder.push({
@@ -3987,6 +4104,132 @@ function toggleItemDesc(itemId) {
   renderOrder();
 }
 
+var POS_BTG_GUIDE = {
+  btg_spark_beck: { like:'Dry bottle-fermented sparkling (méthode traditionnelle) — the house aperitif.', body:'Light, fine persistent mousse, fully dry.', aroma:'Citrus peel, green apple, white flower.', hints:'Clean stony finish. Not sweet. Think Champagne method with South African fruit.', pair:'Oysters, simply seasoned fish, fried zucchini, or the welcome bites.' },
+  btg_spark_zardetto: { like:'Tank-method Prosecco — fresh, floral, table-dry.', body:'Light, lively bubbles, dry enough for food.', aroma:'Pear, white flowers, green apple.', hints:'Charmat keep it fruity, not bready like Champagne.', pair:'Fried vegetables, shrimp, primi piccolo, and a first course.' },
+  btg_spark_concerto: { like:'Dry Lambrusco — violet, red cherry, a light froth. Not the sweet supermarket style.', body:'Light-bodied sparkling red, dry (secco).', aroma:'Violet, red cherry, a hint of earth.', hints:'Chill it. The froth cuts fat; it is not soda-pop Lambrusco.', pair:'Salumi, fried vegetables, pizza, and rich pasta.' },
+  btg_white_walch: { like:'Alpine Pinot Bianco — pear and herbs over stone.', body:'Light to medium, crisp, dry.', aroma:'Pear, alpine herbs, white peach.', hints:'Stony, saline finish. High-altitude Alto Adige, not oaky Chardonnay.', pair:'Sole, salads, lemon or herb dishes, and light primi.' },
+  btg_white_friulano: { like:'Classic Friulian white — almond and pear, bone dry.', body:'Medium-light, dry, quietly textured.', aroma:'Almond, pear, wildflower.', hints:'A dry, slightly bitter almond finish is the grape talking.', pair:'Shrimp, goat cheese, and herb-driven primi.' },
+  btg_white_fiano: { like:'Volcanic Campanian white — honey and hazelnut over mineral.', body:'Medium, dry, more weight than Pinot Bianco.', aroma:'Honey, hazelnut, white peach, wet stone.', hints:'Fiano holds food. Volcanic minerality, not residual sugar.', pair:'Seafood pasta, lobster, roast fish, and rich white sauces.' },
+  btg_white_hartford: { like:'Russian River Chardonnay — ripe apple, citrus, measured oak.', body:'Medium to full, creamy but not heavy.', aroma:'Ripe apple, citrus, light vanilla toast.', hints:'Four Hearts is oaked with restraint. Butter and truffle love it.', pair:'Scallops, lobster, and dishes with butter or truffle.' },
+  btg_red_core: { like:'Campanian Aglianico — dark cherry and spice, approachable tannin.', body:'Medium-plus, firm but not harsh.', aroma:'Dark cherry, black pepper, dried herb.', hints:'Core is the younger, friendlier face of Aglianico — not Taurasi iron.', pair:'Tomato sauces, sausage, roast meats, and the filet Giambotta.' },
+  btg_red_fumanelli: { like:'Valpolicella Classico Superiore — cherry and spice, plush short of Amarone.', body:'Medium, silky, moderate tannin.', aroma:'Red cherry, baking spice, a little dried herb.', hints:'Corvina blend. More lift than Amarone, more depth than basic Valpolicella.', pair:'Ragù, mushrooms, duck, and Murphy duck legs.' },
+  btg_red_planeta: { like:'Sicilian Merlot with bottle age — plum and cocoa, resolved tannin.', body:'Medium-plus, round, settled after years in bottle.', aroma:'Plum, cocoa, dried fig, sweet spice.', hints:'2014 has softened. Not a jammy New-World Merlot.', pair:'Steak, lamb, hard cheeses, and rich red-sauce mains.' },
+  btg_lib_sudtirol: { like:'Alpine Pinot Nero (Blauburgunder) — pale cherry and forest floor, not Burgundy.', body:'Light to medium, fine tannin, high-toned.', aroma:'Pale cherry, rose, forest floor, a cool herbal note.', hints:'Südtirol reserve: savory, not jammy. Serve slightly cool.', pair:'Roast birds, mushrooms, mild game, and truffle pasta.' },
+  btg_lib_fizzano: { like:'Chianti Classico Riserva — sour cherry, leather, savory herbs.', body:'Medium, Sangiovese grip, lively acid.', aroma:'Sour cherry, leather, dried oregano, tea leaf.', hints:'2009 has turned savory. Black-rooster Chianti, not Super Tuscan gloss.', pair:'Bistecca, lamb, aged pecorino, and tomato sauces.' },
+  btg_lib_barbera: { like:'Barbera with a decade in bottle — high acid, dark cherry, long finish.', body:'Medium, low tannin, electric acidity.', aroma:'Dark cherry, violet, a little tar after age.', hints:'Vulpis 2010 drinks savory now. Acid cuts cream and truffle.', pair:'Truffle pasta, braises, rich meats, and porcini ravioli.' },
+  btg_des_spinetta: { like:'Moscato d’Asti — lightly sparkling, low alcohol, peach and orange blossom.', body:'Light, gently sweet, frothy.', aroma:'Peach, orange blossom, grape.', hints:'Not a still dessert wine. Low alcohol; serve very cold.', pair:'Fruit tarts and cheeses that are not too salty. Skip with very salty blue.' },
+  btg_des_vidal: { like:'Niagara ice wine — grapes frozen on the vine, apricot and honey held by acid.', body:'Full sweetness, medium body, lively acid.', aroma:'Apricot, honey, candied orange.', hints:'Sweet but not flabby. Vidal is the classic ice-wine grape.', pair:'Fruit pastry, foie gras, and the chocolate desserts.' },
+  btg_des_riesling: { like:'Riesling ice wine — lime, pineapple, a petrol whisper, acid that carries the sugar.', body:'Sweet, laser-cut acidity, lighter than Vidal.', aroma:'Lime, pineapple, honey, a petrol note.', hints:'More tension than Vidal Pearl. Sugar is there; acid leads.', pair:'Blue cheese and citrus tarts.' },
+  btg_des_franc: { like:'Cabernet Franc ice wine — strawberry, raspberry, tea leaf.', body:'Sweet, medium, red-fruit rather than apricot.', aroma:'Strawberry, raspberry, tea, a floral lift.', hints:'Red ice wine. Serve cold. Less tropical than Vidal.', pair:'Berry desserts and mild blue cheese.' },
+  btg_port_bin27: { like:'Young ruby reserve Port — bottled for blackberry and chocolate.', body:'Full, sweet, youthful tannin.', aroma:'Blackberry, dark chocolate, plum.', hints:'Serve slightly cool after dinner. This is ruby, not tawny.', pair:'Walnuts, dark chocolate, and after-dinner pours.' },
+  btg_port_croft: { like:'Ripe, spicy reserve Port — ready to pour.', body:'Full, sweet, round.', aroma:'Ripe plum, spice, cocoa.', hints:'Special reserve: approachable, not vintage Port.', pair:'Stilton and chocolate.' },
+  btg_port_tawny10: { like:'Ten years in wood — nut, caramel, and dried fig.', body:'Medium-full, sweet, silky from oxidation.', aroma:'Walnut, caramel, dried fig, orange peel.', hints:'Serve lightly chilled. Wood age, not bottle age.', pair:'Cheese, chocolate, pecan tart, and Formaggio.' },
+  btg_port_tawny20: { like:'Twenty years in cask — walnut, orange peel, and toffee, silkier than the ten-year.', body:'Medium, sweet, very silky.', aroma:'Walnut, orange peel, toffee, dried apricot.', hints:'More perfume and less grip than 10-year. Chill slightly.', pair:'Pecan tart, aged cheese, and nut desserts.' }
+};
+var POS_WINE_STYLES = [
+  { test:/lambrusco|concerto/, id:'btg_spark_concerto' },
+  { test:/prosecco|glera|zardetto/, id:'btg_spark_zardetto' },
+  { test:/graham beck/, id:'btg_spark_beck' },
+  { test:/champagne|krug|gosset|dom p[eé]rignon|veuve|bollinger|grande cuv[eé]e|grandes marques|montagne de reims|vall[eé]e de la marne|cote des blancs/, like:'Traditional-method sparkling — Champagne or close kin.', body:'Light to medium, fine mousse, dry to extra-brut.', aroma:'Citrus, apple, brioche or toasted nut with age.', hints:'Autolytic bread notes come from bottle time on lees. Serve well chilled in a tulip, not a coupe.', pair:'Oysters, fried bites, salty cheese, and the start of the meal.' },
+  { test:/sauternes|yquem|barsac/, like:'Botrytised sweet Bordeaux — honey and saffron, held by acid.', body:'Full sweetness, medium body, lively acid.', aroma:'Honey, apricot, saffron, orange peel.', hints:'Noble rot concentrates sugar and perfume. Serve cold with savory richness or dessert.', pair:'Foie gras, blue cheese, fruit tarts, and the chocolate desserts.' },
+  { test:/ice wine|icewine|inniskillin|vidal|rieslaner auslese|tba|trockenbeeren|beerenauslese/, like:'Late-harvest or ice wine — concentrated sweetness with enough acid to stay lively.', body:'Sweet, medium to full, refreshing acid.', aroma:'Apricot, honey, citrus peel.', hints:'Cold climate keeps the sugar from tasting heavy. Serve very cold, small pour.', pair:'Fruit pastry, foie gras, and blue cheese.' },
+  { test:/moscato|asti/, id:'btg_des_spinetta' },
+  { test:/tawny|20 year|10 year|fonseca|croft|port|porto|bin 27/, like:'Fortified Port — sweet, warming, ruby or tawny depending on wood age.', body:'Full, sweet, either youthful grip (ruby) or silky nut (tawny).', aroma:'Blackberry and chocolate (ruby) or walnut, caramel, orange peel (tawny).', hints:'Ruby is bottled young; tawny is aged in wood. Serve ruby slightly cool, tawny lightly chilled.', pair:'Walnuts, Stilton, dark chocolate, and after dinner.' },
+  { test:/amarone/, like:'Amarone della Valpolicella — dried-grape red, dense and bittersweet.', body:'Full, high alcohol, velvet tannin.', aroma:'Raisin, cocoa, cherry liqueur, spice.', hints:'Appassimento (dried grapes) makes it richer than Valpolicella. Not a light pizza red.', pair:'Brasato, aged cheese, game, and rich mushroom dishes.' },
+  { test:/valpolicella/, id:'btg_red_fumanelli' },
+  { test:/barolo|barbaresco|nebbiolo|gattinara/, like:'Nebbiolo from Piedmont — tar, roses, high tannin and acid.', body:'Full structure, firm tannin, high acid; color can look lighter than it drinks.', aroma:'Rose, tar, red cherry, anise, dried herb.', hints:'Needs time or rich food. Decant younger bottles. Not a soft Merlot.', pair:'Brasato, truffles, aged cheese, and long-cooked meats.' },
+  { test:/barbera/, id:'btg_lib_barbera' },
+  { test:/brunello|montalcino/, like:'Brunello di Montalcino — Sangiovese Grosso, savory and long.', body:'Medium-plus to full, firm tannin, high acid.', aroma:'Sour cherry, leather, tobacco, dried herb.', hints:'More muscle than Chianti Classico. Age and food tame the tannin.', pair:'Bistecca, lamb, wild boar, and aged pecorino.' },
+  { test:/chianti|sangiovese|fizzano/, id:'btg_lib_fizzano' },
+  { test:/super tuscan|sassicaia|ornellaia|tignanello|san guido|bolgheri|cabernet sauvignon - napa|napa valley|bond\b/, like:'Cabernet-led or Super Tuscan — black fruit, cedar, serious tannin.', body:'Full, structured, often oak-aged.', aroma:'Blackcurrant, cedar, graphite, sweet spice.', hints:'Decant. Napa is riper; Bolgheri is more savory. Tell the guest the vintage if they ask about age.', pair:'Steak, lamb, hard cheese, and the filet if they want a bottle, not a glass.' },
+  { test:/pomerol|pauillac|saint-julien|saint-est[eè]phe|saint-[eé]milion|margaux|m[eé]doc|latour|lafite|lynch|bordeaux/, like:'Bordeaux — Cabernet and/or Merlot, cedar and cassis, built for the cellar.', body:'Full, firm tannin, long finish. Left Bank more Cabernet; Right Bank more Merlot.', aroma:'Blackcurrant, cedar, graphite, tobacco with age.', hints:'Older vintages are savory; younger ones need decanting and food.', pair:'Lamb, steak, hard cheeses, and long-cooked red-sauce mains.' },
+  { test:/aglianico|taurasi|montevetrano|core/, id:'btg_red_core' },
+  { test:/pinot nero|pinot noir|blauburgunder|burgund|volnay|corton|bataard|montrachet|beaune|vosne|chambolle|gevrey|moreau-naudet|1er cru|grand cru|villages|bourgogne/, like:'Pinot Noir / Burgundy family — red fruit, earth, fine tannin. White Burgundy if the bottle is Chardonnay from the Côte.', body:'Light to medium (red) or medium with tension (white).', aroma:'Red: cherry, forest floor, rose. White: citrus, white flower, hazelnut with age.', hints:'Read the label: many “1er Cru / Grand Cru” bottles here are Burgundy. Cool climate, not Napa fruit bomb.', pair:'Red: roast birds, mushrooms, salmon if they insist on red. White: scallops, lobster, truffle butter, sole.' },
+  { test:/chablis|chardo|hartford|meursault|puligny|chassagne/, like:'Chardonnay — from steely Chablis to richer Côte de Beaune or California.', body:'Medium; lean and mineral or creamy with oak.', aroma:'Citrus, apple, white flower; hazelnut and toast when oaked.', hints:'Ask if they want flint (Chablis) or richer oak. Hartford Four Hearts is the glass reference.', pair:'Scallops, lobster, butter sauces, and truffle dishes.' },
+  { test:/hermitage|cornas|c[oô]te-r[oô]tie|syrah|shiraz/, like:'Northern Rhône Syrah — pepper, smoked meat, dark fruit.', body:'Full, firm, savory rather than jammy.', aroma:'Black pepper, blackberry, smoked meat, violet.', hints:'Cornas and Hermitage are serious. Not Australian jam if it is Rhône.', pair:'Game, roast beef, sausage, and mushroom ragù.' },
+  { test:/rioja/, like:'Rioja — Tempranillo, American oak, leather and red fruit.', body:'Medium to full; Reserva/Gran Reserva turn silky.', aroma:'Strawberry, leather, vanilla, dill from American oak.', hints:'Crianza is fresher; Gran Reserva is tertiary. Serve at cellar temp.', pair:'Lamb, chorizo-adjacent spice, aged cheese, and grilled meats.' },
+  { test:/riesling|gruner|grüner|albari[nñ]o|vermentino|pinot grigio|pinot bianco|friulano|fiano|sauvignon|fum[eé] blanc|gaja rossj/, like:'Aromatic or mineral white — high acid, dry unless the label says otherwise.', body:'Light to medium, refreshing, food-friendly.', aroma:'Citrus, stone fruit, herbs or petrol depending on grape.', hints:'Most of these are dry table wines. German Prädikat (Auslese) can be sweet — read the label.', pair:'Seafood, salads, herb primi, and spicy or lemon dishes.' },
+  { test:/merlot/, id:'btg_red_planeta' },
+  { test:/spark|cava|cr[eé]mant|sekt|franciacorta/, like:'Traditional- or tank-method sparkling.', body:'Light, dry, refreshing mousse.', aroma:'Citrus, apple, maybe brioche.', hints:'Serve very cold. Ask if they want yeasty (traditional method) or fruity (tank).', pair:'Aperitif, fried food, oysters, and salty snacks.' }
+];
+
+function wineHaystack(item){
+  return [
+    item && item.id, item && item.name, item && item.producer, item && item.region,
+    item && item.country, item && item.varietal, item && item.grape, item && item.description, item && item.desc
+  ].join(' ').toLowerCase();
+}
+function cloneWineGuide(g){
+  return g ? { like:g.like||'', body:g.body||'', aroma:g.aroma||'', hints:g.hints||'', pair:g.pair||'' } : null;
+}
+function foodMasterWineGuide(item){
+  item=item||{};
+  var notes=(typeof EPICUREAN_SCALINI!=='undefined' && EPICUREAN_SCALINI.wineNotes) || {};
+  var id=String(item.id||'');
+  if (POS_BTG_GUIDE[id]) return cloneWineGuide(POS_BTG_GUIDE[id]);
+  var hay=wineHaystack(item);
+  var i, rule, g;
+  for (i=0;i<POS_WINE_STYLES.length;i++){
+    rule=POS_WINE_STYLES[i];
+    if (!rule.test.test(hay)) continue;
+    if (rule.id && POS_BTG_GUIDE[rule.id]) return cloneWineGuide(POS_BTG_GUIDE[rule.id]);
+    if (rule.like) return cloneWineGuide(rule);
+  }
+  var blurb=notes[id] || item.note || item.story || '';
+  var grape=item.varietal||item.grape||'';
+  var region=item.region||item.country||'';
+  var vintage=item.vintage && item.vintage!=='NV' ? String(item.vintage) : 'Non-vintage';
+  var like=blurb || ((grape||'This wine')+' from '+(region||'the cellar')+'. '+vintage+'.');
+  var red=/red|rosso|noir|nero|cabernet|merlot|syrah|sangiovese|nebbiolo|pinot n|blend/.test(hay);
+  return {
+    like:like,
+    body: red ? 'Medium to full; tannin and alcohol give the weight.' : 'Light to medium; acidity keeps it moving.',
+    aroma: grape ? (grape+' fruit, and whatever the vintage and cellar have added.') : (red ? 'Red or dark fruit, maybe spice or earth.' : 'Citrus, orchard fruit, maybe herbs or flower.'),
+    hints: region ? ('Tell the guest it is from '+region+(item.producer?(' · '+item.producer):'')+'.') : 'Read the label with them: vintage, place, and grape.',
+    pair: red ? 'Roast meats, tomato sauces, mushrooms, and hard cheese.' : 'Seafood, salads, lemon or herb dishes, and lighter primi.'
+  };
+}
+function wineGuideHtml(item){
+  var g=foodMasterWineGuide(item);
+  if (!g) return '';
+  var html='<div class="wine-fm-card">';
+  html+='<div class="wine-fm-kicker">Food Master · what to say</div>';
+  if (g.like) html+='<p class="wine-fm-like">'+esc(g.like)+'</p>';
+  if (g.body) html+='<div class="wine-fm-row"><b>Body.</b> '+esc(g.body)+'</div>';
+  if (g.aroma) html+='<div class="wine-fm-row"><b>Aroma.</b> '+esc(g.aroma)+'</div>';
+  if (g.hints) html+='<div class="wine-fm-row"><b>Hints.</b> '+esc(g.hints)+'</div>';
+  if (g.pair) html+='<div class="wine-fm-row"><b>Best with.</b> '+esc(g.pair)+'</div>';
+  html+='</div>';
+  return html;
+}
+function isPosWineItem(item){
+  if (!item) return false;
+  if (item.source==='wine' || item.byTheGlass || item.scaliniOnly) return true;
+  var id=String(item.id||'');
+  if (id.indexOf('btg_')===0 || id.indexOf('w')===0 && /wine/i.test(String(item.category||''))) return true;
+  var cat=String(item.category||'')+' '+((item.catIds||[]).join(' '));
+  return /wine/.test(cat);
+}
+function findPosMenuItem(itemId){
+  var items=STATE.menuItems.length?STATE.menuItems:SEED_ITEMS;
+  return items.filter(function(i){ return i && i.id===itemId; })[0] || null;
+}
+function explainPosWine(itemId){
+  var item=findPosMenuItem(itemId);
+  if (!item) { toast('Wine not on the list'); return; }
+  var html='<h2>'+esc(item.name)+'</h2>';
+  html+='<p class="sheet-sub">$'+(Number(item.price)||0).toFixed(2);
+  if (item.producer || item.region || item.varietal) {
+    html+=' · '+esc([item.producer, item.vintage, item.region, item.varietal].filter(Boolean).join(' · '));
+  }
+  html+='</p>';
+  html+=wineGuideHtml(item);
+  html+='<button class="primary-btn" onclick="closeSheet();beginAddItem('+JSON.stringify(String(item.id))+')">Add this pour</button>';
+  html+='<button class="ghost-btn" onclick="closeSheet()">Close</button>';
+  openSheet(html);
+}
+
 function beginAddItem(itemId) {
   var items=STATE.menuItems.length?STATE.menuItems:SEED_ITEMS;
   var item=items.find(function(i){return i.id===itemId;});
@@ -4016,7 +4259,15 @@ function beginAddItem(itemId) {
     dietaryFlags:item.dietaryFlags||item.dietary||[],
     description:item.description||item.desc||'',
     source:item.source||'menu',
-    bottleOz:item.bottleOz
+    bottleOz:item.bottleOz,
+    producer:item.producer||'',
+    vintage:item.vintage||'',
+    region:item.region||'',
+    country:item.country||'',
+    varietal:item.varietal||item.grape||'',
+    grape:item.grape||item.varietal||'',
+    byTheGlass:!!item.byTheGlass,
+    scaliniOnly:!!item.scaliniOnly
   };
   if (item.modifiers&&item.modifiers.length) {
     renderModifierSheet();
@@ -4029,6 +4280,7 @@ function renderModifierSheet(){
   var p=STATE.pendingItem; if(!p) return;
   var html='<h2>'+p.name+'</h2>';
   html+='<p class="sheet-sub">$'+Number(p.price).toFixed(2)+' · '+seatName(p.seat)+'</p>';
+  if (isPosWineItem(p)) html+=wineGuideHtml(p);
   html+='<div class="tasting-section-label">Seat</div><div class="chip-row">';
   var n=sessionOf(STATE.selectedTable).guestCount||2;
   for (var i=1;i<=n;i++) html+='<button type="button" class="chip'+(String(p.seat)===String(i)?' active':'')+'" onclick="STATE.pendingItem.seat='+i+';renderModifierSheet()">G'+i+'</button>';
