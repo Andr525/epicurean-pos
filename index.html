@@ -700,9 +700,9 @@ body.hh-on.floor-drawing .floor-stage { outline:2px dashed var(--primary); }
   background:transparent;
 }
 .ts-console.toast-go.has-dining .ts-check {
-  max-height:none; flex:1 1 48vh; min-height:42vh;
+  max-height:none; flex:1 1 auto; min-height:0;
 }
-.ts-console.toast-go.has-dining .ts-grid-wrap { flex:0 1 20vh; min-height:72px; }
+.ts-console.toast-go.has-dining .ts-grid-wrap { flex:1 1 18vh; min-height:64px; }
 .ts-console.toast-go .ts-check-head, .ts-console.toast-go .ts-line {
   grid-template-columns:28px minmax(0,1fr) 58px 62px;
 }
@@ -724,19 +724,24 @@ body.hh-on.floor-drawing .floor-stage { outline:2px dashed var(--primary); }
   background:var(--surface-2); color:var(--text);
 }
 .ts-console.toast-go .ts-line.dining-line {
-  grid-template-columns:22px minmax(0,1fr) auto;
-  align-items:start; padding:0.28rem 0.1rem 0.32rem;
+  grid-template-columns:18px minmax(0,1fr) auto;
+  align-items:center; padding:0.18rem 0.08rem;
 }
 .ts-console.toast-go .ts-line.dining-line .ts-course-actions {
-  flex-direction:column; align-items:stretch; margin:0; min-width:86px;
+  flex-direction:row; flex-wrap:nowrap; align-items:center; margin:0; gap:4px;
 }
+.ts-console.toast-go .ts-line.dining-line .ts-name { font-size:0.78rem; }
+.ts-console.toast-go .ts-line.dining-line .ts-mod { font-size:0.64rem; padding:0; }
+.ts-console.toast-go .ts-line.dining-line .ts-meta { display:none; }
+.ts-console.toast-go.has-dining .seat-bar { padding:0.1rem 0; }
+.ts-console.toast-go.has-dining .seat-chip { min-height:32px; }
 .ts-course-actions .fire-now {
   background:linear-gradient(135deg,#dc2626,#ea580c); color:#fff; border:none;
 }
 .ts-course-actions .fired-pill { color:#86efac; border-color:rgba(134,239,172,0.35); }
 .ts-sec-label {
-  font-size:0.68rem; letter-spacing:0.08em; text-transform:uppercase;
-  color:var(--text-muted); font-weight:800; padding:0.55rem 0.15rem 0.2rem;
+  font-size:0.62rem; letter-spacing:0.08em; text-transform:uppercase;
+  color:var(--text-muted); font-weight:800; padding:0.25rem 0.15rem 0.1rem;
 }
 .toast-ops { grid-template-columns:1fr 1fr 1fr 1.3fr; }
 .allergy-strip.compact-line {
@@ -3763,7 +3768,8 @@ function renderOrder() {
   html+=renderSeatBar();
   html+=addItemsHeaderHtml();
   html+=periodTabsHtml();
-  html+=renderMenuGrid();
+  if (!tableDiningOrders().length || STATE.menuOpen || STATE.menuSearch) html+=renderMenuGrid();
+  else html+='<div class="add-items-row"><button type="button" class="as-pill" onclick="STATE.menuOpen=true;renderOrder()">Show menu</button></div>';
   html+='</div>';
   c.innerHTML=html;
   paintChrome();
@@ -3779,10 +3785,10 @@ function periodTabsHtml(){
   var pf=STATE.orderCat==='__prixfixe__';
   var tm=STATE.orderCat==='__tasting__';
   return '<div class="period-tabs">'+
-    '<button type="button" class="period-tab'+(food?' active':'')+'" onclick="setMenuFamily(\'food\')">Food</button>'+
-    '<button type="button" class="period-tab'+(drinks?' active':'')+'" onclick="setMenuFamily(\'drinks\')">Drinks</button>'+
-    '<button type="button" class="period-tab'+(pf?' active':'')+'" onclick="filterCat(\'__prixfixe__\')">Prix Fixe</button>'+
-    '<button type="button" class="period-tab'+(tm?' active':'')+'" onclick="filterCat(\'__tasting__\')">Tasting</button>'+
+    '<button type="button" class="period-tab'+(food?' active':'')+'" onclick="STATE.menuOpen=true;setMenuFamily(\'food\')">Food</button>'+
+    '<button type="button" class="period-tab'+(drinks?' active':'')+'" onclick="STATE.menuOpen=true;setMenuFamily(\'drinks\')">Drinks</button>'+
+    '<button type="button" class="period-tab'+(pf?' active':'')+'" onclick="STATE.menuOpen=true;filterCat(\'__prixfixe__\')">Prix Fixe</button>'+
+    '<button type="button" class="period-tab'+(tm?' active':'')+'" onclick="STATE.menuOpen=true;filterCat(\'__tasting__\')">Tasting</button>'+
     '</div>';
 }
 function renderGuestAllergyStrip(){
