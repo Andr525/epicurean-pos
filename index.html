@@ -4239,7 +4239,7 @@ function confirmPrixFixe(pfId) {
     var radios=document.querySelectorAll('input[name="pf-course-'+ci+'"]');
     radios.forEach(function(r){ if(r.checked) picked[ci]=parseInt(r.value,10)||0; });
     var opt=(c.options||[])[picked[ci]||0];
-    if (opt && opt.askTemp){
+    if (opt && prixFixeTempOptions(opt.askTemp, opt).length){
       var tEl=document.querySelector('input[name="pf-temp-'+ci+'-'+(picked[ci]||0)+'"]:checked');
       if (tEl) temps[ci]=tEl.value;
       else missingTemp=opt.name;
