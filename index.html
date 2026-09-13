@@ -738,7 +738,17 @@ body.hh-on.floor-drawing .floor-stage { outline:2px dashed var(--primary); }
   font-size:0.68rem; letter-spacing:0.08em; text-transform:uppercase;
   color:var(--text-muted); font-weight:800; padding:0.55rem 0.15rem 0.2rem;
 }
-.toast-ops { grid-template-columns:1fr 1fr 1.2fr; }
+.toast-ops { grid-template-columns:1fr 1fr 1fr 1.3fr; }
+.allergy-strip.compact-line {
+  display:flex; align-items:center; gap:8px; justify-content:space-between;
+}
+.allergy-strip.compact-line span {
+  font-size:0.72rem; color:var(--text-secondary); font-weight:600;
+}
+.allergy-strip.compact-line button {
+  min-height:28px; padding:0 0.7rem; border-radius:8px; border:1px solid var(--border);
+  background:var(--surface-2); color:var(--text); font-size:0.68rem; font-weight:800; cursor:pointer;
+}
 .toast-ops .pay-now { background:#d6e4ff; color:#102033; border-color:#d6e4ff; }
 .add-items-row {
   display:flex; align-items:center; gap:8px; flex-shrink:0; padding:0.15rem 0 0.35rem;
@@ -3689,6 +3699,8 @@ function liveCheckHtml(){
   var html='<div class="ts-check live-check" onclick="event.target===this&&toggleCheckFocus()">';
   if (!rows.length && !dining.length) html+='<div class="ts-empty lc-empty">Tap a tile to add food or drinks.</div>';
   rows.forEach(function(row){
+    var src=STATE.currentOrder.filter(function(i){ return i.lineId===row.lineId; })[0];
+    if (src && (src.isPrixFixe || src.isTasting) && dining.length) return;
     var picked=!!(STATE.selectedLineIds && STATE.selectedLineIds[row.lineId]);
     var each=Number(row.price)||0;
     var qty=parseInt(row.qty,10)||1;
@@ -3742,6 +3754,7 @@ function renderOrder() {
   html+='<div class="ts-ops toast-ops">';
   html+='<button type="button" onclick="printCheck()">Print</button>';
   html+='<button type="button" onclick="openGuestsSheet()">Guests</button>';
+  html+='<button type="button" onclick="openAllergyEditor()">Allergies</button>';
   html+='<button type="button" class="pay-now" onclick="openPayment(checkTotals().grand)">Pay $'+tot.grand.toFixed(2)+'</button>';
   html+='</div>';
   if (warn.text) html+='<div class="res-warn lvl'+warn.level+'">'+esc(warn.text)+'</div>';
@@ -3774,20 +3787,29 @@ function periodTabsHtml(){
 }
 function renderGuestAllergyStrip(){
   var n=sessionOf(STATE.selectedTable).guestCount||2;
-  var open=STATE.allergySeat!=null?STATE.allergySeat:(STATE.activeSeat||'table');
   var dining=tableDiningOrders().length;
-  var showChips=!dining || !!STATE.allergyOpen;
+  var bits=[];
+  function collect(seat){
+    var cur=seatAllergies(seat);
+    if (cur.length) bits.push(seatName(seat)+' '+cur.join(', '));
+  }
+  collect('table');
+  for (var i=1;i<=n;i++) collect(i);
+  if (dining) {
+    return '<div class="allergy-strip compact-line"><span>'+(bits.length?esc(bits.join(' · ')):'Allergies — tap a guest to flag')+'</span>'+
+      '<button type="button" onclick="openAllergyEditor()">Edit</button></div>';
+  }
+  var open=STATE.allergySeat!=null?STATE.allergySeat:(STATE.activeSeat||'table');
   var html='<div class="allergy-strip"><div class="as-label">Allergies — tap a guest, then flag</div><div class="as-guests">';
   function pill(seat){
     var cur=seatAllergies(seat);
-    var on=String(open)===String(seat) && showChips;
+    var on=String(open)===String(seat);
     html+='<button type="button" class="as-pill'+(on?' active':'')+(cur.length?' flagged':'')+'" onclick=\'STATE.allergySeat='+JSON.stringify(String(seat))+';STATE.allergyOpen=true;renderOrder()\'>'+
       esc(seatName(seat))+(cur.length?' · '+cur.length:'')+'</button>';
   }
   pill('table');
   for (var i=1;i<=n;i++) pill(i);
   html+='</div>';
-  if (!showChips) return html+'</div>';
   var cur=seatAllergies(open);
   html+='<div class="allergy-guest"><b>'+esc(seatName(open))+'</b><div class="chip-row">';
   COMMON_ALLERGENS.forEach(function(a){
