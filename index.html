@@ -18,7 +18,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <title>Epicurean POS</title>
-<!-- pos-build: scalini-print-v28 -->
+<!-- pos-build: scalini-print-v29 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
@@ -695,6 +695,75 @@ body.hh-on.floor-drawing .floor-stage { outline:2px dashed var(--primary); }
   min-height:48px; grid-column:1 / -1; background:var(--surface); font-size:0.8rem; color:var(--text-secondary);
 }
 .ts-tile.sold { opacity:0.45; }
+.ts-console.toast-go .ts-check {
+  max-height:42vh; border:none; border-radius:0; padding:0.15rem 0 0.35rem;
+  background:transparent;
+}
+.ts-console.toast-go .ts-check-head, .ts-console.toast-go .ts-line {
+  grid-template-columns:28px minmax(0,1fr) 58px 62px;
+}
+.ts-console.toast-go .ts-line {
+  background:transparent; padding:0.42rem 0.15rem 0.5rem; margin:0;
+  border-bottom:1px solid rgba(255,255,255,0.06); border-radius:0;
+}
+.ts-console.toast-go .ts-line .ts-name { white-space:normal; }
+.ts-console.toast-go .ts-qty { font-weight:700; color:var(--text-muted); }
+.ts-console.toast-go .ts-money { text-align:right; font-variant-numeric:tabular-nums; }
+.ts-mod {
+  font-size:0.72rem; color:var(--text-secondary); font-weight:500;
+  padding:0.08rem 0 0.08rem 0.15rem; line-height:1.35;
+}
+.ts-course-actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:0.35rem; }
+.ts-course-actions button {
+  min-height:36px; padding:0.3rem 0.65rem; border-radius:8px; font-size:0.72rem;
+  font-weight:800; letter-spacing:0.04em; cursor:pointer; border:1px solid var(--border);
+  background:var(--surface-2); color:var(--text);
+}
+.ts-course-actions .fire-now {
+  background:linear-gradient(135deg,#dc2626,#ea580c); color:#fff; border:none;
+}
+.ts-course-actions .fired-pill { color:#86efac; border-color:rgba(134,239,172,0.35); }
+.ts-sec-label {
+  font-size:0.68rem; letter-spacing:0.08em; text-transform:uppercase;
+  color:var(--text-muted); font-weight:800; padding:0.55rem 0.15rem 0.2rem;
+}
+.toast-ops { grid-template-columns:1fr 1fr 1.2fr; }
+.toast-ops .pay-now { background:#d6e4ff; color:#102033; border-color:#d6e4ff; }
+.add-items-row {
+  display:flex; align-items:center; gap:8px; flex-shrink:0; padding:0.15rem 0 0.35rem;
+}
+.add-items-row .add-items-label { font-weight:800; font-size:0.95rem; flex:1; }
+.add-items-row .add-search { margin:0; min-height:40px; flex:1.4; }
+.period-tabs {
+  display:flex; gap:0; flex-shrink:0; border-bottom:1px solid var(--border); margin-bottom:0.45rem;
+  overflow-x:auto; -webkit-overflow-scrolling:touch;
+}
+.period-tab {
+  flex:1; min-width:72px; min-height:40px; border:none; background:none;
+  color:var(--text-muted); font-weight:800; font-size:0.78rem; cursor:pointer;
+  border-bottom:2px solid transparent; padding:0.35rem 0.4rem;
+}
+.period-tab.active { color:var(--text); border-bottom-color:var(--text); }
+.allergy-strip {
+  background:var(--surface); border:1px solid var(--border); border-radius:10px;
+  padding:0.4rem 0.5rem 0.5rem; flex-shrink:0;
+}
+.allergy-strip .as-label {
+  font-size:0.62rem; letter-spacing:0.07em; text-transform:uppercase;
+  color:var(--primary-light); font-weight:800; margin-bottom:0.25rem;
+}
+.allergy-guest { margin:0.25rem 0 0.15rem; }
+.allergy-guest b { font-size:0.72rem; color:var(--text-secondary); margin-right:6px; }
+.ts-console.toast-go .ts-grid {
+  grid-template-columns:repeat(4, minmax(0,1fr)); gap:6px;
+}
+.ts-console.toast-go .ts-tile {
+  min-height:68px; border-radius:6px; font-size:0.78rem; font-weight:700;
+  letter-spacing:0.02em; background:var(--surface); border-color:rgba(255,255,255,0.08);
+}
+.ts-console.toast-go .ts-tile.food,
+.ts-console.toast-go .ts-tile.drinks,
+.ts-console.toast-go .ts-tile.prix { background:var(--surface-2); }
 body.hh-table .app-content, body.tableside .app-content {
   display:flex; flex-direction:column; overflow:hidden; padding:0.5rem 0.6rem 0.35rem;
 }
@@ -824,7 +893,7 @@ body.hh-table .app-content, body.tableside .app-content {
 <div id="login-screen" class="screen active">
   <h1>Epicurean POS</h1>
   <p class="subtitle">Enter your 4-digit code</p>
-  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 28</p>
+  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 29</p>
   <div class="pin-display" id="pin-display">
     <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
   </div>
@@ -1124,7 +1193,7 @@ var STATE = {
   payEven: 1,
   _seatTick: null
 };
-var COMMON_ALLERGENS = ['Fish','Shellfish','Dairy','Egg','Gluten','Soy','Sesame','Nuts','Sulfites'];
+var COMMON_ALLERGENS = ['Fish','Shellfish','Dairy','Egg','Gluten','Soy','Sesame','Nuts','Tree Nut','Sulfites'];
 
 function isHandheld(){
   return window.matchMedia && window.matchMedia('(max-width:767px)').matches;
@@ -1386,9 +1455,10 @@ function renderHandheldTop(){
   var warn=reservationWarning(STATE.selectedTable);
   document.getElementById('hh-top').innerHTML=
     '<button class="hh-back" onclick="backToFloor()" aria-label="Back">←</button>'+
-    '<div class="hh-title">Table '+esc(String(STATE.selectedTable))+
+    '<div class="hh-title">#'+esc(String(STATE.selectedTable))+' · Table '+esc(String(STATE.selectedTable))+
       '<span>'+sess.guestCount+' guests · '+(STATE.currentServer?esc(STATE.currentServer.name):'')+
       ' · <span id="hh-seated">'+seatedLabelFor(STATE.selectedTable)+'</span></span></div>'+
+    '<button class="hh-more" onclick="printCheck()" aria-label="Print">⎙</button>'+
     '<button class="hh-more" onclick="openOverflow()" aria-label="More">⋮</button>';
   if (warn.level) {
     var title=document.querySelector('#hh-top .hh-title');
@@ -1403,8 +1473,8 @@ function renderHandheldBar(){
   document.getElementById('hh-bar').innerHTML=
     '<div class="hh-actions">'+
       '<button class="btn-hold" onclick="holdUnsent()">HOLD</button>'+
-      '<button class="btn-stay" onclick="stayOrder()"'+(canFire?'':' disabled')+'>STAY</button>'+
       '<button class="btn-send" onclick="sendOrder({})"'+(canFire?'':' disabled')+'>'+sendLabel+'</button>'+
+      '<button class="btn-stay" onclick="stayOrder()"'+(canFire?'':' disabled')+'>STAY</button>'+
     '</div>';
 }
 function setHhMode(mode){
@@ -3439,7 +3509,8 @@ function selectTable(t) {
     STATE.activeSeat = 1;
     STATE.hhMode = 'service';
     STATE.checkFocus = false;
-    STATE.menuNav = { level:'root' };
+    STATE.menuNav = { level:'cats', family:'food' };
+    STATE.menuFamily = 'food';
     STATE.viewCheckId = sessionOf(t).checkId || null;
     switchTab('order');
     toast('Table ' + t);
@@ -3478,7 +3549,8 @@ function confirmGuests(){
   STATE.activeSeat=1;
   STATE.hhMode='service';
   STATE.checkFocus=false;
-  STATE.menuNav={ level:'root' };
+  STATE.menuNav={ level:'cats', family:'food' };
+  STATE.menuFamily='food';
   ensureOpenCheck(STATE.selectedTable);
   STATE.viewCheckId=sessionOf(STATE.selectedTable).checkId;
   closeSheet();
@@ -3578,19 +3650,26 @@ function renderPrixFixeRows(q){
 function liveCheckHtml(){
   var rows=guestCheckItems();
   var tot=checkTotals();
+  var dining=tableDiningOrders();
   var html='<div class="ts-check live-check" onclick="event.target===this&&toggleCheckFocus()">';
-  html+='<div class="ts-check-head"><span>Name</span><span>Qty</span><span>Each</span><span>Total</span></div>';
-  if (!rows.length) html+='<div class="ts-empty lc-empty">Tap a tile to add food or drinks. One check for the whole meal.</div>';
+  if (!rows.length && !dining.length) html+='<div class="ts-empty lc-empty">Tap a tile to add food or drinks.</div>';
   rows.forEach(function(row){
     var picked=!!(STATE.selectedLineIds && STATE.selectedLineIds[row.lineId]);
     var each=Number(row.price)||0;
     var qty=parseInt(row.qty,10)||1;
+    var mods=[];
+    if (row.mods) mods.push(row.mods);
+    if (row.notes) mods.push(row.notes);
     html+='<div class="ts-line lc-line '+row.status+(picked?' picked':'')+'" onclick="toggleLineSelect(\''+row.lineId+'\')">'+
+      '<div class="ts-qty">'+qty+'</div>'+
       '<div><div class="ts-name">'+esc(row.name)+'</div>'+
-      '<div class="ts-meta lc-meta">'+seatName(row.seat)+' · '+row.status.toUpperCase()+(row.mods?' · '+esc(row.mods):'')+(row.notes?' · '+esc(row.notes):'')+'</div></div>'+
-      '<div>'+qty+'</div><div>$'+each.toFixed(2)+'</div><div>$'+(each*qty).toFixed(2)+'</div></div>';
+      mods.map(function(m){ return '<div class="ts-mod">'+esc(m)+'</div>'; }).join('')+
+      '<div class="ts-meta lc-meta">'+seatName(row.seat)+' · '+row.status.toUpperCase()+'</div></div>'+
+      '<div class="ts-money">$'+(each?each.toFixed(2):'')+'</div>'+
+      '<div class="ts-money">$'+(each? (each*qty).toFixed(2):'')+'</div></div>';
   });
-  html+=renderCourseFireRow();
+  html+=renderDiningProgress();
+  html+=renderHeldFireRow();
   html+='<div class="ts-totals"><div><span>BALANCE</span>$'+tot.unsentTotal.toFixed(2)+'</div><div><span>TOTAL</span>$'+tot.grand.toFixed(2)+'</div></div>';
   html+='</div>';
   return html;
@@ -3623,26 +3702,56 @@ function renderOrder() {
   startSeatTicker();
   var c=document.getElementById('app-content');
   var warn=reservationWarning(STATE.selectedTable);
-  var html='<div class="ts-console'+(STATE.checkFocus?' focus':'')+'">';
-  html+='<div class="order-banner" style="margin-bottom:0;">';
-  html+='<div><div class="ob-table">Table '+esc(String(STATE.selectedTable))+'</div>';
-  html+='<div class="ob-meta">'+(sessionOf(STATE.selectedTable).guestCount||STATE.guestCount)+' guests · '+(STATE.currentServer?esc(STATE.currentServer.name):'Food Master')+'</div>';
-  html+='<div class="ob-seated" id="order-seated">'+seatedLabelFor(STATE.selectedTable)+'</div></div>';
-  html+='<div class="ob-total">$'+checkTotals().grand.toFixed(2)+'<span>OPEN CHECK</span></div>';
+  var tot=checkTotals();
+  var html='<div class="ts-console toast-go'+(STATE.checkFocus?' focus':'')+'">';
+  html+='<div class="ts-ops toast-ops">';
+  html+='<button type="button" onclick="printCheck()">Print</button>';
+  html+='<button type="button" onclick="openGuestsSheet()">Guests</button>';
+  html+='<button type="button" class="pay-now" onclick="openPayment(checkTotals().grand)">Pay $'+tot.grand.toFixed(2)+'</button>';
+  html+='</div>';
   if (warn.text) html+='<div class="res-warn lvl'+warn.level+'">'+esc(warn.text)+'</div>';
-  html+='</div>';
   html+=liveCheckHtml();
-  html+='<div class="ts-ops">';
-  html+='<button type="button" onclick="openSplitOverlay()">SPLIT</button>';
-  html+='<button type="button" onclick="openGuestsSheet()">GUESTS</button>';
-  html+='<button type="button" onclick="printCheck()">PRINT</button>';
-  html+='<button type="button" onclick="openPayment(checkTotals().grand)">PAY</button>';
-  html+='</div>';
+  html+=renderGuestAllergyStrip();
   html+=renderSeatBar();
+  html+=addItemsHeaderHtml();
+  html+=periodTabsHtml();
   html+=renderMenuGrid();
   html+='</div>';
   c.innerHTML=html;
   paintChrome();
+}
+function addItemsHeaderHtml(){
+  return '<div class="add-items-row"><div class="add-items-label">Add items</div>'+
+    '<input class="search-box add-search" id="pos-item-find" value="'+esc(STATE.menuSearch||'')+'" placeholder="Search" oninput="STATE.menuSearch=this.value;var s=this.selectionStart;renderOrder();var el=document.getElementById(\'pos-item-find\');if(el){el.focus();try{el.setSelectionRange(s,s);}catch(e){}}"></div>';
+}
+function periodTabsHtml(){
+  var nav=STATE.menuNav||{};
+  var food=STATE.menuFamily!=='drinks' && nav.cat!=='__prixfixe__' && nav.cat!=='__tasting__' && STATE.orderCat!=='__prixfixe__' && STATE.orderCat!=='__tasting__';
+  var drinks=STATE.menuFamily==='drinks';
+  var pf=STATE.orderCat==='__prixfixe__';
+  var tm=STATE.orderCat==='__tasting__';
+  return '<div class="period-tabs">'+
+    '<button type="button" class="period-tab'+(food?' active':'')+'" onclick="setMenuFamily(\'food\')">Food</button>'+
+    '<button type="button" class="period-tab'+(drinks?' active':'')+'" onclick="setMenuFamily(\'drinks\')">Drinks</button>'+
+    '<button type="button" class="period-tab'+(pf?' active':'')+'" onclick="filterCat(\'__prixfixe__\')">Prix Fixe</button>'+
+    '<button type="button" class="period-tab'+(tm?' active':'')+'" onclick="filterCat(\'__tasting__\')">Tasting</button>'+
+    '</div>';
+}
+function renderGuestAllergyStrip(){
+  var n=sessionOf(STATE.selectedTable).guestCount||2;
+  var html='<div class="allergy-strip"><div class="as-label">Guest allergies — tap to flag</div>';
+  function row(seat){
+    var cur=seatAllergies(seat);
+    var h='<div class="allergy-guest"><b>'+seatName(seat)+'</b><div class="chip-row" style="display:inline-flex;margin:0;">';
+    COMMON_ALLERGENS.forEach(function(a){
+      var on=cur.indexOf(a)>-1;
+      h+='<button type="button" class="chip'+(on?' active':'')+'" style="min-height:32px;padding:0.25rem 0.5rem;font-size:0.72rem;" onclick=\'toggleAllergy('+JSON.stringify(String(seat))+','+JSON.stringify(String(a))+',1)\'>'+esc(a)+'</button>';
+    });
+    return h+'</div></div>';
+  }
+  html+=row('table');
+  for (var i=1;i<=n;i++) html+=row(i);
+  return html+'</div>';
 }
 
 function renderMenuGrid(){
@@ -3699,6 +3808,8 @@ function renderMenuGrid(){
       if (q) catItems=catItems.filter(function(i){ return itemMatchesSearch(i,q); });
       else catItems=catItems.slice(0,80);
     }
+    var findQ=String(STATE.menuSearch||'').trim();
+    if (findQ) catItems=catItems.filter(function(i){ return itemMatchesSearch(i, findQ); });
     catItems.forEach(function(item){
       var click=item.eightySixed ? 'toast("86 — not available")' : 'beginAddItem('+JSON.stringify(String(item.id))+')';
       var wine=isPosWineItem(item);
@@ -3716,14 +3827,14 @@ function menuNavBack(){
     STATE.menuNav={ level:'cats', family:STATE.menuFamily };
     STATE.orderCat=null;
   } else {
-    STATE.menuNav={ level:'root' };
+    STATE.menuNav={ level:'cats', family:STATE.menuFamily||'food' };
+    STATE.orderCat=null;
   }
   renderOrder();
 }
 
-function renderCourseFireRow(){
+function renderHeldFireRow(){
   var html='';
-  html+=renderDiningProgress();
   var held=unsentFor().filter(function(i){return i.held && lineBelongsToCheck(i);});
   if (held.length) {
     var courses={};
@@ -3797,10 +3908,11 @@ function addTastingMenu(tmId) {
     dessertAfter:tm.dessertAfter||'meat',
     dessertMenuId:tm.dessertMenuId||'pf_scalini_89',
     courses:courses,
-    selectedMod:courses.length+' courses · fire one by one',
+    selectedMod:courses.length+' courses · fire each course',
     checkId:activeCheckId()
   });
-  toast('+ '+tm.name+' · fire welcome bites one by one');
+  startDiningFromCheckLine(STATE.currentOrder[STATE.currentOrder.length-1]);
+  toast('+ '+tm.name+' · FIRE each course on the check');
   renderOrder();
 }
 
@@ -3896,12 +4008,22 @@ function nextDiningFire(to){
   var courses=diningCourses(to);
   for (var i=0;i<courses.length;i++){
     if (courses[i].fired || courses[i].skipped) continue;
-    if (courses[i].pending || courses[i].later){
-      return { idx:i, needDessert:true, course:courses[i] };
-    }
-    return { idx:i, needDessert:false, course:courses[i] };
+    var needDessert=courseNeedsDessertPick(courses[i]);
+    return { idx:i, needDessert:needDessert, course:courses[i] };
   }
   return { idx:-1, done:true };
+}
+function courseNeedsDessertPick(c){
+  if (!c) return false;
+  if (!(c.later || c.mode==='later')) return false;
+  var choice=String(c.choice||c.name||'');
+  return !choice || /take after/i.test(choice);
+}
+function diningCourseTitle(to, c){
+  if (!c) return 'Course';
+  if (to && to.type==='tasting') return c.name || c.choice || 'Course';
+  if (c.choice && !/take after/i.test(c.choice)) return c.choice;
+  return c.course || c.name || 'Course';
 }
 function tableDiningOrders(){
   return (STATE.activeTastingOrders||[]).filter(function(to){
@@ -3970,7 +4092,9 @@ function findPrixFixeMenu(pfId){
   if (!pf && list.length===1) pf=list[0];
   return hydratePrixFixeMenu(pf);
 }
-function prixFixeTempOptions(kind){
+function prixFixeTempOptions(kind, opt){
+  var name=String((opt && (opt.name||opt.id))||'');
+  if (kind==='pork' && /medallion/i.test(name)) return [];
   if (kind==='steak') return ['Rare','Medium Rare','Medium','Medium Well','Well Done'];
   if (kind==='pork') return ['Medium','Medium Well','Well Done'];
   if (kind==='salmon') return ['Rare','Medium Rare','Medium','Well Done'];
@@ -3984,7 +4108,7 @@ function openPrixFixeSelector(pfId) {
   if (!ov) { toast('Cannot open the prix fixe menu'); return; }
   var courses=pf.courses||[];
   var html='<div class="pf-selector"><h3>'+esc(pf.name)+' — $'+(Number(pf.price)||0).toFixed(2)+'</h3>';
-  html+='<p class="pf-sel-sub">Welcome bites come automatically and fire to the kitchen one by one. Choose primo and main now. Ask temperature on steak, salmon, and pork. Dessert is taken after the main.</p>';
+  html+='<p class="pf-sel-sub">Choose primo and main. Welcome bites, entremet, and dolce each have their own FIRE key on the check. Pork medallions are fully cooked — no temperature.</p>';
   if (!courses.length) html+='<p class="pf-sel-sub">No courses on this menu yet.</p>';
   courses.forEach(function(c,ci){
     var mode=pfCourseMode(c);
@@ -3997,19 +4121,19 @@ function openPrixFixeSelector(pfId) {
       return;
     }
     if (mode==='entremets'){
-      html+='<div class="pf-course-select"><label>'+esc(c.label)+'</label>';
-      html+='<p class="pf-sel-sub">Served to everyone before dessert. Check nut allergies — rum-glazed pineapple is on the plate.</p></div>';
+      html+='<div class="pf-course-select"><label>'+esc(c.label)+' — fire from the check</label>';
+      html+='<p class="pf-sel-sub">Coconut–lime sorbet. Check nut allergies — rum-glazed pineapple is on the plate. Use FIRE when you want it.</p></div>';
       return;
     }
     if (mode==='later'){
-      html+='<div class="pf-course-select"><label>'+esc(c.label)+'</label>';
-      html+='<p class="pf-sel-sub">Included. Take this order after the main course. Gelato is three scoops.</p></div>';
+      html+='<div class="pf-course-select"><label>'+esc(c.label)+' — fire from the check</label>';
+      html+='<p class="pf-sel-sub">Choose the dessert on the check, then FIRE. Gelato is three scoops.</p></div>';
       return;
     }
     html+='<div class="pf-course-select"><label>'+esc(c.label)+'</label><div class="pf-options">';
     (c.options||[]).forEach(function(o,oi){
       var hits=guestAllergyHits(o.allergens);
-      var temps=prixFixeTempOptions(o.askTemp);
+      var temps=prixFixeTempOptions(o.askTemp, o);
       html+='<label class="pf-opt-label"><input type="radio" name="pf-course-'+ci+'" value="'+oi+'"'+(oi===0?' checked':'')+'>'+
         esc(o.name)+(o.upcharge>0?' <span class="pf-upcharge">+$'+Number(o.upcharge).toFixed(0)+'</span>':'')+
         (o.cookNote?' <span class="pf-upcharge">'+esc(o.cookNote)+'</span>':'')+
@@ -4025,6 +4149,8 @@ function openPrixFixeSelector(pfId) {
     });
     html+='</div></div>';
   });
+  html+='<div class="pf-course-select"><label>Modifier / kitchen note</label>';
+  html+='<input class="search-box" id="pf-mod-note" placeholder="No onion, extra sauce, allergy confirmed…"></div>';
   html+='<div class="pf-sel-actions"><button class="send-btn" onclick=\'confirmPrixFixe('+JSON.stringify(String(pf.id))+')\'>Add to Order</button>'+
     '<button class="cancel-pay-btn" onclick="closePfSelector()">Cancel</button></div></div>';
   ov.innerHTML=html;
@@ -4071,6 +4197,10 @@ function confirmPrixFixe(pfId) {
       s.choice=s.choice+' · '+temps[ci];
     }
   });
+  var kitchenNote='';
+  var noteEl=document.getElementById('pf-mod-note');
+  if (noteEl) kitchenNote=String(noteEl.value||'').trim();
+  if (kitchenNote) selections.forEach(function(s){ s.modNote=s.modNote||kitchenNote; });
   var totalUpcharge=selections.reduce(function(s,x){ return s+(x.pending?0:(Number(x.upcharge)||0)); },0);
   var choiceStr=selections.filter(function(s){ return !s.pending; }).map(function(s){ return s.choice; }).join(', ');
   STATE.currentOrder.push({
@@ -4091,10 +4221,12 @@ function confirmPrixFixe(pfId) {
     dessertAfter:'main',
     checkId:activeCheckId(),
     selections:selections,
-    selectedMod:choiceStr
+    notes:kitchenNote,
+    selectedMod:choiceStr+(kitchenNote?(' · '+kitchenNote):'')
   });
+  startDiningFromCheckLine(STATE.currentOrder[STATE.currentOrder.length-1]);
   closePfSelector();
-  toast('+ '+pf.name+' · fire welcome bites one by one');
+  toast('+ '+pf.name+' · FIRE each course on the check');
   renderOrder();
 }
 
@@ -4564,7 +4696,8 @@ function lookupCheckTable(t){
   closeSheet();
   STATE.selectedTable=t;
   STATE.viewCheckId=sessionOf(t).checkId;
-  STATE.menuNav={level:'root'};
+  STATE.menuNav={level:'cats', family:'food'};
+  STATE.menuFamily='food';
   switchTab('order');
   toast('Table '+t);
 }
@@ -4803,10 +4936,11 @@ function openAllergyEditor(){
   html+='<button class="primary-btn" onclick="closeSheet(); if(STATE.hhMode===\'check\') renderCheck(); else renderOrder();">Done</button>';
   openSheet(html);
 }
-function toggleAllergy(seat, name){
+function toggleAllergy(seat, name, stay){
   var list=seatAllergies(seat);
   var i=list.indexOf(name);
   if (i>-1) list.splice(i,1); else list.push(name);
+  if (stay) { renderOrder(); return; }
   openAllergyEditor();
 }
 
@@ -4842,6 +4976,65 @@ function kitchenItemsFrom(lines){
     }
   });
   return out;
+}
+
+function startDiningFromCheckLine(ti){
+  if (!ti || !(ti.isTasting || ti.isPrixFixe)) return null;
+  if (ti.diningOrderId) {
+    return (STATE.activeTastingOrders||[]).filter(function(o){ return o.id===ti.diningOrderId; })[0] || null;
+  }
+  var existing=(STATE.activeTastingOrders||[]).filter(function(o){
+    if (o.status!=='active' || String(o.table)!==String(STATE.selectedTable)) return false;
+    if (ti.isPrixFixe) return o.prixFixeId===ti.prixFixeId && !o._boundLine;
+    return o.tastingId===ti.tastingId && !o._boundLine;
+  })[0];
+  if (existing) { ti.diningOrderId=existing.id; existing._boundLine=ti.lineId; return existing; }
+  var dining;
+  if (ti.isTasting) {
+    dining={
+      id:genId(),
+      table:STATE.selectedTable,
+      guestCount:STATE.guestCount||sessionOf(STATE.selectedTable).guestCount||2,
+      server:STATE.currentServer?STATE.currentServer.name:'Unknown',
+      serverCode:STATE.currentServer?STATE.currentServer.code:'0000',
+      serverRole:STATE.currentServer?STATE.currentServer.role:'Waiter',
+      type:'tasting',
+      tastingName:ti.name,
+      tastingId:ti.tastingId,
+      totalPrice:ti.price,
+      dessertAfter:ti.dessertAfter||'meat',
+      dessertMenuId:ti.dessertMenuId||'pf_scalini_89',
+      courses:(ti.courses||[]).map(function(c){ return Object.assign({}, c, {fired:false, firedAt:null, modNote:c.modNote||ti.notes||''}); }),
+      currentCourse:-1,
+      status:'active',
+      sentAt:Date.now(),
+      _boundLine:ti.lineId
+    };
+  } else {
+    dining={
+      id:genId(),
+      table:STATE.selectedTable,
+      guestCount:STATE.guestCount||sessionOf(STATE.selectedTable).guestCount||2,
+      server:STATE.currentServer?STATE.currentServer.name:'Unknown',
+      serverCode:STATE.currentServer?STATE.currentServer.code:'0000',
+      type:'prix-fixe',
+      prixFixeName:ti.name,
+      prixFixeId:ti.prixFixeId,
+      totalPrice:ti.price,
+      dessertAfter:ti.dessertAfter||'main',
+      dessertMenuId:ti.prixFixeId,
+      selections:(ti.selections||[]).map(function(s){ return Object.assign({}, s, {fired:false, firedAt:null, modNote:s.modNote||ti.notes||''}); }),
+      currentCourse:-1,
+      status:'active',
+      sentAt:Date.now(),
+      _boundLine:ti.lineId
+    };
+  }
+  if (!STATE.activeTastingOrders) STATE.activeTastingOrders=[];
+  STATE.activeTastingOrders.push(dining);
+  ti.diningOrderId=dining.id;
+  if (fbReady) fbDb.collection('tasting_orders').add(dining);
+  return dining;
 }
 
 function sendOrder(opts) {
@@ -4886,50 +5079,9 @@ function sendOrder(opts) {
     if (fbReady) fbDb.collection('orders').add(order).then(function(ref){ publishActiveOrder(order, ref.id); });
   }
 
-  // Send tasting/prix fixe as course-by-course orders
   tastingItems.forEach(function(ti){
-    if (ti.isTasting) {
-      var tastingOrder = {
-        table: STATE.selectedTable,
-        guestCount: STATE.guestCount || sessionOf(STATE.selectedTable).guestCount || 2,
-        server: STATE.currentServer?STATE.currentServer.name:'Unknown',
-        serverCode: STATE.currentServer?STATE.currentServer.code:'0000',
-        serverRole: STATE.currentServer?STATE.currentServer.role:'Waiter',
-        type:'tasting',
-        tastingName:ti.name,
-        tastingId:ti.tastingId,
-        totalPrice:ti.price,
-        dessertAfter:ti.dessertAfter||'meat',
-        dessertMenuId:ti.dessertMenuId||'pf_scalini_89',
-        courses:(ti.courses||[]).map(function(c){ return Object.assign({}, c, {fired:false, firedAt:null}); }),
-        currentCourse:-1,
-        status:'active',
-        sentAt:Date.now()
-      };
-      if (fbReady) fbDb.collection('tasting_orders').add(tastingOrder);
-      var tastingLocal={id:genId(),...tastingOrder};
-      STATE.activeTastingOrders.push(tastingLocal);
-      fireDiningCourse(tastingLocal, true);
-      opts.stay=true;
-    } else if (ti.isPrixFixe) {
-      var pfOrder = {
-        table: STATE.selectedTable,
-        server: STATE.currentServer?STATE.currentServer.name:'Unknown',
-        type:'prix-fixe',
-        prixFixeName:ti.name,
-        prixFixeId:ti.prixFixeId,
-        totalPrice:ti.price,
-        dessertAfter:ti.dessertAfter||'main',
-        dessertMenuId:ti.prixFixeId,
-        selections:(ti.selections||[]).map(function(s){ return Object.assign({}, s, {fired:false, firedAt:null}); }),
-        currentCourse:-1,
-        status:'active',
-        sentAt:Date.now()
-      };
-      if (fbReady) fbDb.collection('tasting_orders').add(pfOrder);
-      var pfLocal={id:genId(),...pfOrder};
-      STATE.activeTastingOrders.push(pfLocal);
-      fireDiningCourse(pfLocal, true);
+    if (ti.isTasting || ti.isPrixFixe) {
+      startDiningFromCheckLine(ti);
       opts.stay=true;
     }
     if (ti.isPairing) {
@@ -4957,40 +5109,41 @@ function sendOrder(opts) {
   }
 }
 
-// Fire next course for a tasting/prix fixe order
-function fireDiningCourse(to, quiet){
+function fireDiningCourse(to, quiet, idx){
   if (!to) return false;
-  var nxt=nextDiningFire(to);
-  if (nxt.done) { if (!quiet) toast('All courses fired'); return false; }
-  if (nxt.needDessert) {
-    if (!quiet) toast('Take dessert before firing entremets');
+  var courses=diningCourses(to);
+  var i=(idx==null || idx<0) ? (nextDiningFire(to).idx) : idx;
+  if (i<0 || !courses[i]) { if (!quiet) toast('All courses fired'); return false; }
+  var nextCourse=courses[i];
+  if (nextCourse.fired || nextCourse.skipped) { if (!quiet) toast('Already fired'); return false; }
+  if (courseNeedsDessertPick(nextCourse)) {
+    if (!quiet) toast('Choose dolce, then FIRE');
     openDessertSelector(to.id);
     return false;
   }
-  var courses=diningCourses(to);
-  var nextCourse=courses[nxt.idx];
   var hits=guestAllergyHits(nextCourse.allergens);
   if (hits.length && !nextCourse.allergyConfirmed) {
     openSheet(
       '<h2>Allergy warning</h2>'+
-      '<div class="warn-banner">This course lists '+esc(hits.join(', '))+'. '+esc(nextCourse.choice||nextCourse.name)+'</div>'+
+      '<div class="warn-banner">This course lists '+esc(hits.join(', '))+'. '+esc(diningCourseTitle(to, nextCourse))+'</div>'+
       '<p class="sheet-sub">'+(nextCourse.cookNote||nextCourse.desc||'')+'</p>'+
-      '<button class="primary-btn" style="background:var(--danger);color:#fff;" onclick="confirmDiningAllergyFire(\''+to.id+'\')">Fire anyway</button>'+
-      '<button class="ghost-btn" onclick="skipDiningCourse(\''+to.id+'\')">Skip this course</button>'+
+      '<button class="primary-btn" style="background:var(--danger);color:#fff;" onclick=\'confirmDiningAllergyFire('+JSON.stringify(String(to.id))+','+i+')\'>Fire anyway</button>'+
+      '<button class="ghost-btn" onclick=\'skipDiningCourse('+JSON.stringify(String(to.id))+','+i+')\'>Skip this course</button>'+
       '<button class="ghost-btn" onclick="closeSheet()">Cancel</button>'
     );
     return false;
   }
   nextCourse.fired=true;
   nextCourse.firedAt=Date.now();
-  to.currentCourse=nxt.idx;
+  to.currentCourse=i;
   var isPf=to.type==='prix-fixe';
-  var courseName=isPf ? (nextCourse.course+': '+nextCourse.choice) : nextCourse.name;
-  if (nextCourse.scoopChoice) courseName+=' ('+nextCourse.scoopChoice+')';
+  var firedName=diningCourseTitle(to, nextCourse);
+  if (nextCourse.scoopChoice) firedName+=' ('+nextCourse.scoopChoice+')';
   var menuName=to.tastingName||to.prixFixeName;
   var notes=[];
   if (nextCourse.desc) notes.push(nextCourse.desc);
   if (nextCourse.cookNote) notes.push(nextCourse.cookNote);
+  if (nextCourse.modNote) notes.push(nextCourse.modNote);
   if (nextCourse.scoopChoice) notes.push('Scoops: '+nextCourse.scoopChoice);
   var courseOrder={
     table: to.table,
@@ -4998,75 +5151,122 @@ function fireDiningCourse(to, quiet){
     tastingCourse:{
       type:isPf?'prix_fixe':'tasting',
       menuName:menuName,
-      courseNum:nxt.idx+1,
+      courseNum:i+1,
       totalCourses:courses.length,
-      courseName:courseName,
+      courseName:firedName,
       station:nextCourse.station||'Expo',
       description:notes.join(' · '),
       allergens:nextCourse.allergens||[],
       cookNote:nextCourse.cookNote||'',
+      modNote:nextCourse.modNote||'',
       choices:isPf ? courses.filter(function(s){return !s.pending;}).map(function(s){return s.course+': '+s.choice;}).join(' · ') : ''
     },
     status:'new', sentAt:Date.now(), clearedAt:null,
-    isTastingCourse:true, courseNum:nxt.idx+1, tastingName:menuName
+    isTastingCourse:true, courseNum:i+1, tastingName:menuName
   };
   if (fbReady) fbDb.collection('orders').add(courseOrder).then(function(ref){ publishActiveOrder(courseOrder, ref.id); });
-  if (!quiet) toast('Fired: '+courseName);
+  if (!quiet) toast('Fired: '+firedName);
   return true;
 }
-function fireNextCourse(orderId) {
+function fireNextCourse(orderId, idx) {
   var to=STATE.activeTastingOrders.find(function(o){ return o.id===orderId; });
   if (!to) return;
-  fireDiningCourse(to, false);
+  fireDiningCourse(to, false, idx);
   renderOrder();
 }
-function confirmDiningAllergyFire(orderId){
+function confirmDiningAllergyFire(orderId, idx){
   var to=STATE.activeTastingOrders.find(function(o){ return o.id===orderId; });
   if (!to) return;
-  var nxt=nextDiningFire(to);
-  if (nxt.course) nxt.course.allergyConfirmed=true;
+  var courses=diningCourses(to);
+  var i=(idx==null)?nextDiningFire(to).idx:idx;
+  if (courses[i]) courses[i].allergyConfirmed=true;
   closeSheet();
-  fireDiningCourse(to, false);
+  fireDiningCourse(to, false, i);
   renderOrder();
 }
-function skipDiningCourse(orderId){
+function skipDiningCourse(orderId, idx){
   var to=STATE.activeTastingOrders.find(function(o){ return o.id===orderId; });
   if (!to) return;
-  var nxt=nextDiningFire(to);
-  if (nxt.course){
-    nxt.course.skipped=true;
-    nxt.course.fired=true;
-    nxt.course.firedAt=Date.now();
-    nxt.course.choice=(nxt.course.choice||nxt.course.name)+' — SKIPPED (allergy)';
-    to.currentCourse=nxt.idx;
+  var courses=diningCourses(to);
+  var i=(idx==null)?nextDiningFire(to).idx:idx;
+  if (courses[i]){
+    courses[i].skipped=true;
+    courses[i].fired=true;
+    courses[i].firedAt=Date.now();
+    courses[i].choice=(courses[i].choice||courses[i].name)+' — SKIPPED (allergy)';
+    to.currentCourse=i;
   }
   closeSheet();
   toast('Course skipped for allergy');
   renderOrder();
 }
+function openCourseNoteSheet(orderId, idx){
+  var to=STATE.activeTastingOrders.find(function(o){ return o.id===orderId; });
+  if (!to) return;
+  var c=diningCourses(to)[idx];
+  if (!c) return;
+  openSheet(
+    '<h2>'+esc(diningCourseTitle(to,c))+'</h2>'+
+    '<p class="sheet-sub">Simple kitchen modifier. Stays on this course.</p>'+
+    '<input class="search-box" id="course-mod-note" value="'+esc(c.modNote||'')+'" placeholder="No onion, extra sauce…">'+
+    '<button class="primary-btn" onclick=\'saveCourseNote('+JSON.stringify(String(orderId))+','+idx+')\'>Save note</button>'+
+    '<button class="ghost-btn" onclick="closeSheet()">Cancel</button>'
+  );
+}
+function saveCourseNote(orderId, idx){
+  var to=STATE.activeTastingOrders.find(function(o){ return o.id===orderId; });
+  if (!to) return;
+  var c=diningCourses(to)[idx];
+  var el=document.getElementById('course-mod-note');
+  if (c && el) c.modNote=String(el.value||'').trim();
+  closeSheet();
+  renderOrder();
+  toast('Note saved');
+}
 
 function renderDiningProgress(){
   var list=tableDiningOrders();
   if (!list.length) return '';
-  var html='<div class="tasting-progress">';
+  var html='';
   list.forEach(function(to){
     var courses=diningCourses(to);
-    var nxt=nextDiningFire(to);
     var done=courses.filter(function(c){ return c.fired || c.skipped; }).length;
-    html+='<div class="tp-card">';
-    html+='<div class="tp-name">'+esc(to.tastingName||to.prixFixeName)+'</div>';
-    html+='<div class="tp-progress">'+done+' / '+courses.length+' fired</div>';
+    html+='<div class="ts-sec-label">'+esc(to.tastingName||to.prixFixeName)+' · '+done+' / '+courses.length+' fired</div>';
     courses.forEach(function(c,i){
-      var label=to.type==='tasting' ? c.name : (c.course+': '+c.choice);
-      var st=c.skipped?'skipped':c.fired?'fired':c.pending?'hold for dessert':'next';
-      html+='<div class="'+(c.fired?'tp-done':'tp-progress')+'">'+(i+1)+'. '+esc(label)+(c.scoopChoice?' ('+esc(c.scoopChoice)+')':'')+' — '+st+'</div>';
+      var title=diningCourseTitle(to,c);
+      var st=c.skipped?'skipped':c.fired?'fired':(courseNeedsDessertPick(c)?'choose dolce':'ready');
+      var mods=[];
+      if (c.course && to.type!=='tasting') mods.push(c.course);
+      if (c.auto || c.fireEach) mods.push('complimentary');
+      if (c.entremets || c.mode==='entremets') mods.push('entremet');
+      if (c.later || c.mode==='later') mods.push('dolce');
+      if (c.selectedTemp) mods.push(c.selectedTemp);
+      if (c.modNote) mods.push(c.modNote);
+      if (c.scoopChoice) mods.push(c.scoopChoice);
+      if (c.upcharge) mods.push('+$'+Number(c.upcharge).toFixed(0));
+      var hits=guestAllergyHits(c.allergens);
+      if (hits.length) mods.push('⚠ '+hits.join(', '));
+      html+='<div class="ts-line lc-line '+(c.fired?'sent':c.skipped?'held':'unsent')+'">'+
+        '<div class="ts-qty">1</div>'+
+        '<div><div class="ts-name">'+esc(title)+'</div>'+
+        mods.map(function(m){ return '<div class="ts-mod">'+esc(m)+'</div>'; }).join('')+
+        '<div class="ts-meta lc-meta">'+st.toUpperCase()+'</div>'+
+        '<div class="ts-course-actions">';
+      if (!c.fired && !c.skipped) {
+        if (courseNeedsDessertPick(c)) {
+          html+='<button type="button" class="fire-now" onclick=\'openDessertSelector('+JSON.stringify(String(to.id))+')\'>CHOOSE · FIRE</button>';
+        } else {
+          html+='<button type="button" class="fire-now" onclick=\'fireNextCourse('+JSON.stringify(String(to.id))+','+i+')\'>FIRE</button>';
+        }
+        html+='<button type="button" onclick=\'openCourseNoteSheet('+JSON.stringify(String(to.id))+','+i+')\'>NOTE</button>';
+      } else {
+        html+='<button type="button" class="fired-pill" disabled>'+(c.skipped?'SKIPPED':'FIRED')+'</button>';
+        if (c.modNote) html+='<button type="button" onclick=\'openCourseNoteSheet('+JSON.stringify(String(to.id))+','+i+')\'>NOTE</button>';
+      }
+      html+='</div></div><div class="ts-money"></div><div class="ts-money"></div></div>';
     });
-    if (nxt.needDessert) html+='<button class="fire-btn" onclick="openDessertSelector(\''+to.id+'\')">TAKE DESSERT</button>';
-    else if (!nxt.done) html+='<button class="fire-btn" onclick="fireNextCourse(\''+to.id+'\')">FIRE NEXT: '+esc((to.type==='tasting'?nxt.course.name:(nxt.course.course+': '+nxt.course.choice)))+'</button>';
-    else html+='<div class="tp-done">All courses fired</div>';
-    html+='</div>';
   });
-  return html+'</div>';
+  return html;
 }
 
 function openDessertSelector(orderId){
@@ -5075,7 +5275,7 @@ function openDessertSelector(orderId){
   var options=dessertOptionsFor(to);
   if (!options.length) { toast('No dessert options on the menu'); return; }
   var html='<div class="pf-selector"><h3>Dolce</h3>';
-  html+='<p class="pf-sel-sub">Take dessert after the '+(to.dessertAfter==='meat'?'meat':'main')+' course. Coconut–lime sorbet fires first as entremets. Gelato is three scoops.</p>';
+  html+='<p class="pf-sel-sub">Choose dolce, then FIRE it from the check. Entremet has its own FIRE key. Gelato is three scoops.</p>';
   html+='<div class="pf-course-select"><label>Dessert</label><div class="pf-options">';
   options.forEach(function(o,oi){
     var hits=guestAllergyHits(o.allergens);
