@@ -18,7 +18,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <title>Epicurean POS</title>
-<!-- pos-build: scalini-print-v29 -->
+<!-- pos-build: scalini-print-v30 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
@@ -699,6 +699,10 @@ body.hh-on.floor-drawing .floor-stage { outline:2px dashed var(--primary); }
   max-height:42vh; border:none; border-radius:0; padding:0.15rem 0 0.35rem;
   background:transparent;
 }
+.ts-console.toast-go.has-dining .ts-check {
+  max-height:none; flex:1 1 48vh; min-height:42vh;
+}
+.ts-console.toast-go.has-dining .ts-grid-wrap { flex:0 1 20vh; min-height:72px; }
 .ts-console.toast-go .ts-check-head, .ts-console.toast-go .ts-line {
   grid-template-columns:28px minmax(0,1fr) 58px 62px;
 }
@@ -713,11 +717,18 @@ body.hh-on.floor-drawing .floor-stage { outline:2px dashed var(--primary); }
   font-size:0.72rem; color:var(--text-secondary); font-weight:500;
   padding:0.08rem 0 0.08rem 0.15rem; line-height:1.35;
 }
-.ts-course-actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:0.35rem; }
+.ts-course-actions { display:flex; flex-wrap:wrap; gap:4px; margin-top:0.2rem; }
 .ts-course-actions button {
-  min-height:36px; padding:0.3rem 0.65rem; border-radius:8px; font-size:0.72rem;
+  min-height:32px; padding:0.22rem 0.55rem; border-radius:8px; font-size:0.68rem;
   font-weight:800; letter-spacing:0.04em; cursor:pointer; border:1px solid var(--border);
   background:var(--surface-2); color:var(--text);
+}
+.ts-console.toast-go .ts-line.dining-line {
+  grid-template-columns:22px minmax(0,1fr) auto;
+  align-items:start; padding:0.28rem 0.1rem 0.32rem;
+}
+.ts-console.toast-go .ts-line.dining-line .ts-course-actions {
+  flex-direction:column; align-items:stretch; margin:0; min-width:86px;
 }
 .ts-course-actions .fire-now {
   background:linear-gradient(135deg,#dc2626,#ea580c); color:#fff; border:none;
@@ -746,14 +757,23 @@ body.hh-on.floor-drawing .floor-stage { outline:2px dashed var(--primary); }
 .period-tab.active { color:var(--text); border-bottom-color:var(--text); }
 .allergy-strip {
   background:var(--surface); border:1px solid var(--border); border-radius:10px;
-  padding:0.4rem 0.5rem 0.5rem; flex-shrink:0;
+  padding:0.28rem 0.45rem 0.32rem; flex-shrink:0;
 }
 .allergy-strip .as-label {
-  font-size:0.62rem; letter-spacing:0.07em; text-transform:uppercase;
-  color:var(--primary-light); font-weight:800; margin-bottom:0.25rem;
+  font-size:0.58rem; letter-spacing:0.07em; text-transform:uppercase;
+  color:var(--primary-light); font-weight:800; margin-bottom:0.15rem;
 }
-.allergy-guest { margin:0.25rem 0 0.15rem; }
-.allergy-guest b { font-size:0.72rem; color:var(--text-secondary); margin-right:6px; }
+.allergy-strip .as-guests { display:flex; flex-wrap:wrap; gap:4px; }
+.allergy-strip .as-pill {
+  min-height:28px; padding:0 0.55rem; border-radius:999px; border:1px solid var(--border);
+  background:var(--surface-2); color:var(--text-secondary); font-size:0.68rem; font-weight:800;
+  cursor:pointer;
+}
+.allergy-strip .as-pill.active { color:var(--text); border-color:var(--primary-light); }
+.allergy-strip .as-pill.flagged { color:#fbbf24; border-color:#f59e0b; }
+.allergy-guest { margin:0.2rem 0 0; }
+.allergy-guest b { font-size:0.68rem; color:var(--text-secondary); margin-right:6px; }
+.allergy-strip .chip-row { display:flex; flex-wrap:wrap; gap:4px; margin-top:0.15rem; }
 .ts-console.toast-go .ts-grid {
   grid-template-columns:repeat(4, minmax(0,1fr)); gap:6px;
 }
@@ -893,7 +913,7 @@ body.hh-table .app-content, body.tableside .app-content {
 <div id="login-screen" class="screen active">
   <h1>Epicurean POS</h1>
   <p class="subtitle">Enter your 4-digit code</p>
-  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 29</p>
+  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 30</p>
   <div class="pin-display" id="pin-display">
     <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
   </div>
@@ -1436,13 +1456,26 @@ function paintChrome(){
 function checkItemsTotal(checkId){
   return guestCheckItems(checkId).reduce(function(s,r){ return s+(Number(r.price)||0)*(parseInt(r.qty,10)||1); },0);
 }
+function diningLineOnCheck(to, cid){
+  return unsentFor().filter(function(i){
+    if (!lineBelongsToCheck(i, cid)) return false;
+    if (i.diningOrderId && i.diningOrderId===to.id) return true;
+    if (to.type==='prix-fixe' && i.isPrixFixe && i.prixFixeId===to.prixFixeId) return true;
+    if (to.type==='tasting' && i.isTasting && i.tastingId===to.tastingId) return true;
+    return false;
+  })[0] || null;
+}
 function checkTotals(){
   var cid=activeCheckId();
   var unsent=unsentFor().filter(function(i){ return lineBelongsToCheck(i, cid); });
   var n=unsent.reduce(function(s,i){ return s+(parseInt(i.qty,10)||1); },0);
   var unsentTotal=unsent.reduce(function(s,i){ return s+(Number(i.price)||0)*(parseInt(i.qty,10)||1); },0);
   var grand=checkItemsTotal(cid);
-  var tastingTotal=STATE.activeTastingOrders.filter(function(to){ return String(to.table)===String(STATE.selectedTable)&&to.status==='active'; }).reduce(function(s,to){ return s+(to.totalPrice||0); },0);
+  var tastingTotal=STATE.activeTastingOrders.filter(function(to){ return String(to.table)===String(STATE.selectedTable)&&to.status==='active'; }).reduce(function(s,to){
+    var line=diningLineOnCheck(to, cid);
+    var already=line ? (Number(line.price)||0)*(parseInt(line.qty,10)||1) : 0;
+    return s+Math.max(0, (Number(to.totalPrice)||0)-already);
+  },0);
   if (!cid || cid===primaryCheckId()) grand+=tastingTotal;
   return { count:n, unsentTotal:unsentTotal, grand:grand, sendable:unsent.filter(function(i){return !i.held;}).length, held:unsent.filter(function(i){return i.held;}).length };
 }
@@ -3565,6 +3598,8 @@ function unsentFor(table){
 }
 function setActiveSeat(seat){
   STATE.activeSeat=seat;
+  STATE.allergySeat=seat;
+  STATE.allergyOpen=true;
   renderOrder();
   paintChrome();
 }
@@ -3703,7 +3738,7 @@ function renderOrder() {
   var c=document.getElementById('app-content');
   var warn=reservationWarning(STATE.selectedTable);
   var tot=checkTotals();
-  var html='<div class="ts-console toast-go'+(STATE.checkFocus?' focus':'')+'">';
+  var html='<div class="ts-console toast-go'+(STATE.checkFocus?' focus':'')+(tableDiningOrders().length?' has-dining':'')+'">';
   html+='<div class="ts-ops toast-ops">';
   html+='<button type="button" onclick="printCheck()">Print</button>';
   html+='<button type="button" onclick="openGuestsSheet()">Guests</button>';
@@ -3739,19 +3774,27 @@ function periodTabsHtml(){
 }
 function renderGuestAllergyStrip(){
   var n=sessionOf(STATE.selectedTable).guestCount||2;
-  var html='<div class="allergy-strip"><div class="as-label">Guest allergies — tap to flag</div>';
-  function row(seat){
+  var open=STATE.allergySeat!=null?STATE.allergySeat:(STATE.activeSeat||'table');
+  var dining=tableDiningOrders().length;
+  var showChips=!dining || !!STATE.allergyOpen;
+  var html='<div class="allergy-strip"><div class="as-label">Allergies — tap a guest, then flag</div><div class="as-guests">';
+  function pill(seat){
     var cur=seatAllergies(seat);
-    var h='<div class="allergy-guest"><b>'+seatName(seat)+'</b><div class="chip-row" style="display:inline-flex;margin:0;">';
-    COMMON_ALLERGENS.forEach(function(a){
-      var on=cur.indexOf(a)>-1;
-      h+='<button type="button" class="chip'+(on?' active':'')+'" style="min-height:32px;padding:0.25rem 0.5rem;font-size:0.72rem;" onclick=\'toggleAllergy('+JSON.stringify(String(seat))+','+JSON.stringify(String(a))+',1)\'>'+esc(a)+'</button>';
-    });
-    return h+'</div></div>';
+    var on=String(open)===String(seat) && showChips;
+    html+='<button type="button" class="as-pill'+(on?' active':'')+(cur.length?' flagged':'')+'" onclick=\'STATE.allergySeat='+JSON.stringify(String(seat))+';STATE.allergyOpen=true;renderOrder()\'>'+
+      esc(seatName(seat))+(cur.length?' · '+cur.length:'')+'</button>';
   }
-  html+=row('table');
-  for (var i=1;i<=n;i++) html+=row(i);
-  return html+'</div>';
+  pill('table');
+  for (var i=1;i<=n;i++) pill(i);
+  html+='</div>';
+  if (!showChips) return html+'</div>';
+  var cur=seatAllergies(open);
+  html+='<div class="allergy-guest"><b>'+esc(seatName(open))+'</b><div class="chip-row">';
+  COMMON_ALLERGENS.forEach(function(a){
+    var on=cur.indexOf(a)>-1;
+    html+='<button type="button" class="chip'+(on?' active':'')+'" style="min-height:28px;padding:0.18rem 0.42rem;font-size:0.68rem;" onclick=\'toggleAllergy('+JSON.stringify(String(open))+','+JSON.stringify(String(a))+',1)\'>'+esc(a)+'</button>';
+  });
+  return html+'</div></div></div>';
 }
 
 function renderMenuGrid(){
@@ -5246,11 +5289,11 @@ function renderDiningProgress(){
       if (c.upcharge) mods.push('+$'+Number(c.upcharge).toFixed(0));
       var hits=guestAllergyHits(c.allergens);
       if (hits.length) mods.push('⚠ '+hits.join(', '));
-      html+='<div class="ts-line lc-line '+(c.fired?'sent':c.skipped?'held':'unsent')+'">'+
+      html+='<div class="ts-line lc-line dining-line '+(c.fired?'sent':c.skipped?'held':'unsent')+'">'+
         '<div class="ts-qty">1</div>'+
         '<div><div class="ts-name">'+esc(title)+'</div>'+
-        mods.map(function(m){ return '<div class="ts-mod">'+esc(m)+'</div>'; }).join('')+
-        '<div class="ts-meta lc-meta">'+st.toUpperCase()+'</div>'+
+        (mods.length?'<div class="ts-mod">'+esc(mods.join(' · '))+'</div>':'')+
+        '<div class="ts-meta lc-meta">'+st.toUpperCase()+'</div></div>'+
         '<div class="ts-course-actions">';
       if (!c.fired && !c.skipped) {
         if (courseNeedsDessertPick(c)) {
@@ -5263,7 +5306,7 @@ function renderDiningProgress(){
         html+='<button type="button" class="fired-pill" disabled>'+(c.skipped?'SKIPPED':'FIRED')+'</button>';
         if (c.modNote) html+='<button type="button" onclick=\'openCourseNoteSheet('+JSON.stringify(String(to.id))+','+i+')\'>NOTE</button>';
       }
-      html+='</div></div><div class="ts-money"></div><div class="ts-money"></div></div>';
+      html+='</div></div>';
     });
   });
   return html;
