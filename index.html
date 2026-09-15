@@ -981,7 +981,7 @@ body.hh-on .ts-console.toast-go .ts-check {
   padding:0.35rem 0.45rem 0.2rem; color:#000;
 }
 body.hh-on .ts-console.toast-go.has-dining .ts-check { max-height:46vh; }
-body.hh-on .ts-check-head { color:#333; }
+body.hh-on .ts-check-head { color:#000; text-transform:none; letter-spacing:0; }
 body.hh-on .ts-console.toast-go .ts-line {
   border-bottom:1px solid #e4e8ee; color:#000;
 }
@@ -3590,7 +3590,7 @@ function renderTables() {
   var focusSt=focusedStation();
   html+='<div class="toast-hdr"><button type="button" onclick="switchTab(\'hub\')" aria-label="Back">←</button><b>Table Service</b><div class="hdr-actions">';
   html+='<button type="button" onclick="switchTab(\'history\')">PREVIOUS CHECKS</button>';
-  html+='<button type="button" onclick="openSwitchUser()">SWITCH USER</button>';
+  html+='<button type="button" onclick="openSwitchUser()" aria-label="Switch user">⇄</button>';
   html+='<button type="button" onclick="openOverflow()" aria-label="More">⋮</button></div></div>';
 
   html+='<div class="floor-room-tabs">';
