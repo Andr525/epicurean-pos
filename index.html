@@ -4007,6 +4007,8 @@ function liveCheckHtml(){
   var tot=checkTotals();
   var dining=tableDiningOrders();
   var html='<div class="ts-check live-check" onclick="event.target===this&&toggleCheckFocus()">';
+  html+='<div class="ts-check-head" style="display:grid;grid-template-columns:28px minmax(0,1fr) 58px 62px;padding:0.15rem 0.3rem;font-size:0.68rem;font-weight:800;color:#000;">';
+  html+='<div>Qty</div><div>Name</div><div>Each</div><div>Total</div></div>';
   if (!rows.length && !dining.length) html+='<div class="ts-empty lc-empty">Tap a tile to add food or drinks.</div>';
   rows.forEach(function(row){
     var src=STATE.currentOrder.filter(function(i){ return i.lineId===row.lineId; })[0];
@@ -4075,8 +4077,6 @@ function renderOrder() {
   var warn=reservationWarning(STATE.selectedTable);
   var tot=checkTotals();
   var html='<div class="ts-console toast-go'+(STATE.checkFocus?' focus':'')+(tableDiningOrders().length?' has-dining':'')+'">';
-  html+='<div class="ts-check-head" style="display:grid;grid-template-columns:28px minmax(0,1fr) 58px 62px;padding:0.15rem 0.3rem;font-size:0.68rem;font-weight:800;color:#333;">';
-  html+='<div>Qty</div><div>Name</div><div>Each</div><div>Total</div></div>';
   if (warn.text) html+='<div class="res-warn lvl'+warn.level+'">'+esc(warn.text)+'</div>';
   html+=liveCheckHtml();
   html+=renderGuestAllergyStrip();
