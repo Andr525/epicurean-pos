@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Epicurean POS">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#3B2314">
+<meta name="theme-color" content="#1b2430">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -18,7 +18,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <title>Epicurean POS</title>
-<!-- pos-build: scalini-print-v30 -->
+<!-- pos-build: scalini-print-v31 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
@@ -872,6 +872,184 @@ body.hh-table .app-content, body.tableside .app-content {
   #print-root, #print-root * { visibility:visible !important; }
   #print-root { display:block !important; position:absolute; left:0; top:0; width:100%; color:#111; background:#fff; padding:1.2rem; }
 }
+
+/* ── Toast Go light handheld ── */
+body.hh-on, body.toast-light {
+  --bg: #d7dee8;
+  --surface: #ffffff;
+  --surface-2: #f3f5f8;
+  --border: #b7c0cc;
+  --primary: #2f6fdb;
+  --primary-light: #000000;
+  --primary-glow: rgba(47,111,219,0.12);
+  --text: #000000;
+  --text-secondary: #111111;
+  --text-muted: #222222;
+  --success: #1f6b3a;
+  --warning: #8a3b00;
+  --danger: #9b1c1c;
+  --info: #1d4f9c;
+  background: #d7dee8;
+  color: #000000;
+}
+body.hh-on .app-header { display:none !important; }
+body.hh-on .app-content { background:#d7dee8; color:#000; }
+body.hh-on .sheet, body.hh-on .sheet h2, body.hh-on .sheet-sub { color:#000; }
+body.hh-on #hh-top {
+  background:#1b2430; border-bottom:0; color:#fff;
+}
+body.hh-on .hh-title { color:#fff; }
+body.hh-on .hh-title span { color:#d5dbe3; }
+body.hh-on .hh-back, body.hh-on .hh-more {
+  background:transparent; border-color:rgba(255,255,255,0.18); color:#fff;
+}
+body.hh-on.hh-table #hh-bar { display:none !important; }
+.toast-hdr {
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  background:#1b2430; color:#fff; padding:0.55rem 0.7rem;
+  margin:-0.7rem -0.75rem 0.7rem;
+}
+body.hh-on .floor-wrap .toast-hdr { margin:-0.75rem -0.75rem 0; }
+.toast-hdr b { font-size:0.95rem; font-weight:800; letter-spacing:0.01em; }
+.toast-hdr .hdr-actions { display:flex; gap:6px; }
+.toast-hdr button {
+  min-height:36px; padding:0 0.65rem; border:0; background:transparent;
+  color:#fff; font-weight:800; font-size:0.72rem; letter-spacing:0.04em; cursor:pointer;
+}
+body.hh-on .mode-hub { padding:0; }
+body.hh-on .hub-top { display:none; }
+body.hh-on .toast-hdr, body.hh-on .toast-hdr button { color:#fff; }
+body.hh-on .hub-sec {
+  background:#e8edf3; color:#000; font-size:0.95rem; letter-spacing:0;
+  text-transform:none; font-weight:700; text-align:center;
+  margin:0; padding:0.65rem 0.4rem; border:1px solid #c5ced8; border-bottom:0;
+}
+body.hh-on .hub-grid {
+  gap:0; border:1px solid #c5ced8; background:#fff; margin-bottom:0.9rem;
+}
+body.hh-on .hub-tile {
+  min-height:64px; border-radius:0; border:0; border-right:1px solid #c5ced8;
+  border-bottom:1px solid #c5ced8; background:#fff; color:#000;
+  font-weight:600; font-size:0.88rem; box-shadow:none;
+}
+body.hh-on .hub-tile.primary, body.hh-on .hub-tile.muted { background:#fff; color:#000; }
+body.hh-on .hub-tile .ico { display:none; }
+body.hh-on .hub-roster, body.hh-on .hub-roster .switch-row {
+  background:#fff; color:#000; border-color:#c5ced8;
+}
+body.hh-on .floor-head { display:none; }
+body.hh-on .floor-room-tabs {
+  background:#1b2430; margin:0; padding:0; gap:0; border-bottom:0;
+}
+body.hh-on .floor-room-tab {
+  border-radius:0; border:0; background:transparent; color:#d5dbe3;
+  font-weight:800; font-size:0.72rem; letter-spacing:0.06em; text-transform:uppercase;
+  padding:0.7rem 0.85rem; min-height:42px;
+}
+body.hh-on .floor-room-tab.active {
+  color:#fff; background:transparent; border-bottom:3px solid #4ea3ff;
+}
+body.hh-on .floor-stage {
+  background:#eef2f6; border:0; border-radius:0; box-shadow:none;
+  height:calc(100dvh - 7.2rem); min-height:380px;
+}
+body.hh-on .floor-canvas {
+  background:
+    linear-gradient(rgba(140,152,168,0.18) 1px,transparent 1px) 0 0/36px 36px,
+    linear-gradient(90deg,rgba(140,152,168,0.18) 1px,transparent 1px) 0 0/36px 36px,
+    #f7f9fc;
+}
+body.hh-on .f-table.open-tbl, body.hh-on .f-stool.open-tbl, body.hh-on .f-outdoor.open-tbl {
+  background:#fff !important; border:2.5px solid #000 !important; color:#000 !important;
+}
+body.hh-on .f-table.open-tbl .f-tnum, body.hh-on .f-stool.open-tbl .f-tnum, body.hh-on .f-outdoor.open-tbl .f-tnum,
+body.hh-on .f-table.open-tbl .f-tsub, body.hh-on .f-stool.open-tbl .f-tsub, body.hh-on .f-outdoor.open-tbl .f-tsub,
+body.hh-on .f-tnum { color:#000; }
+body.hh-on .f-table.busy-tbl, body.hh-on .f-stool.busy-tbl, body.hh-on .f-outdoor.busy-tbl {
+  background:#d9ecdf !important; border:2.5px solid #000 !important; color:#000 !important;
+}
+body.hh-on .f-wall { background:#c5d0dc; }
+body.hh-on .f-bar, body.hh-on .floor-bar, body.hh-on .floor-furn, body.hh-on .floor-host {
+  background:#dfe6ee; border-color:#7d8b99; color:#0a0a0a;
+}
+body.hh-on .floor-zoom-fab button {
+  background:#fff; color:#000; border:1px solid #b7c0cc;
+}
+body.hh-on .floor-legend { color:#000; }
+body.hh-on .ts-console.toast-go .ts-check {
+  background:#fff; border:1px solid #c5ced8; border-radius:0; max-height:38vh;
+  padding:0.35rem 0.45rem 0.2rem; color:#000;
+}
+body.hh-on .ts-console.toast-go.has-dining .ts-check { max-height:46vh; }
+body.hh-on .ts-check-head { color:#333; }
+body.hh-on .ts-console.toast-go .ts-line {
+  border-bottom:1px solid #e4e8ee; color:#000;
+}
+body.hh-on .ts-console.toast-go .ts-line .ts-name { color:#000; }
+body.hh-on .ts-mod, body.hh-on .ts-meta, body.hh-on .ts-qty, body.hh-on .ts-money { color:#222; }
+body.hh-on .ts-line.unsent { background:#fff3e8; color:#000; }
+body.hh-on .ts-line.sent { background:#e8f6ee; color:#000; }
+body.hh-on .ts-line.held { background:#fff7e0; color:#000; }
+body.hh-on .toast-check-actions {
+  display:grid; grid-template-columns:repeat(5,1fr); gap:4px; margin:0.35rem 0 0.2rem;
+}
+body.hh-on .toast-check-actions button {
+  min-height:40px; border:1px solid #c5ced8; background:#eef1f5; color:#000;
+  font-weight:700; font-size:0.72rem; cursor:pointer;
+}
+body.hh-on .toast-check-actions .stay, body.hh-on .toast-check-actions .send {
+  background:#c9daf8; border-color:#9bb6e3;
+}
+body.hh-on .toast-totals {
+  display:flex; justify-content:space-between; padding:0.35rem 0.15rem 0.15rem;
+  font-weight:800; font-size:0.92rem; color:#000;
+}
+body.hh-on .toast-totals .due { color:#8a1530; }
+body.hh-on .toast-totals .tot { color:#163a7a; }
+body.hh-on .toast-check-ops {
+  display:grid; grid-template-columns:repeat(4,1fr); gap:4px; margin:0.2rem 0 0.45rem;
+}
+body.hh-on .toast-check-ops button {
+  min-height:36px; border:1px solid #c5ced8; background:#eef1f5; color:#000;
+  font-weight:700; font-size:0.7rem; cursor:pointer;
+}
+body.hh-on .toast-check-ops .pay { background:#c9daf8; }
+body.hh-on .ts-console.toast-go .ts-tile {
+  background:#fff; color:#000; border:1px solid #c5ced8; border-radius:4px;
+  min-height:58px; font-weight:700;
+}
+body.hh-on .ts-console.toast-go .ts-tile.food,
+body.hh-on .ts-console.toast-go .ts-tile.drinks,
+body.hh-on .ts-console.toast-go .ts-tile.prix { background:#fff; color:#000; }
+body.hh-on .ts-tile .price { color:#000; }
+body.hh-on .ts-tile.active, body.hh-on .ts-tile:focus { outline:2px solid #2f6fdb; }
+body.hh-on .period-tabs { border-color:#c5ced8; }
+body.hh-on .period-tab { color:#333; }
+body.hh-on .period-tab.active { color:#000; border-bottom-color:#2f6fdb; }
+body.hh-on .ticker-dots { display:flex; justify-content:center; gap:6px; padding:0.35rem 0 0.15rem; }
+body.hh-on .ticker-dots button {
+  width:7px; height:7px; border-radius:50%; border:0; background:#9aa5b3; padding:0; cursor:pointer;
+}
+body.hh-on .ticker-dots button.on { background:#1b2430; }
+body.hh-on .sheet { background:#fff; color:#000; }
+body.hh-on .guest-keypad {
+  display:grid; grid-template-columns:repeat(3,1fr); gap:8px; max-width:280px; margin:0.6rem auto 0;
+}
+body.hh-on .guest-keypad button {
+  min-height:52px; border:1px solid #c5ced8; background:#f7f8fa; color:#000;
+  font-size:1.15rem; font-weight:700; cursor:pointer;
+}
+body.hh-on .guest-keypad .done { background:#2f6fdb; color:#fff; }
+body.hh-on .guest-display {
+  min-height:44px; border-bottom:2px solid #000; font-size:1.4rem; font-weight:800;
+  text-align:center; margin:0.4rem 0 0.8rem; color:#000;
+}
+body.hh-on .pf-selector, body.hh-on .payment-card { background:#fff; color:#000; }
+body.hh-on .wine-notes-btn { color:#000; background:#fff; border-color:#c5ced8; }
+body.hh-on .ts-course-actions .fire-now { color:#fff; }
+body.hh-on .add-items-label, body.hh-on .as-label { color:#000; }
+body.hh-on .search-box { background:#fff; color:#000; border-color:#c5ced8; }
+body.hh-on .ts-tile.back { color:#000; background:#fff; }
 </style>
 </head>
 <body>
@@ -928,7 +1106,7 @@ body.hh-table .app-content, body.tableside .app-content {
 <div id="login-screen" class="screen active">
   <h1>Epicurean POS</h1>
   <p class="subtitle">Enter your 4-digit code</p>
-  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 30</p>
+  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 31</p>
   <div class="pin-display" id="pin-display">
     <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
   </div>
@@ -1262,6 +1440,7 @@ function setMenuFamily(fam){
   STATE.orderCat=null;
   STATE.hhMode='service';
   STATE.checkFocus=false;
+  STATE.tilePage=0;
   renderOrder();
 }
 function parseClockTime(str){
@@ -1456,6 +1635,7 @@ function paintChrome(){
   var hh=isHandheld() && !!STATE.currentServer;
   var tableside=!!STATE.currentServer && STATE.activeTab==='order';
   document.body.classList.toggle('hh-on', hh);
+  document.body.classList.toggle('toast-light', hh);
   document.body.classList.toggle('hh-table', tableside);
   document.body.classList.toggle('tableside', tableside);
   var top=document.getElementById('hh-top');
@@ -1507,6 +1687,7 @@ function renderHandheldTop(){
       '<span>'+sess.guestCount+' guests · '+(STATE.currentServer?esc(STATE.currentServer.name):'')+
       ' · <span id="hh-seated">'+seatedLabelFor(STATE.selectedTable)+'</span></span></div>'+
     '<button class="hh-more" onclick="printCheck()" aria-label="Print">⎙</button>'+
+    '<button class="hh-more" onclick="openSwitchUser()" aria-label="Switch user">⇄</button>'+
     '<button class="hh-more" onclick="openOverflow()" aria-label="More">⋮</button>';
   if (warn.level) {
     var title=document.querySelector('#hh-top .hh-title');
@@ -2252,7 +2433,6 @@ function allStaffForLogin(){
   return Object.keys(byCode).map(function(k){ return byCode[k]; });
 }
 function defaultFloorFilter(){
-  if (myStation()) return 'mine';
   var rooms=STATE.rooms||[];
   if (rooms.length) return 'room:'+rooms[0].id;
   if (STATE.roomObjs && !Array.isArray(STATE.roomObjs)) {
@@ -2289,7 +2469,7 @@ function attemptLogin() {
   maybeAlertIpadOrder();
   setTimeout(function(){ STATE._loginBusy=false; }, 400);
 }
-function logout() { STATE.currentServer=null; STATE._loginBusy=false; pin=''; updateDots(); document.body.classList.remove('hh-on','hh-table'); showScreen('login-screen'); }
+function logout() { STATE.currentServer=null; STATE._loginBusy=false; pin=''; updateDots(); document.body.classList.remove('hh-on','hh-table','toast-light'); showScreen('login-screen'); }
 
 // ─── Tabs ───────────────────────────────────────────────────────
 function switchTab(tab) {
@@ -2349,37 +2529,64 @@ function hubStationListHtml(){
 }
 function renderHub(){
   var c=document.getElementById('app-content');
-  var who=STATE.currentServer||{};
-  var html='<div class="mode-hub">';
-  html+='<div class="hub-top"><div><div class="hub-rest">Epicurean House</div>';
-  html+='<div class="hub-user">'+esc(who.name||'Food Master')+' · '+esc(who.role||'')+'</div></div>';
-  html+='<button type="button" class="hub-switch" onclick="openSwitchUser()">Switch user</button></div>';
-  html+='<div class="hub-sec">Mode</div><div class="hub-grid">';
-  html+='<button type="button" class="hub-tile primary" onclick="openTableService()"><span class="ico">🪑</span>Table Service</button>';
-  html+='<button type="button" class="hub-tile muted" onclick="toast(\'Start from Table Service\')"><span class="ico">🧾</span>Quick Order</button>';
-  html+='<button type="button" class="hub-tile muted" onclick="toast(\'Fast Service stays on Table Service for now\')"><span class="ico">⚡</span>Fast Service</button>';
-  html+='<button type="button" class="hub-tile muted" onclick="toast(\'Kitchen Display stays on the KDS iPad\')"><span class="ico">🖥️</span>KDS</button>';
-  html+='<button type="button" class="hub-tile" onclick="openPaymentTerminal()"><span class="ico">💳</span>Payment Terminal</button>';
-  html+='<button type="button" class="hub-tile" onclick="switchTab(\'history\')"><span class="ico">📦</span>Orders Hub</button>';
-  html+='<button type="button" class="hub-tile muted" onclick="toast(\'Delivery is not enabled on this floor\')"><span class="ico">🚗</span>Delivery</button>';
-  html+='<button type="button" class="hub-tile" onclick="switchTab(\'history\')"><span class="ico">⏳</span>Pending Orders</button>';
-  html+='<button type="button" class="hub-tile muted" onclick="toast(\'Guest kiosk is the iPad digital menu\')"><span class="ico">🖥</span>Kiosk</button>';
-  html+='<button type="button" class="hub-tile muted" onclick="toast(\'Waste tracking stays in BOH\')"><span class="ico">🗑</span>Waste Tracking</button>';
-  html+='<button type="button" class="hub-tile" onclick="switchTab(\'messages\')"><span class="ico">💬</span>Messages</button>';
-  html+='<button type="button" class="hub-tile" onclick="openClockApp()"><span class="ico">⏱</span>Time Clock</button>';
-  html+='</div>';
-  html+=hubStationListHtml();
-  html+='<div class="hub-sec">My account</div><div class="hub-grid">';
-  html+='<button type="button" class="hub-tile" onclick="openSwitchUser()"><span class="ico">⇄</span>Switch user</button>';
-  html+='<button type="button" class="hub-tile" onclick="logout()"><span class="ico">↩</span>Sign out</button>';
-  html+='</div>';
-  if (isManager()) {
-    html+='<div class="hub-sec">Manager</div><div class="hub-grid">';
-    html+='<button type="button" class="hub-tile muted" onclick="toast(\'Reports stay in BOH\')"><span class="ico">📊</span>Sales reports</button>';
-    html+='<button type="button" class="hub-tile muted" onclick="toast(\'Menu and tables are edited in BOH\')"><span class="ico">⚙️</span>Setup</button>';
+  if (!isHandheld()) {
+    var who=STATE.currentServer||{};
+    var html='<div class="mode-hub">';
+    html+='<div class="hub-top"><div><div class="hub-rest">Epicurean House</div>';
+    html+='<div class="hub-user">'+esc(who.name||'Food Master')+' · '+esc(who.role||'')+'</div></div>';
+    html+='<button type="button" class="hub-switch" onclick="openSwitchUser()">Switch user</button></div>';
+    html+='<div class="hub-sec">Mode</div><div class="hub-grid">';
+    html+='<button type="button" class="hub-tile primary" onclick="openTableService()"><span class="ico">🪑</span>Table Service</button>';
+    html+='<button type="button" class="hub-tile muted" onclick="toast(\'Start from Table Service\')"><span class="ico">🧾</span>Quick Order</button>';
+    html+='<button type="button" class="hub-tile muted" onclick="toast(\'Fast Service stays on Table Service for now\')"><span class="ico">⚡</span>Fast Service</button>';
+    html+='<button type="button" class="hub-tile muted" onclick="toast(\'Kitchen Display stays on the KDS iPad\')"><span class="ico">🖥️</span>KDS</button>';
+    html+='<button type="button" class="hub-tile" onclick="openPaymentTerminal()"><span class="ico">💳</span>Payment Terminal</button>';
+    html+='<button type="button" class="hub-tile" onclick="switchTab(\'history\')"><span class="ico">📦</span>Orders Hub</button>';
+    html+='<button type="button" class="hub-tile muted" onclick="toast(\'Delivery is not enabled on this floor\')"><span class="ico">🚗</span>Delivery</button>';
+    html+='<button type="button" class="hub-tile" onclick="switchTab(\'history\')"><span class="ico">⏳</span>Pending Orders</button>';
+    html+='<button type="button" class="hub-tile muted" onclick="toast(\'Guest kiosk is the iPad digital menu\')"><span class="ico">🖥</span>Kiosk</button>';
+    html+='<button type="button" class="hub-tile muted" onclick="toast(\'Waste tracking stays in BOH\')"><span class="ico">🗑</span>Waste Tracking</button>';
+    html+='<button type="button" class="hub-tile" onclick="switchTab(\'messages\')"><span class="ico">💬</span>Messages</button>';
+    html+='<button type="button" class="hub-tile" onclick="openClockApp()"><span class="ico">⏱</span>Time Clock</button>';
     html+='</div>';
+    html+=hubStationListHtml();
+    html+='<div class="hub-sec">My account</div><div class="hub-grid">';
+    html+='<button type="button" class="hub-tile" onclick="openSwitchUser()"><span class="ico">⇄</span>Switch user</button>';
+    html+='<button type="button" class="hub-tile" onclick="logout()"><span class="ico">↩</span>Sign out</button>';
+    html+='</div>';
+    if (isManager()) {
+      html+='<div class="hub-sec">Manager</div><div class="hub-grid">';
+      html+='<button type="button" class="hub-tile muted" onclick="toast(\'Reports stay in BOH\')"><span class="ico">📊</span>Sales reports</button>';
+      html+='<button type="button" class="hub-tile muted" onclick="toast(\'Menu and tables are edited in BOH\')"><span class="ico">⚙️</span>Setup</button>';
+      html+='</div>';
+    }
+    html+='</div>';
+    c.innerHTML=html;
+    paintChrome();
+    return;
   }
+  var html='<div class="mode-hub">';
+  html+='<div class="toast-hdr"><b>Epicurean House</b><div class="hdr-actions">';
+  html+='<button type="button" onclick="openSwitchUser()">SWITCH USER</button>';
+  html+='<button type="button" onclick="openOverflow()" aria-label="More">⋮</button></div></div>';
+  html+='<div class="hub-sec">Mode</div><div class="hub-grid">';
+  html+='<button type="button" class="hub-tile primary" onclick="openTableService()">Table Service</button>';
+  html+='<button type="button" class="hub-tile muted" onclick="toast(\'Start from Table Service\')">Quick Order</button>';
+  html+='<button type="button" class="hub-tile muted" onclick="toast(\'Kitchen Display stays on the KDS iPad\')">KDS</button>';
+  html+='<button type="button" class="hub-tile" onclick="openPaymentTerminal()">Payment Terminal</button>';
+  html+='<button type="button" class="hub-tile" onclick="switchTab(\'history\')">Pending Orders</button>';
+  html+='<button type="button" class="hub-tile muted" onclick="switchTab(\'messages\')">Messages</button>';
   html+='</div>';
+  html+='<div class="hub-sec">Manager Activities</div><div class="hub-grid">';
+  html+='<button type="button" class="hub-tile" onclick="switchTab(\'history\')">Shift Review</button>';
+  html+='<button type="button" class="hub-tile" onclick="openClockApp()">Time Cards</button>';
+  html+='<button type="button" class="hub-tile muted" onclick="toast(\'Close out stays in BOH\')">Close Out Day</button>';
+  html+='<button type="button" class="hub-tile" onclick="switchTab(\'history\')">Find Checks</button>';
+  html+='<button type="button" class="hub-tile muted" onclick="toast(\'Gift cards are not on this handheld\')">Transfer Gift Card</button>';
+  html+='<button type="button" class="hub-tile" onclick="openPaymentTerminal()">Register Swipe Card</button>';
+  html+='<button type="button" class="hub-tile muted" onclick="toast(\'Guest lookup stays in BOH\')">Lookup Customer</button>';
+  html+='<button type="button" class="hub-tile muted" onclick="toast(\'Cash drawer stays in BOH\')">Cash Management</button>';
+  html+='</div></div>';
   c.innerHTML=html;
   paintChrome();
 }
@@ -3102,6 +3309,13 @@ function tableAtClientPoint(clientX, clientY){
   var table=el && el.closest ? el.closest('[data-table]') : null;
   return table ? table.getAttribute('data-table') : '';
 }
+function commitTableMove(tNum, canvasDx, canvasDy){
+  var live=liveFloorTable(resolveTableNumber(tNum));
+  if (!live) return;
+  live.x=(live.x||0)+canvasDx;
+  live.y=(live.y||0)+canvasDy;
+  persistPosLayout();
+}
 function bindFloorGestures(){
   var stage=document.getElementById('floor-stage');
   if (!stage || stage._bound) return;
@@ -3111,6 +3325,9 @@ function bindFloorGestures(){
   var moved=false;
   var suppressClick=false;
   var tapX=0, tapY=0;
+  var startTable='';
+  var dragEl=null;
+  var origLeft=0, origTop=0;
   function count(){ return Object.keys(pointers).length; }
   function dist(){
     var ids=Object.keys(pointers);
@@ -3124,6 +3341,13 @@ function bindFloorGestures(){
     try { stage.setPointerCapture(e.pointerId); } catch (err) {}
     pointers[e.pointerId]={x:e.clientX,y:e.clientY};
     moved=false;
+    tapX=e.clientX; tapY=e.clientY;
+    startTable=tableAtClientPoint(e.clientX, e.clientY);
+    dragEl=startTable ? document.querySelector('[data-table="'+startTable+'"]') : null;
+    if (dragEl) {
+      origLeft=parseFloat(dragEl.style.left)||0;
+      origTop=parseFloat(dragEl.style.top)||0;
+    }
     if (count()===2) lastDist=dist();
   });
   stage.addEventListener('pointermove', function(e){
@@ -3137,11 +3361,8 @@ function bindFloorGestures(){
       return;
     }
     if (Math.abs(dx)+Math.abs(dy)>8) moved=true;
-    if (count()===1) {
-      STATE.floorPanX += dx;
-      STATE.floorPanY += dy;
-      applyFloorTransform();
-    } else if (count()>=2) {
+    if (count()>=2) {
+      cancelTableDrag();
       var d=dist();
       if (lastDist>0 && d>0) {
         var factor=d/lastDist;
@@ -3159,14 +3380,57 @@ function bindFloorGestures(){
         applyFloorTransform();
       }
       lastDist=d;
+    } else if (startTable && dragEl && count()===1) {
+      var z=STATE.floorZoom||1;
+      dragEl.style.left=(origLeft+(e.clientX-tapX)/z)+'px';
+      dragEl.style.top=(origTop+(e.clientY-tapY)/z)+'px';
+      dragEl.style.zIndex='40';
+      applyFloorTransform();
+    } else if (count()===1) {
+      STATE.floorPanX += dx;
+      STATE.floorPanY += dy;
+      applyFloorTransform();
     }
     if (moved && e.cancelable) e.preventDefault();
   }, {passive:false});
+  function cancelTableDrag(){
+    if (dragEl) {
+      dragEl.style.left=origLeft+'px';
+      dragEl.style.top=origTop+'px';
+      dragEl.style.zIndex='';
+      dragEl.style.pointerEvents='';
+    }
+    startTable='';
+    dragEl=null;
+  }
+  function finishTableDrag(x, y){
+    if (!moved || !startTable) { startTable=''; dragEl=null; return false; }
+    var hit='';
+    if (dragEl) {
+      dragEl.style.pointerEvents='none';
+      hit=tableAtClientPoint(x, y);
+      dragEl.style.pointerEvents='';
+    }
+    if (hit && String(hit)!==String(startTable)) {
+      combineTables(startTable, hit);
+    } else {
+      var z=STATE.floorZoom||1;
+      commitTableMove(startTable, (x-tapX)/z, (y-tapY)/z);
+      renderTables();
+    }
+    startTable='';
+    dragEl=null;
+    return true;
+  }
   function endPtr(e){
     if (e.pointerType==='touch') return;
     delete pointers[e.pointerId];
     if (count()<2) lastDist=0;
-    if (moved) suppressClick=true;
+    if (moved) {
+      suppressClick=true;
+      finishTableDrag(e.clientX, e.clientY);
+    }
+    startTable='';
   }
   stage.addEventListener('pointerup', endPtr);
   stage.addEventListener('pointercancel', endPtr);
@@ -3183,9 +3447,18 @@ function bindFloorGestures(){
     if (e.touches.length===1) {
       tapX=e.touches[0].clientX;
       tapY=e.touches[0].clientY;
+      startTable=tableAtClientPoint(tapX, tapY);
+      dragEl=startTable ? document.querySelector('[data-table="'+startTable+'"]') : null;
+      if (dragEl) {
+        origLeft=parseFloat(dragEl.style.left)||0;
+        origTop=parseFloat(dragEl.style.top)||0;
+      }
     }
-    if (count()===2) lastDist=dist();
-    if (e.touches.length>=2 && e.cancelable) e.preventDefault();
+    if (e.touches.length>=2) {
+      cancelTableDrag();
+      lastDist=dist();
+      if (e.cancelable) e.preventDefault();
+    }
   }, {passive:false});
   stage.addEventListener('touchmove', function(e){
     if (!e.touches.length) return;
@@ -3196,13 +3469,19 @@ function bindFloorGestures(){
     if (count()===1 && prev) {
       var dx=t.clientX-prev.x, dy=t.clientY-prev.y;
       if (Math.abs(dx)+Math.abs(dy)>8) moved=true;
-      if (moved) {
+      if (moved && startTable && dragEl) {
+        var z=STATE.floorZoom||1;
+        dragEl.style.left=(origLeft+(t.clientX-tapX)/z)+'px';
+        dragEl.style.top=(origTop+(t.clientY-tapY)/z)+'px';
+        dragEl.style.zIndex='40';
+      } else if (moved) {
         STATE.floorPanX += dx;
         STATE.floorPanY += dy;
         applyFloorTransform();
       }
     } else if (e.touches.length>=2) {
       moved=true;
+      cancelTableDrag();
       syncTouches(e);
       var d=dist();
       if (lastDist>0 && d>0) {
@@ -3228,7 +3507,7 @@ function bindFloorGestures(){
   function endTouch(e){
     var wasMoved=moved;
     var x=tapX, y=tapY;
-    if (!wasMoved && e.changedTouches && e.changedTouches[0]) {
+    if (e.changedTouches && e.changedTouches[0]) {
       x=e.changedTouches[0].clientX;
       y=e.changedTouches[0].clientY;
     }
@@ -3236,6 +3515,7 @@ function bindFloorGestures(){
     if (count()<2) lastDist=0;
     if (wasMoved) {
       suppressClick=true;
+      finishTableDrag(x, y);
       return;
     }
     if (e.touches && e.touches.length) return;
@@ -3250,6 +3530,7 @@ function bindFloorGestures(){
   stage.addEventListener('touchcancel', function(e){
     syncTouches(e);
     if (count()<2) lastDist=0;
+    cancelTableDrag();
     if (moved) suppressClick=true;
   });
   stage.addEventListener('click', function(e){
@@ -3306,12 +3587,11 @@ function renderTables() {
 
   var html='<div class="floor-wrap floor-fixed">';
   var mgr=isManager();
-  var who=STATE.currentServer||{};
   var focusSt=focusedStation();
-  var roomId=focusedRoomId();
-  var headTitle=STATE.floorFilter==='mine' ? 'My station' : (focusSt?stationLabel(focusSt):(roomId?roomName(roomId)||'Floor':'Floor map'));
-  html+='<div class="floor-head"><div><h2>'+esc(headTitle)+'</h2></div>';
-  html+='<div style="font-size:0.8rem;color:var(--text-muted);text-align:right;">'+esc(who.name||'Food Master')+'</div></div>';
+  html+='<div class="toast-hdr"><button type="button" onclick="switchTab(\'hub\')" aria-label="Back">←</button><b>Table Service</b><div class="hdr-actions">';
+  html+='<button type="button" onclick="switchTab(\'history\')">PREVIOUS CHECKS</button>';
+  html+='<button type="button" onclick="openSwitchUser()">SWITCH USER</button>';
+  html+='<button type="button" onclick="openOverflow()" aria-label="More">⋮</button></div></div>';
 
   html+='<div class="floor-room-tabs">';
   html+='<button class="floor-room-tab'+(STATE.floorFilter==='mine'?' active':'')+'" onclick="showMyStation()">My station'+(mineCount?' ('+mineCount+')':'')+'</button>';
@@ -3365,7 +3645,7 @@ function renderTables() {
     html+='</div>';
     html+='<div class="floor-zoom-fab" onpointerdown="event.stopPropagation()" ontouchstart="event.stopPropagation()"><button type="button" onclick="event.stopPropagation();floorZoomBy(1.25)">+</button><button type="button" onclick="event.stopPropagation();floorZoomBy(1/1.25)">−</button></div>';
     html+='</div>';
-    html+='<div class="floor-legend"><span><span class="floor-dot" style="background:transparent;border:2px dashed #F3ECDC"></span>Available</span><span><span class="floor-dot" style="background:#3E9A68"></span>Seated</span><span><span class="floor-dot" style="background:#E65050"></span>Call</span></div>';
+    html+='<div class="floor-legend"><span><span class="floor-dot" style="background:#fff;border:2px solid #000"></span>Available</span><span><span class="floor-dot" style="background:#d9ecdf;border:2px solid #000"></span>Seated</span><span><span class="floor-dot" style="background:#E65050"></span>Call</span></div>';
   } else {
     html+='<p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:0.8rem;">Waiting for the dining room from BOH…</p>';
   }
@@ -3571,27 +3851,50 @@ function showGuestCountSheet(t){
   var sess=sessionOf(t);
   var n=sess.guestCount||currentTurnParty(findFloorTable(t))||2;
   sess.guestCount=n;
+  STATE._guestBuf='';
+  paintGuestCountSheet(t);
+}
+function paintGuestCountSheet(t){
+  var buf=STATE._guestBuf||'';
   openSheet(
-    '<h2>Table '+t+'</h2>'+
-    '<p class="sheet-sub">How many guests? Then start the table.</p>'+
-    '<div class="qty-row">'+
-      '<button type="button" onclick="bumpGuests(-1)">−</button>'+
-      '<div id="guest-count-display" style="font-size:1.6rem;font-weight:800;min-width:2.5rem;text-align:center;">'+n+'</div>'+
-      '<button type="button" onclick="bumpGuests(1)">+</button>'+
+    '<h2>Number of Guests</h2>'+
+    '<div class="guest-display" id="guest-count-display">'+(buf||'')+'</div>'+
+    '<div class="guest-keypad">'+
+      [1,2,3,4,5,6,7,8,9].map(function(k){ return '<button type="button" onclick="guestKey(\''+k+'\')">'+k+'</button>'; }).join('')+
+      '<button type="button" onclick="guestKey(\'C\')">C</button>'+
+      '<button type="button" onclick="guestKey(\'0\')">0</button>'+
+      '<button type="button" class="done" onclick="confirmGuests()">Done</button>'+
     '</div>'+
-    '<button class="primary-btn" onclick="confirmGuests()">Start table</button>'+
     '<button class="ghost-btn" onclick="openCombineSheet()">Combine with another table</button>'+
     '<button class="ghost-btn" onclick="closeSheet()">Cancel</button>'
   );
 }
+function guestKey(k){
+  var buf=STATE._guestBuf||'';
+  if (k==='C') buf='';
+  else if (buf==='0') buf=String(k);
+  else if (buf.length<2) buf+=k;
+  if (buf.length>2) buf=buf.slice(0,2);
+  var n=parseInt(buf,10);
+  if (n>20) { buf='20'; n=20; }
+  STATE._guestBuf=buf;
+  var sess=sessionOf(STATE.selectedTable);
+  if (n>=1) sess.guestCount=n;
+  var el=document.getElementById('guest-count-display');
+  if (el) el.textContent=buf;
+}
 function bumpGuests(d){
   var sess=sessionOf(STATE.selectedTable);
   sess.guestCount=Math.max(1, Math.min(20, (sess.guestCount||2)+d));
+  STATE._guestBuf=String(sess.guestCount);
   var el=document.getElementById('guest-count-display');
   if (el) el.textContent=sess.guestCount;
 }
 function confirmGuests(){
   var sess=sessionOf(STATE.selectedTable);
+  var n=parseInt(STATE._guestBuf,10);
+  if (!(n>=1)) n=sess.guestCount||2;
+  sess.guestCount=Math.min(20, n);
   STATE.guestCount=sess.guestCount||2;
   sess.seatedAt=sess.seatedAt||Date.now();
   STATE.activeSeat=1;
@@ -3599,6 +3902,8 @@ function confirmGuests(){
   STATE.checkFocus=false;
   STATE.menuNav={ level:'cats', family:'food' };
   STATE.menuFamily='food';
+  STATE.menuOpen=true;
+  STATE.tilePage=0;
   ensureOpenCheck(STATE.selectedTable);
   STATE.viewCheckId=sessionOf(STATE.selectedTable).checkId;
   closeSheet();
@@ -3722,8 +4027,22 @@ function liveCheckHtml(){
   });
   html+=renderDiningProgress();
   html+=renderHeldFireRow();
-  html+='<div class="ts-totals"><div><span>BALANCE</span>$'+tot.unsentTotal.toFixed(2)+'</div><div><span>TOTAL</span>$'+tot.grand.toFixed(2)+'</div></div>';
+  var t=checkTotals();
+  var canFire=!!(t.sendable||Object.keys(STATE.selectedLineIds||{}).length);
+  html+='<div class="toast-check-actions">';
+  html+='<button type="button" onclick="openOverflow()">Tab</button>';
+  html+='<button type="button" onclick="openSplitOverlay()">Split</button>';
+  html+='<button type="button" onclick="holdUnsent()">Hold</button>';
+  html+='<button type="button" class="stay" onclick="stayOrder()"'+(canFire?'':' disabled')+'>Stay</button>';
+  html+='<button type="button" class="send" onclick="sendOrder({})"'+(canFire?'':' disabled')+'>Send</button>';
   html+='</div>';
+  html+='<div class="toast-totals"><span class="due">Balance Due: $'+tot.grand.toFixed(2)+'</span><span class="tot">TOTAL: $'+tot.grand.toFixed(2)+'</span></div>';
+  html+='<div class="toast-check-ops">';
+  html+='<button type="button" onclick="openGuestsSheet()">'+esc(String(sessionOf(STATE.selectedTable).guestCount||2))+' Guests</button>';
+  html+='<button type="button" onclick="STATE.menuOpen=true;setMenuFamily(\'food\')">Dining</button>';
+  html+='<button type="button" onclick="printCheck()">Print</button>';
+  html+='<button type="button" class="pay" onclick="openPayment(checkTotals().grand)">Pay $'+tot.grand.toFixed(2)+'</button>';
+  html+='</div></div>';
   return html;
 }
 function toggleCheckFocus(){
@@ -3756,20 +4075,14 @@ function renderOrder() {
   var warn=reservationWarning(STATE.selectedTable);
   var tot=checkTotals();
   var html='<div class="ts-console toast-go'+(STATE.checkFocus?' focus':'')+(tableDiningOrders().length?' has-dining':'')+'">';
-  html+='<div class="ts-ops toast-ops">';
-  html+='<button type="button" onclick="printCheck()">Print</button>';
-  html+='<button type="button" onclick="openGuestsSheet()">Guests</button>';
-  html+='<button type="button" onclick="openAllergyEditor()">Allergies</button>';
-  html+='<button type="button" class="pay-now" onclick="openPayment(checkTotals().grand)">Pay $'+tot.grand.toFixed(2)+'</button>';
-  html+='</div>';
+  html+='<div class="ts-check-head" style="display:grid;grid-template-columns:28px minmax(0,1fr) 58px 62px;padding:0.15rem 0.3rem;font-size:0.68rem;font-weight:800;color:#333;">';
+  html+='<div>Qty</div><div>Name</div><div>Each</div><div>Total</div></div>';
   if (warn.text) html+='<div class="res-warn lvl'+warn.level+'">'+esc(warn.text)+'</div>';
   html+=liveCheckHtml();
   html+=renderGuestAllergyStrip();
-  html+=renderSeatBar();
   html+=addItemsHeaderHtml();
   html+=periodTabsHtml();
-  if (!tableDiningOrders().length || STATE.menuOpen || STATE.menuSearch) html+=renderMenuGrid();
-  else html+='<div class="add-items-row"><button type="button" class="as-pill" onclick="STATE.menuOpen=true;renderOrder()">Show menu</button></div>';
+  html+=renderMenuGrid();
   html+='</div>';
   c.innerHTML=html;
   paintChrome();
@@ -3825,40 +4138,64 @@ function renderGuestAllergyStrip(){
   return html+'</div></div></div>';
 }
 
+function tickerTouchStart(e){
+  if (!e.changedTouches || !e.changedTouches[0]) return;
+  STATE._tickerX=e.changedTouches[0].clientX;
+}
+function tickerTouchEnd(e){
+  if (!e.changedTouches || !e.changedTouches[0]) return;
+  var d=e.changedTouches[0].clientX-(STATE._tickerX||e.changedTouches[0].clientX);
+  if (Math.abs(d)<40) return;
+  STATE.tilePage=(STATE.tilePage||0)+(d<0?1:-1);
+  renderOrder();
+}
+function paginateTiles(tiles){
+  var per=8;
+  var pages=Math.max(1, Math.ceil((tiles.length||1)/per));
+  var page=STATE.tilePage||0;
+  if (page<0) page=0;
+  if (page>pages-1) page=pages-1;
+  STATE.tilePage=page;
+  var slice=tiles.slice(page*per, page*per+per);
+  var html='<div class="ts-grid-wrap ticker" ontouchstart="tickerTouchStart(event)" ontouchend="tickerTouchEnd(event)">';
+  html+='<div class="ts-grid" id="menu-items-list">'+slice.join('')+'</div>';
+  if (pages>1){
+    html+='<div class="ticker-dots">';
+    for (var i=0;i<pages;i++) html+='<button type="button" class="'+(i===page?'on':'')+'" onclick="STATE.tilePage='+i+';renderOrder()"></button>';
+    html+='</div>';
+  }
+  return html+'</div>';
+}
 function renderMenuGrid(){
   var nav=STATE.menuNav||{level:'root'};
   var items=STATE.menuItems.length?STATE.menuItems:(STATE.menuLive?[]:SEED_ITEMS);
-  var html='<div class="ts-grid-wrap"><div class="ts-grid" id="menu-items-list">';
+  var tiles=[];
+  var top='';
   if (nav.level==='root') {
-    html+='<button type="button" class="ts-tile food" onclick="setMenuFamily(\'food\')">FOOD</button>';
-    html+='<button type="button" class="ts-tile drinks" onclick="setMenuFamily(\'drinks\')">DRINKS</button>';
-    if ((STATE.prixFixeMenus||[]).length) {
-      html+='<button type="button" class="ts-tile prix" onclick="filterCat(\'__prixfixe__\')">Prix Fixe</button>';
-    }
-    if ((STATE.tastingMenus||[]).length) {
-      html+='<button type="button" class="ts-tile prix" onclick="filterCat(\'__tasting__\')">Tasting</button>';
-    }
-    html+='</div></div>';
-    return html;
+    tiles.push('<button type="button" class="ts-tile food" onclick="setMenuFamily(\'food\')">FOOD</button>');
+    tiles.push('<button type="button" class="ts-tile drinks" onclick="setMenuFamily(\'drinks\')">DRINKS</button>');
+    if ((STATE.prixFixeMenus||[]).length) tiles.push('<button type="button" class="ts-tile prix" onclick="filterCat(\'__prixfixe__\')">Prix Fixe</button>');
+    if ((STATE.tastingMenus||[]).length) tiles.push('<button type="button" class="ts-tile prix" onclick="filterCat(\'__tasting__\')">Tasting</button>');
+    return paginateTiles(tiles);
   }
-  html+='<button type="button" class="ts-tile back" onclick="menuNavBack()">← '+(nav.level==='items'?(STATE.menuFamily==='drinks'?'Drinks':'Food'):'Menu')+'</button>';
+  top='<button type="button" class="ts-tile back" onclick="menuNavBack();STATE.tilePage=0">← '+(nav.level==='items'?(STATE.menuFamily==='drinks'?'Drinks':'Food'):'Menu')+'</button>';
   if (nav.level==='cats') {
     if (STATE.menuFamily==='food' && (STATE.prixFixeMenus||[]).length) {
-      html+='<button type="button" class="ts-tile prix" onclick="filterCat(\'__prixfixe__\')">Prix Fixe<span class="price">set menus</span></button>';
+      tiles.push('<button type="button" class="ts-tile prix" onclick="filterCat(\'__prixfixe__\')">Prix Fixe<span class="price">set menus</span></button>');
     }
     if (STATE.menuFamily==='food' && (STATE.tastingMenus||[]).length) {
-      html+='<button type="button" class="ts-tile prix" onclick="filterCat(\'__tasting__\')">Tasting<span class="price">course-by-course</span></button>';
+      tiles.push('<button type="button" class="ts-tile prix" onclick="filterCat(\'__tasting__\')">Tasting<span class="price">course-by-course</span></button>');
     }
     familyCategories().forEach(function(cat){
-      html+='<button type="button" class="ts-tile" onclick="filterCat(\''+cat.id+'\')">'+esc(cat.name)+'</button>';
+      tiles.push('<button type="button" class="ts-tile" onclick="filterCat(\''+cat.id+'\')">'+esc(cat.name)+'</button>');
     });
   } else if (STATE.orderCat==='__prixfixe__') {
     (STATE.prixFixeMenus||[]).forEach(function(pf){
-      html+='<button type="button" class="ts-tile prix" onclick=\'openPrixFixeSelector('+JSON.stringify(String(pf.id))+')\'>'+esc(pf.name)+'<span class="price">$'+(Number(pf.price)||0).toFixed(2)+'</span></button>';
+      tiles.push('<button type="button" class="ts-tile prix" onclick=\'openPrixFixeSelector('+JSON.stringify(String(pf.id))+')\'>'+esc(pf.name)+'<span class="price">$'+(Number(pf.price)||0).toFixed(2)+'</span></button>');
     });
   } else if (STATE.orderCat==='__tasting__') {
     (STATE.tastingMenus||[]).forEach(function(tm){
-      html+='<button type="button" class="ts-tile prix" onclick="addTastingMenu('+JSON.stringify(String(tm.id))+')">'+esc(tm.name)+'<span class="price">$'+(Number(tm.price)||0).toFixed(2)+'</span></button>';
+      tiles.push('<button type="button" class="ts-tile prix" onclick="addTastingMenu('+JSON.stringify(String(tm.id))+')">'+esc(tm.name)+'<span class="price">$'+(Number(tm.price)||0).toFixed(2)+'</span></button>');
     });
   } else {
     var catItems=items.filter(function(i){
@@ -3875,7 +4212,7 @@ function renderMenuGrid(){
     if (STATE.orderCat==='wine') wineCat=true;
     if (wineCat && catItems.length>60) {
       var q=String(STATE._posWineFind||'').trim().toLowerCase();
-      html+='<div style="grid-column:1/-1"><input class="search-box" id="pos-wine-find" value="'+esc(STATE._posWineFind||'')+'" placeholder="Find a bottle ('+catItems.length+')" oninput="STATE._posWineFind=this.value;var s=this.selectionStart;renderOrder();var el=document.getElementById(\'pos-wine-find\');if(el){el.focus();try{el.setSelectionRange(s,s);}catch(e){}}"></div>';
+      top+='<div style="grid-column:1/-1"><input class="search-box" id="pos-wine-find" value="'+esc(STATE._posWineFind||'')+'" placeholder="Find a bottle ('+catItems.length+')" oninput="STATE._posWineFind=this.value;var s=this.selectionStart;renderOrder();var el=document.getElementById(\'pos-wine-find\');if(el){el.focus();try{el.setSelectionRange(s,s);}catch(e){}}"></div>';
       if (q) catItems=catItems.filter(function(i){ return itemMatchesSearch(i,q); });
       else catItems=catItems.slice(0,80);
     }
@@ -3884,13 +4221,12 @@ function renderMenuGrid(){
     catItems.forEach(function(item){
       var click=item.eightySixed ? 'toast("86 — not available")' : 'beginAddItem('+JSON.stringify(String(item.id))+')';
       var wine=isPosWineItem(item);
-      html+='<button type="button" class="ts-tile'+(item.eightySixed?' sold':'')+(wine?' wine':'')+'" onclick=\''+click+'\'>'+esc(item.name)+'<span class="price">$'+(Number(item.price)||0).toFixed(2)+'</span>';
-      if (wine && !item.eightySixed) html+='<span class="wine-notes-btn" onclick=\'event.preventDefault();event.stopPropagation();explainPosWine('+JSON.stringify(String(item.id))+')\'>Notes · pair</span>';
-      html+='</button>';
+      var t='<button type="button" class="ts-tile'+(item.eightySixed?' sold':'')+(wine?' wine':'')+'" onclick=\''+click+'\'>'+esc(item.name)+'<span class="price">$'+(Number(item.price)||0).toFixed(2)+'</span>';
+      if (wine && !item.eightySixed) t+='<span class="wine-notes-btn" onclick=\'event.preventDefault();event.stopPropagation();explainPosWine('+JSON.stringify(String(item.id))+')\'>Notes · pair</span>';
+      tiles.push(t+'</button>');
     });
   }
-  html+='</div></div>';
-  return html;
+  return top+paginateTiles(tiles);
 }
 function menuNavBack(){
   var nav=STATE.menuNav||{level:'root'};
@@ -3924,6 +4260,7 @@ function filterCat(catId) {
   STATE.menuNav={ level:'items', family:STATE.menuFamily, cat:catId };
   STATE.hhMode='service';
   STATE.checkFocus=false;
+  STATE.tilePage=0;
   renderOrder();
   if (catId==='__prixfixe__') {
     var menus=(STATE.prixFixeMenus||[]).map(hydratePrixFixeMenu).filter(function(p){ return p && p.id; });
@@ -4927,6 +5264,12 @@ function combineTables(a, b){
   var dropObj=liveFloorTable(drop);
   if (!keepObj || !dropObj) { toast('Those tables are not on the floor'); return; }
   applyCombineToObject(keepObj, dropObj);
+  eachLiveFloorObject(function(o){
+    if (o && String(o.combinedInto)===String(drop)) o.combinedInto=String(keep);
+  });
+  (STATE.tableCombines||[]).forEach(function(c){
+    if (c && String(c.keep)===String(drop)) c.keep=String(keep);
+  });
   STATE.tableCombines=STATE.tableCombines||[];
   var already=STATE.tableCombines.some(function(c){ return String(c.keep)===String(keep) && String(c.drop)===String(drop); });
   if (!already) STATE.tableCombines.push({ keep:String(keep), drop:String(drop), at:Date.now() });
