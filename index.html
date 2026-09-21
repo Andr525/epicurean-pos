@@ -18,7 +18,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <title>Epicurean POS</title>
-<!-- pos-build: scalini-print-v31 -->
+<!-- pos-build: scalini-print-v32 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
@@ -112,6 +112,27 @@ body { font-family:var(--font); color:var(--text); background:var(--bg); -webkit
 .pf-sel-actions { display:flex; gap:0.5rem; margin-top:1.2rem; }
 .pf-temp-row { display:flex; flex-wrap:wrap; gap:6px; margin:0.35rem 0 0.55rem 1.4rem; }
 .pf-temp-row .chip { min-height:36px; padding:0.35rem 0.7rem; font-size:0.78rem; }
+.pf-item-tools {
+  margin:0.35rem 0 0.7rem 0.15rem; padding:0.55rem 0.6rem 0.65rem;
+  border:1px solid var(--border); border-radius:10px; background:var(--surface-2);
+}
+.pf-item-tools .pf-tools-label {
+  font-size:0.68rem; font-weight:800; letter-spacing:0.04em; text-transform:uppercase;
+  color:var(--text); margin:0.15rem 0 0.35rem;
+}
+.pf-flag-scroll {
+  display:flex; gap:6px; overflow-x:auto; -webkit-overflow-scrolling:touch;
+  padding:0.15rem 0 0.35rem; max-width:100%;
+}
+.pf-flag-scroll .chip, .pf-nut-sub .chip {
+  flex:0 0 auto; min-height:36px; padding:0.3rem 0.65rem; font-size:0.75rem;
+  border:1px solid var(--border); background:var(--surface); color:var(--text); cursor:pointer;
+}
+.pf-flag-scroll .chip.on, .pf-nut-sub .chip.on {
+  border-color:#9b1c1c; background:#fde8e8; color:#7a1020; font-weight:800;
+}
+.pf-nut-sub { display:flex; flex-wrap:wrap; gap:6px; margin:0.35rem 0 0.15rem; }
+.pf-course-note { width:100%; min-height:44px; margin:0.2rem 0 0.45rem; }
 .wine-notes-btn {
   margin-top:0.35rem; font-size:0.68rem; font-weight:700; letter-spacing:0.04em;
   color:#E8D5A3; text-transform:uppercase; border:1px solid rgba(201,168,76,0.45);
@@ -322,6 +343,11 @@ body { font-family:var(--font); color:var(--text); background:var(--bg); -webkit
 .f-table.busy-tbl, .f-stool.busy-tbl, .f-outdoor.busy-tbl {
   background:#3E9A68 !important; border:2.5px solid #9BE3B8 !important; color:#0d2a18 !important;
 }
+.f-table.warn-tbl, .f-stool.warn-tbl, .f-outdoor.warn-tbl {
+  background:#F4C2D0 !important; border:2.5px solid #C45A7A !important; color:#4a1020 !important;
+}
+.f-table.warn-tbl .f-tnum, .f-stool.warn-tbl .f-tnum, .f-outdoor.warn-tbl .f-tnum,
+.f-table.warn-tbl .f-dwell, .f-stool.warn-tbl .f-dwell, .f-outdoor.warn-tbl .f-dwell { color:#4a1020; }
 .f-table.busy-tbl .f-tnum, .f-stool.busy-tbl .f-tnum, .f-outdoor.busy-tbl .f-tnum,
 .f-table.busy-tbl .f-tsub, .f-stool.busy-tbl .f-tsub, .f-outdoor.busy-tbl .f-tsub { color:#0d2a18; }
 .f-couch { width:100%; height:100%; background:#5a4126; border-radius:18px 18px 6px 6px; border:2px solid #3f2d18; }
@@ -966,8 +992,12 @@ body.hh-on .f-table.open-tbl .f-tnum, body.hh-on .f-stool.open-tbl .f-tnum, body
 body.hh-on .f-table.open-tbl .f-tsub, body.hh-on .f-stool.open-tbl .f-tsub, body.hh-on .f-outdoor.open-tbl .f-tsub,
 body.hh-on .f-tnum { color:#000; }
 body.hh-on .f-table.busy-tbl, body.hh-on .f-stool.busy-tbl, body.hh-on .f-outdoor.busy-tbl {
-  background:#d9ecdf !important; border:2.5px solid #000 !important; color:#000 !important;
+  background:#c8ead4 !important; border:2.5px solid #000 !important; color:#000 !important;
 }
+body.hh-on .f-table.warn-tbl, body.hh-on .f-stool.warn-tbl, body.hh-on .f-outdoor.warn-tbl {
+  background:#f7c5d4 !important; border:2.5px solid #000 !important; color:#000 !important;
+}
+body.hh-on .f-dwell { color:#000; text-shadow:none; font-size:0.62rem; }
 body.hh-on .f-wall { background:#c5d0dc; }
 body.hh-on .f-bar, body.hh-on .floor-bar, body.hh-on .floor-furn, body.hh-on .floor-host {
   background:#dfe6ee; border-color:#7d8b99; color:#0a0a0a;
@@ -1106,7 +1136,7 @@ body.hh-on .ts-tile.back { color:#000; background:#fff; }
 <div id="login-screen" class="screen active">
   <h1>Epicurean POS</h1>
   <p class="subtitle">Enter your 4-digit code</p>
-  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 31</p>
+  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 32</p>
   <div class="pin-display" id="pin-display">
     <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
   </div>
@@ -1407,6 +1437,24 @@ var STATE = {
   _seatTick: null
 };
 var COMMON_ALLERGENS = ['Fish','Shellfish','Dairy','Egg','Gluten','Soy','Sesame','Nuts','Tree Nut','Sulfites'];
+var PF_KITCHEN_FLAGS = [
+  {id:'gluten', label:'Gluten', allergen:'Gluten'},
+  {id:'nuts', label:'Nuts', allergen:'Nuts', kids:[
+    {id:'peanut', label:'Peanut'},
+    {id:'almond', label:'Almond'},
+    {id:'walnut', label:'Walnut'},
+    {id:'pecan', label:'Pecan'},
+    {id:'cashew', label:'Cashew'},
+    {id:'hazelnut', label:'Hazelnut'},
+    {id:'pistachio', label:'Pistachio'},
+    {id:'tree-nut', label:'Tree nut'}
+  ]},
+  {id:'sulfites', label:'Sulfites', allergen:'Sulfites'},
+  {id:'dairy', label:'Dairy', allergen:'Dairy'},
+  {id:'onion-garlic', label:'Onions/garlic'},
+  {id:'light-salt', label:'Light in salt'},
+  {id:'no-pepper', label:'No pepper'}
+];
 
 function isHandheld(){
   return window.matchMedia && window.matchMedia('(max-width:767px)').matches;
@@ -1607,7 +1655,35 @@ function courseName(n){
 }
 function seatName(seat){
   if (seat==='table' || seat==='TABLE' || seat==null || seat==='') return 'TABLE';
-  return 'G'+seat;
+  return 'P'+seat;
+}
+function tablePositionCount(table){
+  var t=table==null?STATE.selectedTable:table;
+  var sess=sessionOf(t);
+  var n=Math.max(1, parseInt(sess.guestCount,10)||1);
+  if (sess.positions && sess.positions>n) n=sess.positions;
+  unsentFor(t).forEach(function(i){
+    var s=parseInt(i.seat,10);
+    if (s>n) n=s;
+  });
+  (STATE.activeTastingOrders||[]).forEach(function(to){
+    if (String(to.table)!==String(t)) return;
+    var s=parseInt(to.seat,10);
+    if (s>n) n=s;
+    (to.selections||[]).forEach(function(c){
+      var p=parseInt(c.seat,10);
+      if (p>n) n=p;
+    });
+  });
+  return n;
+}
+function addTablePosition(){
+  var sess=sessionOf(STATE.selectedTable);
+  var n=tablePositionCount()+1;
+  sess.positions=n;
+  if (!sess.guestCount || sess.guestCount<n) sess.guestCount=n;
+  STATE.guestCount=sess.guestCount;
+  return n;
 }
 function closeSheet(){
   var el=document.getElementById('sheet-overlay');
@@ -3876,7 +3952,7 @@ function guestKey(k){
   else if (buf.length<2) buf+=k;
   if (buf.length>2) buf=buf.slice(0,2);
   var n=parseInt(buf,10);
-  if (n>20) { buf='20'; n=20; }
+  if (n>99) { buf='99'; n=99; }
   STATE._guestBuf=buf;
   var sess=sessionOf(STATE.selectedTable);
   if (n>=1) sess.guestCount=n;
@@ -3885,7 +3961,7 @@ function guestKey(k){
 }
 function bumpGuests(d){
   var sess=sessionOf(STATE.selectedTable);
-  sess.guestCount=Math.max(1, Math.min(20, (sess.guestCount||2)+d));
+  sess.guestCount=Math.max(1, Math.min(99, (sess.guestCount||2)+d));
   STATE._guestBuf=String(sess.guestCount);
   var el=document.getElementById('guest-count-display');
   if (el) el.textContent=sess.guestCount;
@@ -3894,7 +3970,7 @@ function confirmGuests(){
   var sess=sessionOf(STATE.selectedTable);
   var n=parseInt(STATE._guestBuf,10);
   if (!(n>=1)) n=sess.guestCount||2;
-  sess.guestCount=Math.min(20, n);
+  sess.guestCount=Math.min(99, n);
   STATE.guestCount=sess.guestCount||2;
   sess.seatedAt=sess.seatedAt||Date.now();
   STATE.activeSeat=1;
@@ -3924,11 +4000,12 @@ function setActiveSeat(seat){
   paintChrome();
 }
 function renderSeatBar(){
-  var n=sessionOf(STATE.selectedTable).guestCount||STATE.guestCount||2;
+  var n=tablePositionCount();
   var html='<div class="seat-bar">';
   for (var i=1;i<=n;i++){
-    html+='<button type="button" class="seat-chip'+(String(STATE.activeSeat)===String(i)?' active':'')+'" onclick="setActiveSeat('+i+')">G'+i+'</button>';
+    html+='<button type="button" class="seat-chip'+(String(STATE.activeSeat)===String(i)?' active':'')+'" onclick="setActiveSeat('+i+')">P'+i+'</button>';
   }
+  html+='<button type="button" class="seat-chip" onclick="addTablePosition();setActiveSeat(tablePositionCount())">+ P</button>';
   html+='<button type="button" class="seat-chip'+(STATE.activeSeat==='table'?' active':'')+'" onclick="setActiveSeat(\'table\')">Shared</button></div>';
   return html;
 }
@@ -5338,7 +5415,8 @@ function openAllergyEditor(){
   var html='<h2>Guest allergies</h2><p class="sheet-sub">Flags stay on this table for this shift. They do not change BOH recipes.</p>';
   function block(seat){
     var cur=seatAllergies(seat);
-    var h='<div class="tasting-section-label">'+seatName(seat)+'</div><div class="chip-row">';
+    var label=(seat==='table'||seat==='TABLE')?'TABLE':('G'+seat);
+    var h='<div class="tasting-section-label">'+label+'</div><div class="chip-row">';
     COMMON_ALLERGENS.forEach(function(a){
       var on=cur.indexOf(a)>-1;
       h+='<button type="button" class="chip'+(on?' active':'')+'" onclick="toggleAllergy(\''+seat+'\',\''+a+'\')">'+a+'</button>';
@@ -5346,7 +5424,7 @@ function openAllergyEditor(){
     return h+'</div>';
   }
   html+=block('table');
-  for (var i=1;i<=n;i++) html+=block(i);
+  for (var i=1;i<=tablePositionCount();i++) html+=block(i);
   html+='<button class="primary-btn" onclick="closeSheet(); if(STATE.hhMode===\'check\') renderCheck(); else renderOrder();">Done</button>';
   openSheet(html);
 }
