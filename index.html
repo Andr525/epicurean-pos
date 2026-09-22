@@ -18,7 +18,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <title>Epicurean POS</title>
-<!-- pos-build: scalini-print-v32 -->
+<!-- pos-build: scalini-print-v33 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
@@ -632,8 +632,9 @@ body.hh-on.floor-drawing .floor-stage { outline:2px dashed var(--primary); }
 .lc-line.sent { color:var(--success); }
 .lc-line.picked { background:var(--primary-glow); border-radius:8px; padding:0.4rem 0.35rem; }
 .lc-line .lc-meta { font-size:0.68rem; color:var(--text-muted); }
-.course-fire-row { display:flex; flex-wrap:wrap; gap:8px; margin-top:0.55rem; }
-.course-fire-row button { flex:1; min-width:120px; min-height:44px; border:none; border-radius:12px; background:linear-gradient(135deg,#dc2626,#ea580c); color:#fff; font-weight:800; cursor:pointer; }
+.ts-check-lines { overflow-y:auto; -webkit-overflow-scrolling:touch; min-height:72px; max-height:22vh; }
+.course-fire-row { display:flex; flex-wrap:wrap; gap:6px; margin:0.35rem 0 0.15rem; flex-shrink:0; }
+.course-fire-row button { flex:1 1 108px; min-width:108px; min-height:40px; border:none; border-radius:10px; background:linear-gradient(135deg,#dc2626,#ea580c); color:#fff; font-weight:800; cursor:pointer; }
 .order-desk { display:block; }
 
 .ts-console { display:flex; flex-direction:column; height:100%; min-height:0; gap:0.45rem; }
@@ -700,12 +701,43 @@ body.hh-on.floor-drawing .floor-stage { outline:2px dashed var(--primary); }
   background:transparent;
 }
 .ts-console.toast-go.has-dining .ts-check {
-  max-height:none; flex:1 1 auto; min-height:0;
+  max-height:42vh; flex:0 1 42vh; min-height:0;
 }
-.ts-console.toast-go.has-dining .ts-grid-wrap { flex:1 1 18vh; min-height:64px; }
+.ts-console.toast-go.has-dining .ts-grid-wrap { flex:1 1 32vh; min-height:140px; overflow:auto; }
 .ts-console.toast-go .ts-check-head, .ts-console.toast-go .ts-line {
-  grid-template-columns:28px minmax(0,1fr) 58px 62px;
+  grid-template-columns:minmax(0,1fr) 36px 58px 62px 28px;
 }
+.ts-check-meta {
+  display:flex; justify-content:space-between; gap:8px; align-items:baseline;
+  padding:0.12rem 0.2rem 0.28rem; font-size:0.72rem; font-weight:800;
+}
+.ts-check-meta span { font-weight:600; font-size:0.68rem; color:var(--text-muted); }
+.line-kebab {
+  width:28px; height:28px; border:none; background:transparent; color:inherit;
+  font-size:1.15rem; font-weight:800; line-height:1; cursor:pointer; padding:0;
+}
+.line-menu-pop {
+  position:fixed; z-index:9600; min-width:168px; max-height:220px; overflow:auto;
+  background:#1b2430; color:#fff; border-radius:10px;
+  box-shadow:0 10px 28px rgba(0,0,0,0.35); padding:0.2rem 0;
+}
+.line-menu-pop button {
+  display:block; width:100%; text-align:left; border:none; background:none;
+  color:#fff; font-weight:700; font-size:0.82rem; padding:0.7rem 0.9rem; cursor:pointer;
+}
+.line-menu-pop button:active { background:#2a3544; }
+.seat-pick-list { display:flex; flex-direction:column; gap:0; margin:0.4rem 0 0.8rem; }
+.seat-pick-list button {
+  width:100%; min-height:48px; text-align:left; padding:0 0.9rem;
+  border:1px solid var(--border); background:var(--surface-2); color:var(--text);
+  font-weight:800; font-size:0.95rem; cursor:pointer; border-radius:0;
+}
+.seat-pick-list button.active { outline:2px solid #2f6fdb; outline-offset:-2px; }
+.seat-now {
+  min-height:36px; padding:0 0.7rem; border:1px solid var(--border); background:var(--surface);
+  color:var(--text); font-weight:800; font-size:0.78rem; cursor:pointer; border-radius:8px;
+}
+.extra-plate-hint { font-size:0.68rem; color:var(--text-muted); font-weight:700; }
 .ts-console.toast-go .ts-line {
   background:transparent; padding:0.42rem 0.15rem 0.5rem; margin:0;
   border-bottom:1px solid rgba(255,255,255,0.06); border-radius:0;
@@ -724,11 +756,11 @@ body.hh-on.floor-drawing .floor-stage { outline:2px dashed var(--primary); }
   background:var(--surface-2); color:var(--text);
 }
 .ts-console.toast-go .ts-line.dining-line {
-  grid-template-columns:18px minmax(0,1fr) auto;
+  grid-template-columns:minmax(0,1fr) 28px;
   align-items:center; padding:0.18rem 0.08rem;
 }
 .ts-console.toast-go .ts-line.dining-line .ts-course-actions {
-  flex-direction:row; flex-wrap:nowrap; align-items:center; margin:0; gap:4px;
+  display:none;
 }
 .ts-console.toast-go .ts-line.dining-line .ts-name { font-size:0.78rem; }
 .ts-console.toast-go .ts-line.dining-line .ts-mod { font-size:0.64rem; padding:0; }
@@ -738,7 +770,7 @@ body.hh-on.floor-drawing .floor-stage { outline:2px dashed var(--primary); }
 .ts-course-actions .fire-now {
   background:linear-gradient(135deg,#dc2626,#ea580c); color:#fff; border:none;
 }
-.ts-course-actions .fired-pill { color:#86efac; border-color:rgba(134,239,172,0.35); }
+.ts-line .fired-pill { font-size:0.62rem; font-weight:800; color:#1f7a4d; text-align:right; }
 .ts-sec-label {
   font-size:0.62rem; letter-spacing:0.08em; text-transform:uppercase;
   color:var(--text-muted); font-weight:800; padding:0.25rem 0.15rem 0.1rem;
@@ -976,11 +1008,25 @@ body.hh-on .floor-zoom-fab button {
   background:#fff; color:#000; border:1px solid #b7c0cc;
 }
 body.hh-on .floor-legend { color:#000; }
+body.hh-on .ts-console.toast-go { min-height:0; height:100%; }
 body.hh-on .ts-console.toast-go .ts-check {
-  background:#fff; border:1px solid #c5ced8; border-radius:0; max-height:38vh;
-  padding:0.35rem 0.45rem 0.2rem; color:#000;
+  background:#fff; border:1px solid #c5ced8; border-radius:0; max-height:42vh;
+  padding:0.35rem 0.45rem 0.2rem; color:#000; overflow-y:auto; -webkit-overflow-scrolling:touch;
 }
-body.hh-on .ts-console.toast-go.has-dining .ts-check { max-height:46vh; }
+body.hh-on .ts-console.toast-go.has-dining .ts-check { max-height:42vh; flex:0 1 42vh; }
+body.hh-on .ts-grid-wrap {
+  flex:1 1 auto; min-height:28vh; overflow-x:auto; overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+}
+body.hh-on .ts-console.toast-go .ts-grid {
+  grid-template-columns:repeat(4, minmax(72px,1fr));
+  grid-auto-rows:minmax(58px, auto);
+}
+body.hh-on .ts-check-meta, body.hh-on .ts-check-meta span { color:#000; }
+body.hh-on .line-kebab { color:#111; }
+body.hh-on .seat-now { background:#fff; color:#000; border-color:#c5ced8; }
+body.hh-on .seat-pick-list button { background:#fff; color:#000; border-color:#c5ced8; }
+body.hh-on .course-fire-row button { min-height:40px; font-size:0.72rem; }
 body.hh-on .ts-check-head { color:#000; text-transform:none; letter-spacing:0; }
 body.hh-on .ts-console.toast-go .ts-line {
   border-bottom:1px solid #e4e8ee; color:#000;
@@ -991,7 +1037,7 @@ body.hh-on .ts-line.unsent { background:#fff3e8; color:#000; }
 body.hh-on .ts-line.sent { background:#e8f6ee; color:#000; }
 body.hh-on .ts-line.held { background:#fff7e0; color:#000; }
 body.hh-on .toast-check-actions {
-  display:grid; grid-template-columns:repeat(5,1fr); gap:4px; margin:0.35rem 0 0.2rem;
+  display:grid; grid-template-columns:repeat(6,1fr); gap:4px; margin:0.35rem 0 0.2rem;
 }
 body.hh-on .toast-check-actions button {
   min-height:40px; border:1px solid #c5ced8; background:#eef1f5; color:#000;
@@ -1084,6 +1130,7 @@ body.hh-on .ts-tile.back { color:#000; background:#fff; }
 
 <!-- SHEET OVERLAY (guest count, modifiers, confirmations) -->
 <div id="sheet-overlay"></div>
+<div id="line-menu-pop" class="line-menu-pop" hidden></div>
 <div id="split-overlay" class="split-overlay"></div>
 <div id="print-root"></div>
 <div id="hh-overflow" class="call-alert">
@@ -1107,7 +1154,7 @@ body.hh-on .ts-tile.back { color:#000; background:#fff; }
 <div id="login-screen" class="screen active">
   <h1>Epicurean POS</h1>
   <p class="subtitle">Enter your 4-digit code</p>
-  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 32</p>
+  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 33</p>
   <div class="pin-display" id="pin-display">
     <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
   </div>
@@ -1607,8 +1654,25 @@ function courseName(n){
   return {1:'Cocktails',2:'Starters',3:'Mains',4:'Dessert'}[Number(n)] || ('Course '+n);
 }
 function seatName(seat){
-  if (seat==='table' || seat==='TABLE' || seat==null || seat==='') return 'TABLE';
-  return 'G'+seat;
+  if (seat==='table' || seat==='TABLE' || seat==null || seat==='') return 'Share';
+  return 'Seat '+seat;
+}
+function extraOnItem(item){
+  if (!item) return 0;
+  return Number(item.upcharge)||Number(item.supplement)||Number(item.extraCharge)||Number(item.surcharge)||0;
+}
+function extraPlateFee(item){
+  var n=defaultCourse(item);
+  var cat=[item&&item.category, item&&item.name, ((item&&item.catIds)||[]).join(' ')].join(' ').toLowerCase();
+  if (n===4 || /dessert|dolce|pastry|sweet/.test(cat)) return 22;
+  if (n===2 || /small|app|primi|primo|pasta|ravioli|salad|soup|ceviche|side/.test(cat)) return 38;
+  return 48;
+}
+function tableHasDining(){
+  return tableDiningOrders().length>0;
+}
+function isDrinkItem(item){
+  return defaultCourse(item)===1;
 }
 function closeSheet(){
   var el=document.getElementById('sheet-overlay');
@@ -4014,16 +4078,39 @@ function setActiveSeat(seat){
   STATE.activeSeat=seat;
   STATE.allergySeat=seat;
   STATE.allergyOpen=true;
+  if (STATE.pendingItem) STATE.pendingItem.seat=seat;
   renderOrder();
   paintChrome();
+}
+function addGuestSeat(){
+  var sess=sessionOf(STATE.selectedTable);
+  sess.guestCount=Math.min(20, (sess.guestCount||2)+1);
+  STATE.guestCount=sess.guestCount;
+  setActiveSeat(sess.guestCount);
+  persistCheck(ensureOpenCheck(STATE.selectedTable));
+  toast('Seat '+sess.guestCount+' added');
+}
+function openSeatPicker(){
+  var n=sessionOf(STATE.selectedTable).guestCount||STATE.guestCount||2;
+  var cur=STATE.activeSeat;
+  var html='<h2>Seat</h2><p class="sheet-sub">Share the plate, or put it on a seat.</p><div class="seat-pick-list">';
+  html+='<button type="button" class="'+(cur==='table'?'active':'')+'" onclick="setActiveSeat(\'table\');closeSheet()">Share</button>';
+  for (var i=1;i<=n;i++){
+    html+='<button type="button" class="'+(String(cur)===String(i)?'active':'')+'" onclick="setActiveSeat('+i+');closeSheet()">Seat '+i+'</button>';
+  }
+  html+='<button type="button" onclick="closeSheet();addGuestSeat()">+ Add seat</button></div>';
+  html+='<button class="ghost-btn" onclick="closeSheet()">Cancel</button>';
+  openSheet(html);
 }
 function renderSeatBar(){
   var n=sessionOf(STATE.selectedTable).guestCount||STATE.guestCount||2;
   var html='<div class="seat-bar">';
+  html+='<button type="button" class="seat-now" onclick="openSeatPicker()">'+esc(seatName(STATE.activeSeat))+' ▾</button>';
+  html+='<button type="button" class="seat-chip'+(STATE.activeSeat==='table'?' active':'')+'" onclick="setActiveSeat(\'table\')">Share</button>';
   for (var i=1;i<=n;i++){
-    html+='<button type="button" class="seat-chip'+(String(STATE.activeSeat)===String(i)?' active':'')+'" onclick="setActiveSeat('+i+')">G'+i+'</button>';
+    html+='<button type="button" class="seat-chip'+(String(STATE.activeSeat)===String(i)?' active':'')+'" onclick="setActiveSeat('+i+')">Seat '+i+'</button>';
   }
-  html+='<button type="button" class="seat-chip'+(STATE.activeSeat==='table'?' active':'')+'" onclick="setActiveSeat(\'table\')">Shared</button></div>';
+  html+='<button type="button" class="seat-chip" onclick="addGuestSeat()">+ Add seat</button></div>';
   return html;
 }
 function orderBannerHtml(){
@@ -4096,13 +4183,138 @@ function renderPrixFixeRows(q){
   });
   return html;
 }
+function lineKebabBtn(spec){
+  return '<button type="button" class="line-kebab" aria-label="Line menu" onclick=\'event.stopPropagation();toggleLineMenu(event,'+JSON.stringify(spec)+')\'>⋮</button>';
+}
+function closeLineMenu(){
+  var pop=document.getElementById('line-menu-pop');
+  if (!pop) return;
+  pop.hidden=true;
+  pop.innerHTML='';
+}
+function toggleLineMenu(ev, spec){
+  var pop=document.getElementById('line-menu-pop');
+  if (!pop) return;
+  if (!pop.hidden && pop.getAttribute('data-key')===JSON.stringify(spec)) { closeLineMenu(); return; }
+  var html='';
+  if (spec && spec.type==='dining') {
+    html+='<button type="button" onclick=\'closeLineMenu();fireIndependentDining('+JSON.stringify(String(spec.toId))+','+spec.idx+')\'>Fire this item</button>';
+    html+='<button type="button" onclick=\'closeLineMenu();openCourseNoteSheet('+JSON.stringify(String(spec.toId))+','+spec.idx+')\'>Note</button>';
+  } else if (spec && spec.lineId) {
+    html+='<button type="button" onclick=\'closeLineMenu();fireIndependentLine('+JSON.stringify(String(spec.lineId))+')\'>Fire this item</button>';
+    html+='<button type="button" onclick=\'closeLineMenu();openLineNoteSheet('+JSON.stringify(String(spec.lineId))+')\'>Note</button>';
+  }
+  pop.innerHTML=html;
+  pop.hidden=false;
+  pop.setAttribute('data-key', JSON.stringify(spec));
+  var r=(ev.currentTarget||ev.target).getBoundingClientRect();
+  var top=r.bottom+4;
+  var left=Math.max(8, r.right-176);
+  if (top+160>window.innerHeight) top=Math.max(8, r.top-160);
+  pop.style.top=top+'px';
+  pop.style.left=left+'px';
+}
+document.addEventListener('click', function(e){
+  var pop=document.getElementById('line-menu-pop');
+  if (!pop || pop.hidden) return;
+  if (pop.contains(e.target) || (e.target && e.target.closest && e.target.closest('.line-kebab'))) return;
+  closeLineMenu();
+});
+function fireIndependentLine(lineId){
+  STATE.selectedLineIds={}; STATE.selectedLineIds[lineId]=1;
+  sendOrder({ stay:true });
+}
+function fireIndependentDining(toId, idx){
+  fireNextCourse(toId, idx);
+}
+function openLineNoteSheet(lineId){
+  var line=STATE.currentOrder.filter(function(i){ return i.lineId===lineId; })[0];
+  if (!line) { toast('Sent items keep their original note'); return; }
+  openSheet(
+    '<h2>Note</h2><p class="sheet-sub">'+esc(line.name)+'</p>'+
+    '<input class="search-box" id="line-mod-note" value="'+esc(line.notes||'')+'" placeholder="Kitchen note">'+
+    '<button class="primary-btn" onclick=\'saveLineNote('+JSON.stringify(String(lineId))+')\'>Save note</button>'+
+    '<button class="ghost-btn" onclick="closeSheet()">Cancel</button>'
+  );
+}
+function saveLineNote(lineId){
+  var line=STATE.currentOrder.filter(function(i){ return i.lineId===lineId; })[0];
+  var el=document.getElementById('line-mod-note');
+  if (line && el) line.notes=String(el.value||'').trim();
+  closeSheet();
+  renderOrder();
+  toast('Note saved');
+}
+function normFireTitle(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim(); }
+function diningFireGroupKey(to, c, idx){
+  if (!c) return 'x'+idx;
+  if (c.later || c.mode==='later') return 'dolce';
+  if (c.entremets || c.mode==='entremets') return 'entremet';
+  if (c.auto || c.fireEach) return 'auto:'+normFireTitle(diningCourseTitle(to,c));
+  return 'slot:'+normFireTitle(c.course||c.name||('i'+idx));
+}
+function collectDiningFireGroups(){
+  var groups=[], map={};
+  tableDiningOrders().forEach(function(to){
+    diningCourses(to).forEach(function(c,i){
+      if (c.fired || c.skipped) return;
+      var key=diningFireGroupKey(to,c,i);
+      if (!map[key]) {
+        var label=diningCourseTitle(to,c);
+        if (key==='dolce') label='Dolce';
+        if (key==='entremet') label='Entremet';
+        if (key.indexOf('slot:')===0) label=c.course||label;
+        map[key]={ key:key, label:label, count:0, needDessert:false, members:[] };
+        groups.push(map[key]);
+      }
+      map[key].count++;
+      map[key].members.push({ toId:to.id, idx:i });
+      if (courseNeedsDessertPick(c)) map[key].needDessert=true;
+    });
+  });
+  return groups;
+}
+function collectALaCarteFireGroups(){
+  var map={};
+  unsentFor().filter(function(i){ return lineBelongsToCheck(i); }).forEach(function(i){
+    if (i.isPrixFixe || i.isTasting || i.isPairing) return;
+    var n=Number(i.course)||defaultCourse(i);
+    if (!map[n]) map[n]={ course:n, name:courseName(n), count:0 };
+    map[n].count += parseInt(i.qty,10)||1;
+  });
+  return Object.keys(map).sort().map(function(k){ return map[k]; });
+}
+function fireDiningGroup(key){
+  var group=collectDiningFireGroups().filter(function(g){ return g.key===key; })[0];
+  if (!group) { toast('Nothing to fire'); return; }
+  if (group.needDessert) {
+    var first=group.members.filter(function(m){
+      var to=STATE.activeTastingOrders.filter(function(o){ return o.id===m.toId; })[0];
+      return to && courseNeedsDessertPick(diningCourses(to)[m.idx]);
+    })[0];
+    if (first) { openDessertSelector(first.toId); return; }
+  }
+  var n=0;
+  group.members.forEach(function(m){
+    var to=STATE.activeTastingOrders.filter(function(o){ return o.id===m.toId; })[0];
+    if (!to) return;
+    var c=diningCourses(to)[m.idx];
+    if (!c || c.fired || c.skipped) return;
+    c.allergyConfirmed=true;
+    if (fireDiningCourse(to, true, m.idx)) n++;
+  });
+  toast(n ? ('Fired '+group.label+' · '+n) : 'Already fired');
+  renderOrder();
+}
 function liveCheckHtml(){
   var rows=guestCheckItems();
   var tot=checkTotals();
   var dining=tableDiningOrders();
   var html='<div class="ts-check live-check" onclick="event.target===this&&toggleCheckFocus()">';
-  html+='<div class="ts-check-head" style="display:grid;grid-template-columns:28px minmax(0,1fr) 58px 62px;padding:0.15rem 0.3rem;font-size:0.68rem;font-weight:800;color:#000;">';
-  html+='<div>Qty</div><div>Name</div><div>Each</div><div>Total</div></div>';
+  html+='<div class="ts-check-meta"><div>#'+esc(String(STATE.selectedTable))+', Table '+esc(String(STATE.selectedTable))+'</div>';
+  html+='<span>'+esc(STATE.currentServer?STATE.currentServer.name:'Food Master')+'</span></div>';
+  html+='<div class="ts-check-head"><div>Name</div><div>Qty</div><div>Each</div><div>Total</div><div></div></div>';
+  html+='<div class="ts-check-lines">';
   if (!rows.length && !dining.length) html+='<div class="ts-empty lc-empty">Tap a tile to add food or drinks.</div>';
   rows.forEach(function(row){
     var src=STATE.currentOrder.filter(function(i){ return i.lineId===row.lineId; })[0];
@@ -4113,20 +4325,24 @@ function liveCheckHtml(){
     var mods=[];
     if (row.mods) mods.push(row.mods);
     if (row.notes) mods.push(row.notes);
+    if (src && src.extraPlate) mods.push('Extra plate');
     html+='<div class="ts-line lc-line '+row.status+(picked?' picked':'')+'" onclick="toggleLineSelect(\''+row.lineId+'\')">'+
-      '<div class="ts-qty">'+qty+'</div>'+
       '<div><div class="ts-name">'+esc(row.name)+'</div>'+
       mods.map(function(m){ return '<div class="ts-mod">'+esc(m)+'</div>'; }).join('')+
       '<div class="ts-meta lc-meta">'+seatName(row.seat)+' · '+row.status.toUpperCase()+'</div></div>'+
+      '<div class="ts-qty">'+qty+'</div>'+
       '<div class="ts-money">$'+(each?each.toFixed(2):'')+'</div>'+
-      '<div class="ts-money">$'+(each? (each*qty).toFixed(2):'')+'</div></div>';
+      '<div class="ts-money">$'+(each? (each*qty).toFixed(2):'')+'</div>'+
+      lineKebabBtn({ lineId:row.lineId })+'</div>';
   });
   html+=renderDiningProgress();
-  html+=renderHeldFireRow();
+  html+='</div>';
+  html+=renderCourseFireRow();
   var t=checkTotals();
   var canFire=!!(t.sendable||Object.keys(STATE.selectedLineIds||{}).length);
   html+='<div class="toast-check-actions">';
   html+='<button type="button" onclick="openOverflow()">Tab</button>';
+  html+='<button type="button" onclick="STATE.menuOpen=true;setMenuFamily(\'food\')">+ Item</button>';
   html+='<button type="button" onclick="openSplitOverlay()">Split</button>';
   html+='<button type="button" onclick="holdUnsent()">Hold</button>';
   html+='<button type="button" class="stay" onclick="stayOrder()"'+(canFire?'':' disabled')+'>Stay</button>';
@@ -4134,7 +4350,7 @@ function liveCheckHtml(){
   html+='</div>';
   html+='<div class="toast-totals"><span class="due">Balance Due: $'+tot.grand.toFixed(2)+'</span><span class="tot">TOTAL: $'+tot.grand.toFixed(2)+'</span></div>';
   html+='<div class="toast-check-ops">';
-  html+='<button type="button" onclick="openGuestsSheet()">'+esc(String(sessionOf(STATE.selectedTable).guestCount||2))+' Guests</button>';
+  html+='<button type="button" onclick="openSeatPicker()">'+esc(String(sessionOf(STATE.selectedTable).guestCount||2))+' Guests</button>';
   html+='<button type="button" onclick="STATE.menuOpen=true;setMenuFamily(\'food\')">Dining</button>';
   html+='<button type="button" onclick="printCheck()">Print</button>';
   html+='<button type="button" class="pay" onclick="openPayment(checkTotals().grand)">Pay $'+tot.grand.toFixed(2)+'</button>';
@@ -4174,6 +4390,7 @@ function renderOrder() {
   if (warn.text) html+='<div class="res-warn lvl'+warn.level+'">'+esc(warn.text)+'</div>';
   html+=liveCheckHtml();
   html+=renderGuestAllergyStrip();
+  html+=renderSeatBar();
   html+=addItemsHeaderHtml();
   html+=periodTabsHtml();
   html+=renderMenuGrid();
@@ -4182,7 +4399,8 @@ function renderOrder() {
   paintChrome();
 }
 function addItemsHeaderHtml(){
-  return '<div class="add-items-row"><div class="add-items-label">Add items</div>'+
+  var extra=tableHasDining()?'<div class="extra-plate-hint">Extra plate $38 app · $48 main · $22 dessert</div>':'';
+  return '<div class="add-items-row"><div class="add-items-label">Add items</div>'+extra+
     '<input class="search-box add-search" id="pos-item-find" value="'+esc(STATE.menuSearch||'')+'" placeholder="Search" oninput="STATE.menuSearch=this.value;var s=this.selectionStart;renderOrder();var el=document.getElementById(\'pos-item-find\');if(el){el.focus();try{el.setSelectionRange(s,s);}catch(e){}}"></div>';
 }
 function periodTabsHtml(){
@@ -4244,7 +4462,7 @@ function tickerTouchEnd(e){
   renderOrder();
 }
 function paginateTiles(tiles){
-  var per=8;
+  var per=12;
   var pages=Math.max(1, Math.ceil((tiles.length||1)/per));
   var page=STATE.tilePage||0;
   if (page<0) page=0;
@@ -4334,20 +4552,23 @@ function menuNavBack(){
   renderOrder();
 }
 
-function renderHeldFireRow(){
+function renderCourseFireRow(){
   var html='';
-  var held=unsentFor().filter(function(i){return i.held && lineBelongsToCheck(i);});
-  if (held.length) {
-    var courses={};
-    held.forEach(function(i){ courses[i.course||3]=(courses[i.course||3]||0)+(parseInt(i.qty,10)||1); });
-    html+='<div class="course-fire-row tasting-progress">';
-    Object.keys(courses).sort().forEach(function(n){
-      html+='<button class="fire-btn" onclick="sendOrder({fireCourse:'+n+',stay:true})">FIRE '+courseName(n).toUpperCase()+' ('+courses[n]+')</button>';
-    });
-    html+='</div>';
-  }
+  var dining=collectDiningFireGroups();
+  var ala=collectALaCarteFireGroups();
+  if (!dining.length && !ala.length) return '';
+  html+='<div class="course-fire-row tasting-progress">';
+  dining.forEach(function(g){
+    var label=g.needDessert ? ('CHOOSE · FIRE '+g.label) : ('FIRE '+g.label);
+    html+='<button type="button" class="fire-btn fire-now" onclick=\'fireDiningGroup('+JSON.stringify(String(g.key))+')\'>'+esc(label)+(g.count>1?' ('+g.count+')':'')+'</button>';
+  });
+  ala.forEach(function(g){
+    html+='<button type="button" class="fire-btn fire-now" onclick="sendOrder({fireCourse:'+g.course+',stay:true})">FIRE '+esc(String(g.name)).toUpperCase()+' ('+g.count+')</button>';
+  });
+  html+='</div>';
   return html;
 }
+function renderHeldFireRow(){ return renderCourseFireRow(); }
 
 function filterCat(catId) {
   STATE.orderCat=catId;
@@ -4870,6 +5091,10 @@ function beginAddItem(itemId) {
   if (!item) return;
   if (item.eightySixed) { toast('86 — not available'); return; }
   var price=Number(item.price)||0;
+  var dining=tableHasDining() && !isDrinkItem(item);
+  var extraFee=dining ? extraPlateFee(item) : 0;
+  var surcharge=dining ? extraOnItem(item) : 0;
+  if (dining) price=extraFee+surcharge;
   STATE.pendingItem={
     lineId:genId(),
     table:STATE.selectedTable,
@@ -4879,8 +5104,11 @@ function beginAddItem(itemId) {
     checkId:activeCheckId(),
     qty:1,
     notes:'',
-    selectedMod:null,
+    selectedMod:dining?('Extra plate $'+extraFee+(surcharge?(' + $'+surcharge):'')):null,
     mods:{},
+    extraPlate:dining,
+    extraFee:extraFee,
+    itemSurcharge:surcharge,
     id:item.id,
     name:item.name,
     price:price,
@@ -4903,7 +5131,7 @@ function beginAddItem(itemId) {
     byTheGlass:!!item.byTheGlass,
     scaliniOnly:!!item.scaliniOnly
   };
-  if (item.modifiers&&item.modifiers.length) {
+  if (dining || (item.modifiers&&item.modifiers.length)) {
     renderModifierSheet();
     return;
   }
@@ -4913,19 +5141,24 @@ function beginAddItem(itemId) {
 function renderModifierSheet(){
   var p=STATE.pendingItem; if(!p) return;
   var html='<h2>'+p.name+'</h2>';
-  html+='<p class="sheet-sub">$'+Number(p.price).toFixed(2)+' · '+seatName(p.seat)+'</p>';
+  if (p.extraPlate) {
+    html+='<p class="sheet-sub">Extra plate $'+Number(p.extraFee||0).toFixed(0)+(p.itemSurcharge?(' + $'+Number(p.itemSurcharge).toFixed(0)+' on the item'):'')+' = $'+Number(p.price).toFixed(2)+'</p>';
+  } else {
+    html+='<p class="sheet-sub">$'+Number(p.price).toFixed(2)+' · '+seatName(p.seat)+'</p>';
+  }
   if (isPosWineItem(p)) html+=wineGuideHtml(p);
-  html+='<div class="tasting-section-label">Seat</div><div class="chip-row">';
+  html+='<div class="tasting-section-label">Seat</div><div class="seat-pick-list">';
   var n=sessionOf(STATE.selectedTable).guestCount||2;
-  for (var i=1;i<=n;i++) html+='<button type="button" class="chip'+(String(p.seat)===String(i)?' active':'')+'" onclick="STATE.pendingItem.seat='+i+';renderModifierSheet()">G'+i+'</button>';
-  html+='<button type="button" class="chip'+(p.seat==='table'?' active':'')+'" onclick="STATE.pendingItem.seat=\'table\';renderModifierSheet()">TABLE</button></div>';
+  html+='<button type="button" class="'+(p.seat==='table'?'active':'')+'" onclick="STATE.pendingItem.seat=\'table\';renderModifierSheet()">Share</button>';
+  for (var i=1;i<=n;i++) html+='<button type="button" class="'+(String(p.seat)===String(i)?'active':'')+'" onclick="STATE.pendingItem.seat='+i+';renderModifierSheet()">Seat '+i+'</button>';
+  html+='<button type="button" onclick="var s=sessionOf(STATE.selectedTable);s.guestCount=Math.min(20,(s.guestCount||2)+1);STATE.guestCount=s.guestCount;STATE.pendingItem.seat=s.guestCount;renderModifierSheet()">+ Add seat</button></div>';
   html+='<div class="tasting-section-label">Quantity</div><div class="qty-row">';
   html+='<button type="button" onclick="STATE.pendingItem.qty=Math.max(1,(STATE.pendingItem.qty||1)-1);renderModifierSheet()">−</button>';
   html+='<div style="font-size:1.3rem;font-weight:800;">'+(p.qty||1)+'</div>';
   html+='<button type="button" onclick="STATE.pendingItem.qty=(STATE.pendingItem.qty||1)+1;renderModifierSheet()">+</button></div>';
   html+='<div class="tasting-section-label">Course</div><div class="chip-row">';
   [1,2,3,4].forEach(function(cn){
-    html+='<button type="button" class="chip'+(Number(p.course)===cn?' active':'')+'" onclick="STATE.pendingItem.course='+cn+';renderModifierSheet()">'+cn+' '+courseName(cn)+'</button>';
+    html+='<button type="button" class="chip'+(Number(p.course)===cn?' active':'')+'" onclick="setPendingCourse('+cn+')">'+cn+' '+courseName(cn)+'</button>';
   });
   html+='</div>';
   (p.modifiers||[]).forEach(function(mod,mi){
@@ -4947,12 +5180,30 @@ function renderModifierSheet(){
   html+='<button class="ghost-btn" onclick="closeSheet()">Cancel</button>';
   openSheet(html);
 }
+function setPendingCourse(cn){
+  var p=STATE.pendingItem; if(!p) return;
+  p.course=cn;
+  if (p.extraPlate) {
+    p.extraFee = cn===4 ? 22 : (cn===2 ? 38 : 48);
+    p.price=(Number(p.extraFee)||0)+(Number(p.itemSurcharge)||0);
+    p.selectedMod='Extra plate $'+p.extraFee+(p.itemSurcharge?(' + $'+p.itemSurcharge):'');
+  }
+  renderModifierSheet();
+}
 function pickMod(mi, opt){
   var p=STATE.pendingItem; if(!p) return;
   var group=(p.modifiers[mi]||{}).group;
   p.mods[group]=opt;
   var dollar=String(opt).match(/\$(\d+(?:\.\d+)?)/);
-  if (dollar) p.price=Number(dollar[1]);
+  if (dollar) {
+    var add=Number(dollar[1]);
+    if (p.extraPlate) {
+      p.itemSurcharge=(Number(p.itemSurcharge)||0)+add;
+      p.price=(Number(p.extraFee)||0)+p.itemSurcharge;
+    } else {
+      p.price=add;
+    }
+  }
   p.selectedMod=Object.keys(p.mods).map(function(g){return g+': '+p.mods[g];}).join(', ');
   if (modifiersReady(p)) maybeAllergyThenAdd();
   else renderModifierSheet();
@@ -5573,6 +5824,7 @@ function startDiningFromCheckLine(ti){
       courses:(ti.courses||[]).map(function(c){ return Object.assign({}, c, {fired:false, firedAt:null, modNote:c.modNote||ti.notes||''}); }),
       currentCourse:-1,
       status:'active',
+      seat:ti.seat||STATE.activeSeat||'table',
       sentAt:Date.now(),
       _boundLine:ti.lineId
     };
@@ -5592,6 +5844,7 @@ function startDiningFromCheckLine(ti){
       selections:(ti.selections||[]).map(function(s){ return Object.assign({}, s, {fired:false, firedAt:null, modNote:s.modNote||ti.notes||''}); }),
       currentCourse:-1,
       status:'active',
+      seat:ti.seat||STATE.activeSeat||'table',
       sentAt:Date.now(),
       _boundLine:ti.lineId
     };
@@ -5609,7 +5862,10 @@ function sendOrder(opts) {
   var selectedIds=STATE.selectedLineIds||{};
   var hasSelected=Object.keys(selectedIds).length>0;
   var bundle = opts.fireCourse != null
-    ? pool.filter(function(i){ return i.held && Number(i.course)===Number(opts.fireCourse); })
+    ? pool.filter(function(i){
+        if (i.isPrixFixe||i.isTasting||i.isPairing) return false;
+        return Number(i.course||defaultCourse(i))===Number(opts.fireCourse);
+      })
     : hasSelected
       ? pool.filter(function(i){ return selectedIds[i.lineId]; })
       : pool.filter(function(i){ return !i.held; });
@@ -5797,7 +6053,7 @@ function renderDiningProgress(){
   list.forEach(function(to){
     var courses=diningCourses(to);
     var done=courses.filter(function(c){ return c.fired || c.skipped; }).length;
-    html+='<div class="ts-sec-label">'+esc(to.tastingName||to.prixFixeName)+' · '+done+' / '+courses.length+' fired</div>';
+    html+='<div class="ts-sec-label">'+esc(to.tastingName||to.prixFixeName)+' · '+esc(seatName(to.seat||'table'))+' · '+done+' / '+courses.length+' fired</div>';
     courses.forEach(function(c,i){
       var title=diningCourseTitle(to,c);
       var st=c.skipped?'skipped':c.fired?'fired':(courseNeedsDessertPick(c)?'choose dolce':'ready');
@@ -5813,23 +6069,11 @@ function renderDiningProgress(){
       var hits=guestAllergyHits(c.allergens);
       if (hits.length) mods.push('⚠ '+hits.join(', '));
       html+='<div class="ts-line lc-line dining-line '+(c.fired?'sent':c.skipped?'held':'unsent')+'">'+
-        '<div class="ts-qty">1</div>'+
         '<div><div class="ts-name">'+esc(title)+'</div>'+
         (mods.length?'<div class="ts-mod">'+esc(mods.join(' · '))+'</div>':'')+
         '<div class="ts-meta lc-meta">'+st.toUpperCase()+'</div></div>'+
-        '<div class="ts-course-actions">';
-      if (!c.fired && !c.skipped) {
-        if (courseNeedsDessertPick(c)) {
-          html+='<button type="button" class="fire-now" onclick=\'openDessertSelector('+JSON.stringify(String(to.id))+')\'>CHOOSE · FIRE</button>';
-        } else {
-          html+='<button type="button" class="fire-now" onclick=\'fireNextCourse('+JSON.stringify(String(to.id))+','+i+')\'>FIRE</button>';
-        }
-        html+='<button type="button" onclick=\'openCourseNoteSheet('+JSON.stringify(String(to.id))+','+i+')\'>NOTE</button>';
-      } else {
-        html+='<button type="button" class="fired-pill" disabled>'+(c.skipped?'SKIPPED':'FIRED')+'</button>';
-        if (c.modNote) html+='<button type="button" onclick=\'openCourseNoteSheet('+JSON.stringify(String(to.id))+','+i+')\'>NOTE</button>';
-      }
-      html+='</div></div>';
+        (c.fired||c.skipped ? '<div class="fired-pill">'+(c.skipped?'SKIPPED':'FIRED')+'</div>' : lineKebabBtn({ type:'dining', toId:to.id, idx:i }))+
+        '</div>';
     });
   });
   return html;
