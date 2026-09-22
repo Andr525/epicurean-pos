@@ -634,7 +634,7 @@ body.hh-on.floor-drawing .floor-stage { outline:2px dashed var(--primary); }
 .lc-line .lc-meta { font-size:0.68rem; color:var(--text-muted); }
 .ts-check-lines { overflow-y:auto; -webkit-overflow-scrolling:touch; min-height:72px; max-height:22vh; }
 .course-fire-row { display:flex; flex-wrap:wrap; gap:6px; margin:0.35rem 0 0.15rem; flex-shrink:0; }
-.course-fire-row button { flex:1 1 108px; min-width:108px; min-height:40px; border:none; border-radius:10px; background:linear-gradient(135deg,#dc2626,#ea580c); color:#fff; font-weight:800; cursor:pointer; }
+.course-fire-row button { flex:1 1 46%; min-width:46%; max-width:100%; min-height:40px; border:none; border-radius:10px; background:linear-gradient(135deg,#dc2626,#ea580c); color:#fff; font-weight:800; cursor:pointer; white-space:normal; font-size:0.66rem; line-height:1.2; padding:0.32rem 0.4rem; }
 .order-desk { display:block; }
 
 .ts-console { display:flex; flex-direction:column; height:100%; min-height:0; gap:0.45rem; }
@@ -4199,10 +4199,10 @@ function toggleLineMenu(ev, spec){
   var html='';
   if (spec && spec.type==='dining') {
     html+='<button type="button" onclick=\'closeLineMenu();fireIndependentDining('+JSON.stringify(String(spec.toId))+','+spec.idx+')\'>Fire this item</button>';
-    html+='<button type="button" onclick=\'closeLineMenu();openCourseNoteSheet('+JSON.stringify(String(spec.toId))+','+spec.idx+')\'>Note</button>';
+    html+='<button type="button" onclick=\'closeLineMenu();openCourseNoteSheet('+JSON.stringify(String(spec.toId))+','+spec.idx+')\'>Kitchen note</button>';
   } else if (spec && spec.lineId) {
     html+='<button type="button" onclick=\'closeLineMenu();fireIndependentLine('+JSON.stringify(String(spec.lineId))+')\'>Fire this item</button>';
-    html+='<button type="button" onclick=\'closeLineMenu();openLineNoteSheet('+JSON.stringify(String(spec.lineId))+')\'>Note</button>';
+    html+='<button type="button" onclick=\'closeLineMenu();openLineNoteSheet('+JSON.stringify(String(spec.lineId))+')\'>Kitchen note</button>';
   }
   pop.innerHTML=html;
   pop.hidden=false;
@@ -4325,7 +4325,7 @@ function liveCheckHtml(){
     var mods=[];
     if (row.mods) mods.push(row.mods);
     if (row.notes) mods.push(row.notes);
-    if (src && src.extraPlate) mods.push('Extra plate');
+    if (src && src.extraPlate && mods.join(' ').indexOf('Extra plate')<0) mods.push('Extra plate');
     html+='<div class="ts-line lc-line '+row.status+(picked?' picked':'')+'" onclick="toggleLineSelect(\''+row.lineId+'\')">'+
       '<div><div class="ts-name">'+esc(row.name)+'</div>'+
       mods.map(function(m){ return '<div class="ts-mod">'+esc(m)+'</div>'; }).join('')+
@@ -4490,7 +4490,8 @@ function renderMenuGrid(){
     if ((STATE.tastingMenus||[]).length) tiles.push('<button type="button" class="ts-tile prix" onclick="filterCat(\'__tasting__\')">Tasting</button>');
     return paginateTiles(tiles);
   }
-  top='<button type="button" class="ts-tile back" onclick="menuNavBack();STATE.tilePage=0">← '+(nav.level==='items'?(STATE.menuFamily==='drinks'?'Drinks':'Food'):'Menu')+'</button>';
+  var extra='';
+  tiles.unshift('<button type="button" class="ts-tile back" onclick="menuNavBack();STATE.tilePage=0">← '+(nav.level==='items'?(STATE.menuFamily==='drinks'?'Drinks':'Food'):'Menu')+'</button>');
   if (nav.level==='cats') {
     if (STATE.menuFamily==='food' && (STATE.prixFixeMenus||[]).length) {
       tiles.push('<button type="button" class="ts-tile prix" onclick="filterCat(\'__prixfixe__\')">Prix Fixe<span class="price">set menus</span></button>');
@@ -4524,7 +4525,7 @@ function renderMenuGrid(){
     if (STATE.orderCat==='wine') wineCat=true;
     if (wineCat && catItems.length>60) {
       var q=String(STATE._posWineFind||'').trim().toLowerCase();
-      top+='<div style="grid-column:1/-1"><input class="search-box" id="pos-wine-find" value="'+esc(STATE._posWineFind||'')+'" placeholder="Find a bottle ('+catItems.length+')" oninput="STATE._posWineFind=this.value;var s=this.selectionStart;renderOrder();var el=document.getElementById(\'pos-wine-find\');if(el){el.focus();try{el.setSelectionRange(s,s);}catch(e){}}"></div>';
+      extra='<div><input class="search-box" id="pos-wine-find" value="'+esc(STATE._posWineFind||'')+'" placeholder="Find a bottle ('+catItems.length+')" oninput="STATE._posWineFind=this.value;var s=this.selectionStart;renderOrder();var el=document.getElementById(\'pos-wine-find\');if(el){el.focus();try{el.setSelectionRange(s,s);}catch(e){}}"></div>';
       if (q) catItems=catItems.filter(function(i){ return itemMatchesSearch(i,q); });
       else catItems=catItems.slice(0,80);
     }
@@ -4538,7 +4539,7 @@ function renderMenuGrid(){
       tiles.push(t+'</button>');
     });
   }
-  return top+paginateTiles(tiles);
+  return extra+paginateTiles(tiles);
 }
 function menuNavBack(){
   var nav=STATE.menuNav||{level:'root'};
