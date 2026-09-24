@@ -3724,16 +3724,28 @@ function bindFloorGestures(){
     var tb=tableAtClientPoint(b.x, b.y);
     var ga=physJoinGroupOf(ta);
     var gb=physJoinGroupOf(tb);
-    var mergedKeep=ta && ta===tb ? resolveTableNumber(ta) : '';
-    var merged=!!(mergedKeep && isCombinedTable(mergedKeep));
-    var phys=!!(ga && gb && ga===gb);
-    if (!phys && !merged) return false;
-    var members=phys ? (ga.members||[]).map(String) : [mergedKeep];
+    var group=null;
+    var phys=false;
+    if (ga && gb && ga===gb) { group=ga; phys=true; }
+    else if (ga && (!tb || !gb)) { group=ga; phys=true; }
+    else if (gb && (!ta || !ga)) { group=gb; phys=true; }
+    var mergedKeep='';
+    if (!group) {
+      mergedKeep=ta && isCombinedTable(resolveTableNumber(ta)) ? resolveTableNumber(ta) : (tb && isCombinedTable(resolveTableNumber(tb)) ? resolveTableNumber(tb) : '');
+      if (mergedKeep) group={ members:[mergedKeep] };
+    }
+    if (!group) return false;
+    var members=(group.members||[]).map(String);
     var box=groupBoxOf(members);
-    var twoMembers=phys && ta && tb && ta!==tb;
+    if (!box) return false;
+    function inBox(p){
+      return p.x>=box.left-16 && p.x<=box.right+16 && p.y>=box.top-16 && p.y<=box.bottom+16;
+    }
+    if (!inBox(a) || !inBox(b)) return false;
+    var twoMembers=phys && ta && tb && ta!==tb && physJoinGroupOf(ta)===physJoinGroupOf(tb);
     if (!twoMembers && !oppositeSides(a, b, box)) return false;
     splitMode=phys ? 'phys' : 'merge';
-    splitEl=document.querySelector('[data-table="'+(phys?ta:mergedKeep)+'"]');
+    splitEl=document.querySelector('[data-table="'+(phys?(ta||tb||members[0]):mergedKeep)+'"]');
     startSplitDist=dist();
     captureSplitTracks();
     if (splitEl) {
@@ -3836,10 +3848,27 @@ function bindFloorGestures(){
     }
     return doSplit;
   }
+  function fingersOnJoinedGroup(){
+    var ids=Object.keys(pointers);
+    if (ids.length<2) return false;
+    var a=pointers[ids[0]], b=pointers[ids[1]];
+    var ta=tableAtClientPoint(a.x, a.y);
+    var tb=tableAtClientPoint(b.x, b.y);
+    if (isPhysJoined(ta) || isPhysJoined(tb)) return true;
+    if (ta && isCombinedTable(resolveTableNumber(ta))) return true;
+    if (tb && isCombinedTable(resolveTableNumber(tb))) return true;
+    var ga=physJoinGroupOf(ta), gb=physJoinGroupOf(tb);
+    if (ga || gb) return true;
+    return false;
+  }
   function handleTwoFingers(){
     cancelTableDrag();
     if (maybeBeginSplit() || splitMode) {
       applySplitStretch();
+      lastDist=dist();
+      return true;
+    }
+    if (fingersOnJoinedGroup()) {
       lastDist=dist();
       return true;
     }
