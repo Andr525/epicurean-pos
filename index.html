@@ -18,7 +18,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <title>Epicurean POS</title>
-<!-- pos-build: scalini-print-v36 -->
+<!-- pos-build: scalini-print-v37 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
@@ -738,6 +738,8 @@ body.hh-on.floor-drawing .floor-stage { outline:2px dashed var(--primary); }
   color:var(--text); font-weight:800; font-size:0.78rem; cursor:pointer; border-radius:8px;
 }
 .extra-plate-hint { font-size:0.68rem; color:var(--text-muted); font-weight:700; }
+.ts-tile.extra-pf .course-tag { display:block; font-size:0.62rem; font-weight:700; opacity:0.72; margin-top:0.12rem; }
+.ts-tile.extra-pf .price { margin-top:0.18rem; }
 .ts-console.toast-go .ts-line {
   background:transparent; padding:0.42rem 0.15rem 0.5rem; margin:0;
   border-bottom:1px solid rgba(255,255,255,0.06); border-radius:0;
@@ -1154,7 +1156,7 @@ body.hh-on .ts-tile.back { color:#000; background:#fff; }
 <div id="login-screen" class="screen active">
   <h1>Epicurean POS</h1>
   <p class="subtitle">Enter your 4-digit code</p>
-  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 36</p>
+  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 37</p>
   <div class="pin-display" id="pin-display">
     <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
   </div>
@@ -1659,14 +1661,176 @@ function seatName(seat){
 }
 function extraOnItem(item){
   if (!item) return 0;
+  if (item.pfExtra && item.itemSurcharge!=null) return Number(item.itemSurcharge)||0;
   return Number(item.upcharge)||Number(item.supplement)||Number(item.extraCharge)||Number(item.surcharge)||0;
 }
 function extraPlateFee(item){
+  if (item && item.pfCourseKind==='des') return 22;
+  if (item && item.pfCourseKind==='app') return 38;
+  if (item && item.pfCourseKind==='main') return 48;
   var n=defaultCourse(item);
   var cat=[item&&item.category, item&&item.name, ((item&&item.catIds)||[]).join(' ')].join(' ').toLowerCase();
   if (n===4 || /dessert|dolce|pastry|sweet/.test(cat)) return 22;
   if (n===2 || /small|app|primi|primo|pasta|ravioli|salad|soup|ceviche|side/.test(cat)) return 38;
   return 48;
+}
+function extraPlateFeeByKind(kind){
+  if (kind==='des') return 22;
+  if (kind==='app') return 38;
+  return 48;
+}
+function pfCourseKind(label){
+  var s=String(label||'').toLowerCase();
+  if (/dolce|dessert|entremet|pastry|gelato|formaggio|sweet/.test(s)) return 'des';
+  if (/principale|main|entree|entrée|piatti/.test(s)) return 'main';
+  if (/primi|primo|piccolo|welcome|app|salad|starter|small|ceviche|soup/.test(s)) return 'app';
+  return 'main';
+}
+function extraPlateSurchargeForDish(dish, kind){
+  var hay=[dish&&dish.name, dish&&dish.id, dish&&dish.ingredients, dish&&dish.desc, dish&&dish.choice].join(' ').toLowerCase();
+  var listed=Number(dish&&(dish.upcharge||dish.supplement||dish.extraCharge||dish.surcharge))||0;
+  if (/mignon|giambotta/.test(hay)) return 18;
+  if (/\braviolo\b/.test(hay)) return 8;
+  if (/lamb|osso bucco|osso buco/.test(hay)) return 8;
+  if ((kind==='app' || pfCourseKind(dish&&dish.courseLabel)==='app') && /shrimp/.test(hay) && !/linguini|fusilli|tagliatelle|pappardelle|rigatoni|spaghettini/.test(hay)) return 10;
+  return listed;
+}
+function parseExtraDishSearch(q){
+  var raw=String(q||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
+  var parts=raw.split(' ').filter(Boolean);
+  var courseKind='';
+  var words=[];
+  parts.forEach(function(p){
+    if (p==='app' || p==='apps' || p==='appetizer' || p==='appetizers' || p==='primo' || p==='primi' || p==='starter' || p==='starters') courseKind='app';
+    else if (p==='main' || p==='mains' || p==='entree' || p==='entrees' || p==='principale') courseKind='main';
+    else if (p==='des' || p==='dessert' || p==='desserts' || p==='dolce' || p==='dolci') courseKind='des';
+    else if (p==='and' || p==='the' || p==='of' || p==='a' || p==='an' || p==='with' || p==='in' || p==='on' || p==='for') return;
+    else words.push(p);
+  });
+  return { courseKind:courseKind, words:words, needle:words.join(' ') };
+}
+function listPrixFixeExtraDishes(){
+  var out=[];
+  var seen={};
+  function add(pf, course, opt){
+    if (!opt || opt.headingOnly || !String(opt.name||'').trim()) return;
+    var courseLabel=(course && (course.label||course.name||course.course)) || opt.course || '';
+    var kind=pfCourseKind(courseLabel);
+    var id=String(opt.id||opt.dishId||opt.name||'');
+    var key=String((pf && pf.id) || 'pf')+'::'+id+'::'+kind;
+    if (seen[key]) return;
+    seen[key]=1;
+    out.push({
+      key:key,
+      pfId:pf && pf.id,
+      pfName:pf && pf.name,
+      courseLabel:courseLabel,
+      kind:kind,
+      id:id,
+      name:opt.name,
+      desc:opt.desc||'',
+      ingredients:opt.ingredients||'',
+      upcharge:Number(opt.upcharge)||0,
+      station:opt.station || (course && course.station) || '',
+      allergens:opt.allergens||[],
+      dietary:opt.dietary||opt.dietaryFlags||[],
+      askTemp:opt.askTemp||'',
+      cookNote:opt.cookNote||'',
+      cookTime:opt.cookTime||0
+    });
+  }
+  var menus=(STATE.prixFixeMenus||[]).map(hydratePrixFixeMenu).filter(Boolean);
+  if (!menus.length && typeof EPICUREAN_SCALINI!=='undefined' && EPICUREAN_SCALINI.prixFixe) {
+    menus=[hydratePrixFixeMenu(JSON.parse(JSON.stringify(EPICUREAN_SCALINI.prixFixe)))];
+  }
+  menus.forEach(function(pf){
+    (pf.courses||[]).forEach(function(c){
+      (c.options||[]).forEach(function(o){ add(pf,c,o); });
+    });
+    (pf.dishes||[]).forEach(function(d){ add(pf,{label:d.course,station:d.station},d); });
+  });
+  return out;
+}
+function pfExtraHaystack(d){
+  return [
+    d.name, d.desc, d.ingredients, d.id, d.courseLabel, d.pfName,
+    /shrimp|lobster/.test([d.name,d.desc,d.ingredients,d.id].join(' ').toLowerCase()) ? 'shrimp' : '',
+    /pork chop|san domenico/.test(String(d.name||'').toLowerCase()) ? 'pork' : '',
+    /medallion/.test(String(d.name||'').toLowerCase()) ? 'medallions medallion' : '',
+    /mignon|giambotta/.test(String(d.name||'').toLowerCase()) ? 'mignon filet' : '',
+    /\braviolo\b/.test(String(d.name||'').toLowerCase()) ? 'raviolo' : '',
+    /lamb|osso/.test(String(d.name||'').toLowerCase()) ? 'lamb' : ''
+  ].join(' ').toLowerCase();
+}
+function matchPrixFixeExtraDishes(q){
+  var parsed=parseExtraDishSearch(q);
+  if (!parsed.courseKind && !parsed.needle) return [];
+  return listPrixFixeExtraDishes().filter(function(d){
+    if (parsed.courseKind && d.kind!==parsed.courseKind) return false;
+    if (!parsed.needle) return true;
+    var hay=pfExtraHaystack(d);
+    var name=String(d.name||'').toLowerCase();
+    if (parsed.needle==='pork' || (parsed.words.length===1 && parsed.words[0]==='pork')) {
+      return /pork/.test(hay) && !/medallion/.test(name);
+    }
+    if (parsed.needle==='medallions' || parsed.needle==='medallion') return /medallion/.test(name);
+    if (parsed.needle==='mignon' || parsed.needle==='filet') return /mignon|giambotta/.test(name);
+    if (parsed.needle==='raviolo') return /\braviolo\b/.test(name);
+    return parsed.words.every(function(w){ return hay.indexOf(w)>-1; });
+  });
+}
+function beginAddPrixFixeExtra(key){
+  if (!tableHasDining()) { toast('Add a prix fixe first'); return; }
+  var dish=listPrixFixeExtraDishes().filter(function(d){ return d.key===key; })[0];
+  if (!dish) { toast('Dish not on the prix fixe'); return; }
+  var kind=dish.kind||'main';
+  var extraFee=extraPlateFeeByKind(kind);
+  var surcharge=extraPlateSurchargeForDish(dish, kind);
+  var temps=prixFixeTempOptions(dish.askTemp, dish);
+  var modifiers=temps.length ? [{group:'Temperature',options:temps}] : [];
+  var course=kind==='des'?4:(kind==='app'?2:3);
+  STATE.pendingItem={
+    lineId:genId(),
+    table:STATE.selectedTable,
+    seat:STATE.activeSeat,
+    course:course,
+    held:false,
+    checkId:activeCheckId(),
+    qty:1,
+    notes:'',
+    selectedMod:'Extra plate $'+extraFee+(surcharge?(' + $'+surcharge):''),
+    mods:{},
+    extraPlate:true,
+    extraFee:extraFee,
+    itemSurcharge:surcharge,
+    pfExtra:true,
+    pfCourseKind:kind,
+    pfId:dish.pfId||'',
+    pfOptionId:dish.id||'',
+    id:'pfx_'+String(dish.id||'dish')+'_'+Date.now(),
+    name:dish.name,
+    price:extraFee+surcharge,
+    upcharge:surcharge,
+    category:kind==='des'?'desserts':(kind==='app'?'small-plates':'entrees'),
+    catIds:[],
+    station:dish.station||'Expo',
+    cookTime:dish.cookTime||0,
+    modifiers:modifiers,
+    allergens:dish.allergens||[],
+    dietaryFlags:dish.dietary||[],
+    description:dish.desc||'',
+    source:'prix-fixe-extra',
+    cookNote:dish.cookNote||''
+  };
+  renderModifierSheet();
+}
+function prixFixeExtraTileHtml(d){
+  var fee=extraPlateFeeByKind(d.kind);
+  var surcharge=extraPlateSurchargeForDish(d, d.kind);
+  var total=fee+surcharge;
+  var tag=(d.courseLabel||d.kind)+' · extra $'+fee+(surcharge?(' + $'+surcharge):'');
+  return '<button type="button" class="ts-tile prix extra-pf" onclick=\'beginAddPrixFixeExtra('+JSON.stringify(String(d.key))+')\'>'+
+    esc(d.name)+'<span class="course-tag">'+esc(tag)+'</span><span class="price">$'+total.toFixed(2)+'</span></button>';
 }
 function tableHasDining(){
   return tableDiningOrders().length>0;
@@ -4450,9 +4614,11 @@ function renderOrder() {
   paintChrome();
 }
 function addItemsHeaderHtml(){
-  var extra=tableHasDining()?'<div class="extra-plate-hint">Extra plate $38 app · $48 main · $22 dessert</div>':'';
+  var dining=tableHasDining();
+  var extra=dining?'<div class="extra-plate-hint">Extra plate $38 app · $48 main · $22 dessert · shrimp · pork · medallions · mignon</div>':'';
+  var ph=dining?'shrimp · pork · mignon · app / main / des':'Search';
   return '<div class="add-items-row"><div class="add-items-label">Add items</div>'+extra+
-    '<input class="search-box add-search" id="pos-item-find" value="'+esc(STATE.menuSearch||'')+'" placeholder="Search" oninput="STATE.menuSearch=this.value;var s=this.selectionStart;renderOrder();var el=document.getElementById(\'pos-item-find\');if(el){el.focus();try{el.setSelectionRange(s,s);}catch(e){}}"></div>';
+    '<input class="search-box add-search" id="pos-item-find" value="'+esc(STATE.menuSearch||'')+'" placeholder="'+esc(ph)+'" oninput="STATE.menuSearch=this.value;var s=this.selectionStart;renderOrder();var el=document.getElementById(\'pos-item-find\');if(el){el.focus();try{el.setSelectionRange(s,s);}catch(e){}}"></div>';
 }
 function periodTabsHtml(){
   var nav=STATE.menuNav||{};
@@ -4534,6 +4700,25 @@ function renderMenuGrid(){
   var items=STATE.menuItems.length?STATE.menuItems:(STATE.menuLive?[]:SEED_ITEMS);
   var tiles=[];
   var top='';
+  var findQ=String(STATE.menuSearch||'').trim();
+  if (findQ) {
+    if (tableHasDining()) {
+      matchPrixFixeExtraDishes(findQ).forEach(function(d){ tiles.push(prixFixeExtraTileHtml(d)); });
+    }
+    var q=findQ.toLowerCase();
+    items.forEach(function(item){
+      if (!itemMatchesSearch(item, q)) return;
+      var click=item.eightySixed ? 'toast("86 — not available")' : 'beginAddItem('+JSON.stringify(String(item.id))+')';
+      var wine=isPosWineItem(item);
+      var t='<button type="button" class="ts-tile'+(item.eightySixed?' sold':'')+(wine?' wine':'')+'" onclick=\''+click+'\'>'+esc(item.name)+'<span class="price">$'+(Number(item.price)||0).toFixed(2)+'</span>';
+      if (wine && !item.eightySixed) t+='<span class="wine-notes-btn" onclick=\'event.preventDefault();event.stopPropagation();explainPosWine('+JSON.stringify(String(item.id))+')\'>Notes · pair</span>';
+      tiles.push(t+'</button>');
+    });
+    if (!tiles.length) {
+      return '<p style="color:var(--text-muted);font-size:0.85rem;padding:0.8rem 0.2rem;">No matches. Try shrimp, shrimp main, pork, medallions, mignon, or add app / main / des.</p>';
+    }
+    return paginateTiles(tiles);
+  }
   if (nav.level==='root') {
     tiles.push('<button type="button" class="ts-tile food" onclick="setMenuFamily(\'food\')">FOOD</button>');
     tiles.push('<button type="button" class="ts-tile drinks" onclick="setMenuFamily(\'drinks\')">DRINKS</button>');
@@ -5237,6 +5422,7 @@ function setPendingCourse(cn){
   p.course=cn;
   if (p.extraPlate) {
     p.extraFee = cn===4 ? 22 : (cn===2 ? 38 : 48);
+    if (p.pfExtra) p.pfCourseKind = cn===4 ? 'des' : (cn===2 ? 'app' : 'main');
     p.price=(Number(p.extraFee)||0)+(Number(p.itemSurcharge)||0);
     p.selectedMod='Extra plate $'+p.extraFee+(p.itemSurcharge?(' + $'+p.itemSurcharge):'');
   }
