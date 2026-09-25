@@ -1691,7 +1691,7 @@ function extraPlateSurchargeForDish(dish, kind){
   var listed=Number(dish&&(dish.upcharge||dish.supplement||dish.extraCharge||dish.surcharge))||0;
   if (/mignon|giambotta/.test(hay)) return 18;
   if (/\braviolo\b/.test(hay)) return 8;
-  if (/lamb|osso bucco|osso buco/.test(hay)) return 8;
+  if (/\blamb\b|osso bucco|osso buco/.test(hay)) return 8;
   if ((kind==='app' || pfCourseKind(dish&&dish.courseLabel)==='app') && /shrimp/.test(hay) && !/linguini|fusilli|tagliatelle|pappardelle|rigatoni|spaghettini/.test(hay)) return 10;
   return listed;
 }
@@ -1759,7 +1759,7 @@ function pfExtraHaystack(d){
     /medallion/.test(String(d.name||'').toLowerCase()) ? 'medallions medallion' : '',
     /mignon|giambotta/.test(String(d.name||'').toLowerCase()) ? 'mignon filet' : '',
     /\braviolo\b/.test(String(d.name||'').toLowerCase()) ? 'raviolo' : '',
-    /lamb|osso/.test(String(d.name||'').toLowerCase()) ? 'lamb' : ''
+    /\blamb\b|osso bucco|osso buco/.test(String(d.name||'').toLowerCase()) ? 'lamb' : ''
   ].join(' ').toLowerCase();
 }
 function matchPrixFixeExtraDishes(q){
@@ -1771,7 +1771,10 @@ function matchPrixFixeExtraDishes(q){
     var hay=pfExtraHaystack(d);
     var name=String(d.name||'').toLowerCase();
     if (parsed.needle==='pork' || (parsed.words.length===1 && parsed.words[0]==='pork')) {
-      return /pork/.test(hay) && !/medallion/.test(name);
+      return /pork chop|san domenico/.test(name) && !/medallion/.test(name);
+    }
+    if (parsed.needle==='lamb' || (parsed.words.length===1 && parsed.words[0]==='lamb')) {
+      return /\blamb\b/.test(name);
     }
     if (parsed.needle==='medallions' || parsed.needle==='medallion') return /medallion/.test(name);
     if (parsed.needle==='mignon' || parsed.needle==='filet') return /mignon|giambotta/.test(name);
