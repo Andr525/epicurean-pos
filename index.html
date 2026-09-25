@@ -18,7 +18,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <title>Epicurean POS</title>
-<!-- pos-build: scalini-print-v35 -->
+<!-- pos-build: scalini-print-v36 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
@@ -1154,7 +1154,7 @@ body.hh-on .ts-tile.back { color:#000; background:#fff; }
 <div id="login-screen" class="screen active">
   <h1>Epicurean POS</h1>
   <p class="subtitle">Enter your 4-digit code</p>
-  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 35</p>
+  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 36</p>
   <div class="pin-display" id="pin-display">
     <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
   </div>
@@ -1753,6 +1753,7 @@ function renderHandheldTop(){
       ' · <span id="hh-seated">'+seatedLabelFor(STATE.selectedTable)+'</span></span></div>'+
     '<button class="hh-more" onclick="printCheck()" aria-label="Print">⎙</button>'+
     '<button class="hh-more" onclick="openSwitchUser()" aria-label="Switch user">⇄</button>'+
+    '<button class="hh-more" onclick="logout()" aria-label="Sign out">Out</button>'+
     '<button class="hh-more" onclick="openOverflow()" aria-label="More">⋮</button>';
   if (warn.level) {
     var title=document.querySelector('#hh-top .hh-title');
@@ -2534,7 +2535,17 @@ function attemptLogin() {
   maybeAlertIpadOrder();
   setTimeout(function(){ STATE._loginBusy=false; }, 400);
 }
-function logout() { STATE.currentServer=null; STATE._loginBusy=false; pin=''; updateDots(); document.body.classList.remove('hh-on','hh-table','toast-light'); showScreen('login-screen'); }
+function logout() {
+  try { closeOverflow(); } catch (e) {}
+  try { closeSheet(); } catch (e) {}
+  STATE.currentServer=null;
+  STATE._loginBusy=false;
+  STATE.floorFitDone=false;
+  pin='';
+  updateDots();
+  document.body.classList.remove('hh-on','hh-table','toast-light');
+  showScreen('login-screen');
+}
 
 // ─── Tabs ───────────────────────────────────────────────────────
 function switchTab(tab) {
@@ -2549,8 +2560,7 @@ function switchTab(tab) {
   paintChrome();
 }
 function openTableService(){
-  STATE.floorFilter=defaultFloorFilter();
-  STATE.floorFitDone=false;
+  if (!STATE.floorUserPicked) STATE.floorFilter=defaultFloorFilter();
   switchTab('tables');
 }
 function openPaymentTerminal(){
@@ -2633,6 +2643,7 @@ function renderHub(){
   var html='<div class="mode-hub">';
   html+='<div class="toast-hdr"><b>Epicurean House</b><div class="hdr-actions">';
   html+='<button type="button" onclick="openSwitchUser()">SWITCH USER</button>';
+  html+='<button type="button" onclick="logout()">Sign out</button>';
   html+='<button type="button" onclick="openOverflow()" aria-label="More">⋮</button></div></div>';
   html+='<div class="hub-sec">Mode</div><div class="hub-grid">';
   html+='<button type="button" class="hub-tile primary" onclick="openTableService()">Table Service</button>';
@@ -3353,6 +3364,10 @@ function floorFitStation(){
   applyFloorTransform();
 }
 function restoreFloorView(){
+  if (STATE.floorFitDone) {
+    applyFloorTransform();
+    return;
+  }
   floorResetView();
 }
 function tapTable(tNum, ev){
@@ -3784,6 +3799,7 @@ function renderTables() {
   html+='<div class="toast-hdr"><button type="button" onclick="switchTab(\'hub\')" aria-label="Back">←</button><b>Table Service</b><div class="hdr-actions">';
   html+='<button type="button" onclick="switchTab(\'history\')">PREVIOUS CHECKS</button>';
   html+='<button type="button" onclick="openSwitchUser()" aria-label="Switch user">⇄</button>';
+  html+='<button type="button" onclick="logout()">Sign out</button>';
   html+='<button type="button" onclick="openOverflow()" aria-label="More">⋮</button></div></div>';
 
   html+='<div class="floor-room-tabs">';
@@ -3836,7 +3852,7 @@ function renderTables() {
       }
     });
     html+='</div>';
-    html+='<div class="floor-zoom-fab" onpointerdown="event.stopPropagation()" ontouchstart="event.stopPropagation()"><button type="button" onclick="event.stopPropagation();floorZoomBy(1.25)">+</button><button type="button" onclick="event.stopPropagation();floorZoomBy(1/1.25)">−</button></div>';
+    html+='<div class="floor-zoom-fab" onpointerdown="event.stopPropagation()" ontouchstart="event.stopPropagation()"><button type="button" onclick="event.stopPropagation();floorZoomBy(1.25)">+</button><button type="button" onclick="event.stopPropagation();floorZoomBy(1/1.25)">−</button><button type="button" onclick="event.stopPropagation();floorResetView()" title="Original size">fit</button></div>';
     html+='</div>';
     html+='<div class="floor-legend"><span><span class="floor-dot" style="background:#fff;border:2px solid #000"></span>Available</span><span><span class="floor-dot" style="background:#d9ecdf;border:2px solid #000"></span>Seated</span><span><span class="floor-dot" style="background:#E65050"></span>Call</span></div>';
   } else {
@@ -6383,7 +6399,9 @@ function closePayment() {
 function renderMessages() {
   var c=document.getElementById('app-content');
   var msgs=STATE.messages.filter(m=>m.table===STATE.selectedTable).sort((a,b)=>a.time-b.time);
-  var html='<h3 style="font-size:0.9rem;font-weight:600;color:var(--text-secondary);margin-bottom:1rem;">Messages — Table '+STATE.selectedTable+'</h3>';
+  var html='<div class="toast-hdr"><button type="button" onclick="switchTab(\'hub\')" aria-label="Back">←</button><b>Messages — Table '+esc(String(STATE.selectedTable))+'</b><div class="hdr-actions">';
+  html+='<button type="button" onclick="logout()">Sign out</button>';
+  html+='<button type="button" onclick="openOverflow()" aria-label="More">⋮</button></div></div>';
   html+='<div class="msg-list">';
   msgs.forEach(m=>{
     var body=esc(m.text||'');
@@ -6461,7 +6479,9 @@ function acknowledgeIpadOrder(){
 function renderHistory() {
   var c=document.getElementById('app-content');
   var orders=STATE.orders.filter(o=>o.server===(STATE.currentServer?STATE.currentServer.name:'')).sort((a,b)=>b.sentAt-a.sentAt);
-  var html='<h3 style="font-size:0.9rem;font-weight:600;color:var(--text-secondary);margin-bottom:1rem;">Order History</h3>';
+  var html='<div class="toast-hdr"><button type="button" onclick="switchTab(\'hub\')" aria-label="Back">←</button><b>Order History</b><div class="hdr-actions">';
+  html+='<button type="button" onclick="logout()">Sign out</button>';
+  html+='<button type="button" onclick="openOverflow()" aria-label="More">⋮</button></div></div>';
   if (!orders.length) { c.innerHTML=html+'<p style="color:var(--text-muted);">No orders yet.</p>'; paintChrome(); return; }
   orders.forEach(o=>{
     var elapsed=Math.round((Date.now()-o.sentAt)/60000);
