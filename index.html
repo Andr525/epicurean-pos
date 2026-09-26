@@ -18,7 +18,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <title>Epicurean POS</title>
-<!-- pos-build: scalini-print-v37 -->
+<!-- pos-build: scalini-print-v38 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
@@ -1156,7 +1156,7 @@ body.hh-on .ts-tile.back { color:#000; background:#fff; }
 <div id="login-screen" class="screen active">
   <h1>Epicurean POS</h1>
   <p class="subtitle">Enter your 4-digit code</p>
-  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 37</p>
+  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 38</p>
   <div class="pin-display" id="pin-display">
     <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
   </div>
@@ -2549,12 +2549,14 @@ function loadData() {
     if (doc.exists && doc.data()) applyBohTables(doc.data());
   }, function(){});
 
+  loadStaffCache();
+  fetchStaffList();
   fbDb.collection('boh_shared').doc('staff_clock').onSnapshot(function(doc){
     if (doc.exists && doc.data()) {
       var list=doc.data().list;
-      if (Array.isArray(list)) STATE.staff=list;
+      if (Array.isArray(list)) applyStaffList(list);
     }
-  }, function(){});
+  }, function(){ STATE._staffFetched=true; });
   fbDb.collection('boh_shared').doc('guests').onSnapshot(function(doc){
     if (doc.exists && doc.data() && Array.isArray(doc.data().list)) STATE.guests=doc.data().list;
   }, function(){});
@@ -2652,6 +2654,39 @@ function bohRole(s){
 function normalizePin(v){
   return String(v==null?'':v).replace(/\D/g,'').slice(-4);
 }
+var POS_STAFF_KEY='eh_pos_staff_list';
+function loadStaffCache(){
+  try {
+    var raw=localStorage.getItem(POS_STAFF_KEY);
+    var list=raw?JSON.parse(raw):null;
+    if (Array.isArray(list) && list.length && !(STATE.staff&&STATE.staff.length)) STATE.staff=list;
+  } catch (e) {}
+}
+function persistStaffCache(){
+  try { localStorage.setItem(POS_STAFF_KEY, JSON.stringify(STATE.staff||[])); } catch (e) {}
+}
+function applyStaffList(list){
+  if (!Array.isArray(list)) return;
+  STATE.staff=list;
+  STATE._staffFetched=true;
+  persistStaffCache();
+}
+function fetchStaffList(){
+  if (!fbReady || !fbDb || !fbDb.collection) {
+    STATE._staffFetched=true;
+    return Promise.resolve(STATE.staff||[]);
+  }
+  return fbDb.collection('boh_shared').doc('staff_clock').get().then(function(doc){
+    var data=doc && (typeof doc.data==='function' ? doc.data() : doc.data);
+    var list=data && Array.isArray(data.list) ? data.list : [];
+    if (list.length) applyStaffList(list);
+    else STATE._staffFetched=true;
+    return STATE.staff||[];
+  }).catch(function(){
+    STATE._staffFetched=true;
+    return STATE.staff||[];
+  });
+}
 function allStaffForLogin(){
   var byCode={};
   function add(s){
@@ -2663,7 +2698,28 @@ function allStaffForLogin(){
   }
   SEED_STAFF.forEach(add);
   (STATE.staff||[]).forEach(add);
+  (STATE.stations||[]).forEach(function(st){
+    var code=normalizePin(st && st.serverCode);
+    if (code.length!==4 || byCode[code] || !st.server) return;
+    add({ code:code, name:st.server, role:bohRole({code:code}) });
+  });
   return Object.keys(byCode).map(function(k){ return byCode[k]; });
+}
+function pinHasPosAccess(code){
+  var d=String(code||'')[0];
+  return d==='3' || d==='4' || d==='5';
+}
+function staffFromPin(code){
+  code=normalizePin(code);
+  if (code.length!==4 || !pinHasPosAccess(code)) return null;
+  if ((STATE.staff||[]).some(function(s){ return normalizePin(s.code!=null?s.code:s.pin)===code && s.status==='inactive'; })) return null;
+  var known=allStaffForLogin().filter(function(s){ return s.code===code; })[0];
+  if (known) return known;
+  return { code:code, name:bohRole({code:code}), role:bohRole({code:code}) };
+}
+function findStaffForPin(code){
+  code=normalizePin(code);
+  return allStaffForLogin().filter(function(s){ return normalizePin(s.code)===code; })[0] || staffFromPin(code);
 }
 function defaultFloorFilter(){
   var rooms=STATE.rooms||[];
@@ -2674,21 +2730,16 @@ function defaultFloorFilter(){
   }
   return 'all';
 }
-function attemptLogin() {
-  if (STATE._loginBusy) return;
-  var entered=normalizePin(pin);
-  var staff=allStaffForLogin().find(function(s){ return normalizePin(s.code)===entered; });
-  if (!staff) {
-    var err=document.getElementById('pin-error');
-    if (fbReady && !(STATE.staff&&STATE.staff.length)) {
-      if (err) err.textContent='Staff list is still loading — enter the code again';
-    } else if (err) err.textContent='Invalid code';
-    pin='';
-    updateDots();
-    return;
-  }
+function failLogin(){
+  var err=document.getElementById('pin-error');
+  if (err) err.textContent='Invalid code';
+  pin='';
+  updateDots();
+}
+function finishLogin(staff){
   STATE._loginBusy=true;
-  document.getElementById('pin-error').textContent='';
+  var err=document.getElementById('pin-error');
+  if (err) err.textContent='';
   STATE.currentServer=staff;
   STATE.floorUserPicked=false;
   STATE.floorFilter=defaultFloorFilter();
@@ -2701,6 +2752,31 @@ function attemptLogin() {
   paintChrome();
   maybeAlertIpadOrder();
   setTimeout(function(){ STATE._loginBusy=false; }, 400);
+}
+function attemptLogin() {
+  if (STATE._loginBusy) return;
+  var entered=normalizePin(pin);
+  if (entered.length!==4) return;
+  var staff=findStaffForPin(entered);
+  if (staff) { finishLogin(staff); return; }
+  if (fbReady && !STATE._staffFetched) {
+    STATE._loginBusy=true;
+    var err=document.getElementById('pin-error');
+    if (err) err.textContent='Checking staff list…';
+    fetchStaffList().then(function(){
+      STATE._loginBusy=false;
+      staff=findStaffForPin(entered);
+      if (staff) finishLogin(staff);
+      else failLogin();
+    }).catch(function(){
+      STATE._loginBusy=false;
+      staff=findStaffForPin(entered);
+      if (staff) finishLogin(staff);
+      else failLogin();
+    });
+    return;
+  }
+  failLogin();
 }
 function logout() {
   try { closeOverflow(); } catch (e) {}
@@ -6703,6 +6779,7 @@ function acknowledgeCall() {
 // ─── Init ───────────────────────────────────────────────────────
 function init() {
   buildNumpad();
+  loadStaffCache();
   loadData();
   window.addEventListener('resize', function(){ if (STATE.currentServer) paintChrome(); });
 }
