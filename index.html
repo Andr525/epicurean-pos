@@ -838,6 +838,10 @@ body.hh-on .ts-console.toast-go .ts-grid.list {
   grid-template-columns:1fr !important;
   grid-auto-rows:minmax(56px, auto);
 }
+.ts-console.toast-go .ts-grid.drink-cats,
+body.hh-on .ts-console.toast-go .ts-grid.drink-cats {
+  grid-template-columns:repeat(2, minmax(0,1fr)) !important;
+}
 .ts-console.toast-go .ts-grid.list .ts-tile,
 body.hh-on .ts-console.toast-go .ts-grid.list .ts-tile {
   min-height:56px; align-items:flex-start; justify-content:center;
@@ -4982,7 +4986,10 @@ function renderMenuGrid(){
       tiles.push(t+'</button>');
     });
   }
-  return extra+paginateTiles(tiles, isWineListCat(STATE.orderCat)?'list':'');
+  var tileMode='';
+  if (isWineListCat(STATE.orderCat)) tileMode='list';
+  else if (STATE.menuFamily==='drinks' && nav.level==='cats') tileMode='drink-cats';
+  return extra+paginateTiles(tiles, tileMode);
 }
 function menuNavBack(){
   var nav=STATE.menuNav||{level:'root'};
