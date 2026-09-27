@@ -18,7 +18,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <title>Epicurean POS</title>
-<!-- pos-build: scalini-print-v38 -->
+<!-- pos-build: scalini-print-v39 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
@@ -833,6 +833,27 @@ body.hh-on.floor-drawing .floor-stage { outline:2px dashed var(--primary); }
 .ts-console.toast-go .ts-tile.food,
 .ts-console.toast-go .ts-tile.drinks,
 .ts-console.toast-go .ts-tile.prix { background:var(--surface-2); }
+.ts-console.toast-go .ts-grid.list,
+body.hh-on .ts-console.toast-go .ts-grid.list {
+  grid-template-columns:1fr !important;
+  grid-auto-rows:minmax(56px, auto);
+}
+.ts-console.toast-go .ts-grid.list .ts-tile,
+body.hh-on .ts-console.toast-go .ts-grid.list .ts-tile {
+  min-height:56px; align-items:flex-start; justify-content:center;
+  text-align:left; padding:0.45rem 0.75rem; font-size:0.9rem;
+  line-height:1.3; white-space:normal; overflow-wrap:anywhere;
+}
+.ts-console.toast-go .ts-grid.list .ts-tile .price,
+.ts-console.toast-go .ts-grid.list .ts-tile .course-tag { text-align:left; }
+.allergy-strip.compact-line { display:flex; align-items:center; gap:8px; }
+.allergy-strip.compact-line span { flex:1; font-size:0.72rem; font-weight:700; }
+.allergy-strip.compact-line button {
+  min-height:32px; padding:0 0.55rem; border:1px solid var(--border);
+  background:var(--surface-2); color:var(--text); font-weight:800;
+  font-size:0.68rem; cursor:pointer; border-radius:8px;
+}
+textarea.search-box { min-height:72px; width:100%; resize:vertical; font-family:inherit; }
 body.hh-table .app-content, body.tableside .app-content {
   display:flex; flex-direction:column; overflow:hidden; padding:0.5rem 0.6rem 0.35rem;
 }
@@ -1156,7 +1177,7 @@ body.hh-on .ts-tile.back { color:#000; background:#fff; }
 <div id="login-screen" class="screen active">
   <h1>Epicurean POS</h1>
   <p class="subtitle">Enter your 4-digit code</p>
-  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 38</p>
+  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 39</p>
   <div class="pin-display" id="pin-display">
     <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
   </div>
@@ -1463,7 +1484,9 @@ function isHandheld(){
 }
 function sessionOf(table){
   var k = String(table);
-  if (!STATE.tableSessions[k]) STATE.tableSessions[k] = { guestCount: 2, allergies: { table: [] } };
+  if (!STATE.tableSessions[k]) STATE.tableSessions[k] = { guestCount: 2, allergies: { table: [] }, kitchenNote: '' };
+  if (!STATE.tableSessions[k].allergies) STATE.tableSessions[k].allergies = { table: [] };
+  if (STATE.tableSessions[k].kitchenNote==null) STATE.tableSessions[k].kitchenNote = '';
   return STATE.tableSessions[k];
 }
 function isDrinkCat(cat){
@@ -1471,17 +1494,30 @@ function isDrinkCat(cat){
   var id=String(cat.id||(typeof cat==='string'?cat:'')||'').toLowerCase();
   var name=String(cat.name||'').toLowerCase();
   var extra=String(cat.source||cat.station||'').toLowerCase();
-  return /cocktail|beer|wine|spirit|bar|drink|bev|retail/.test(id+' '+name+' '+extra);
+  return /cocktail|mocktail|beer|wine|spirit|bar|drink|bev|retail|coffee|soft|soda|after.?dinner|digestif/.test(id+' '+name+' '+extra);
 }
 function foodCategories(cats){
   return (cats||[]).filter(function(c){ return !isDrinkCat(c); });
 }
+function drinkCatRank(c){
+  var id=String((c&&c.id)||'').toLowerCase();
+  var order=['cocktails','mocktails','wine-glass','wine-bottle','wine','beer','spirits','after-dinner','soft-drinks','coffees','retail'];
+  var i=order.indexOf(id);
+  return i<0 ? 80 : i;
+}
 function drinkCategories(cats){
-  return (cats||[]).filter(function(c){ return isDrinkCat(c); });
+  var hasBottle=(cats||[]).some(function(c){ return c && c.id==='wine-bottle'; });
+  return (cats||[]).filter(function(c){
+    if (!isDrinkCat(c)) return false;
+    if (hasBottle && c && c.id==='wine') return false;
+    return true;
+  });
 }
 function familyCategories(){
   var cats=STATE.menuCategories.length?STATE.menuCategories:(STATE.menuLive?[]:SEED_CATEGORIES);
-  return STATE.menuFamily==='drinks' ? drinkCategories(cats) : foodCategories(cats);
+  var list=STATE.menuFamily==='drinks' ? drinkCategories(cats) : foodCategories(cats);
+  if (STATE.menuFamily==='drinks') list=list.slice().sort(function(a,b){ return drinkCatRank(a)-drinkCatRank(b); });
+  return list;
 }
 function setMenuFamily(fam){
   STATE.menuFamily=fam==='drinks'?'drinks':'food';
@@ -1980,12 +2016,18 @@ function moneyOpt(n){
   n=Number(n)||0;
   return n%1 ? n.toFixed(2) : String(n);
 }
-function barKindCat(kind){
-  kind=String(kind||'');
-  if (/cocktail/i.test(kind)) return {id:'cocktails', name:'Cocktails'};
-  if (/beer/i.test(kind)) return {id:'beer', name:'Beer'};
-  if (/spirit|liquor/i.test(kind)) return {id:'spirits', name:'Spirits'};
-  if (/wine/i.test(kind)) return {id:'wine', name:'Wine'};
+function barKindCat(kindOrItem){
+  var it=(kindOrItem && typeof kindOrItem==='object') ? kindOrItem : {kind:kindOrItem};
+  var kind=String(it.kind||it.category||'');
+  var hay=[kind, it.name, it.desc, it.description, it.category].join(' ');
+  if (/mocktail|zero.?proof|non.?alc|virgin|na cocktail/i.test(hay)) return {id:'mocktails', name:'Mocktails'};
+  if (/after.?dinner|digestif|amaro|limoncello|grappa|cognac|brandy|\bport\b|dessert wine|sambuca|fernet/i.test(hay)) return {id:'after-dinner', name:'After Dinner'};
+  if (/coffee|espresso|cappuccino|latte|macchiato|americano|cortado/i.test(hay)) return {id:'coffees', name:'Coffees'};
+  if (/soft|soda|cola|ginger ale|tonic|juice|lemonade|sparkling water|still water|pellegrino|acqua/i.test(hay)) return {id:'soft-drinks', name:'Soft Drinks'};
+  if (/cocktail/i.test(kind||hay)) return {id:'cocktails', name:'Cocktails'};
+  if (/beer/i.test(kind||hay)) return {id:'beer', name:'Beer'};
+  if (/spirit|liquor/i.test(kind||hay)) return {id:'spirits', name:'Spirits'};
+  if (/wine/i.test(kind||hay)) return {id:'wine-bottle', name:'Wines by the Bottle'};
   return {id: slugCat(kind||'bar'), name: kind || 'Bar'};
 }
 function slugCat(name){
@@ -2014,6 +2056,53 @@ function resolveWineGlassCatId(cats){
   }
   cats.push({id:'wine-glass', name:'Wines by the Glass', visible:true, kind:'wine'});
   return 'wine-glass';
+}
+function resolveWineBottleCatId(cats){
+  var found=(cats||[]).find(function(c){
+    if (!c) return false;
+    var id=String(c.id||'').toLowerCase();
+    var n=String(c.name||'').toLowerCase();
+    if (id==='wine-bottle' || id==='c_wine_bottle') return true;
+    return (n.indexOf('wine')>=0 || n.indexOf('wines')>=0) && n.indexOf('bottle')>=0 && id!=='wine';
+  });
+  if (found) {
+    found.name = 'Wines by the Bottle';
+    found.visible = true;
+    return found.id;
+  }
+  cats.push({id:'wine-bottle', name:'Wines by the Bottle', visible:true, kind:'wine'});
+  return 'wine-bottle';
+}
+function ensureDrinkExtraCategories(cats){
+  [
+    {id:'cocktails', name:'Cocktails'},
+    {id:'mocktails', name:'Mocktails'},
+    {id:'wine-glass', name:'Wines by the Glass', kind:'wine'},
+    {id:'wine-bottle', name:'Wines by the Bottle', kind:'wine'},
+    {id:'beer', name:'Beer'},
+    {id:'spirits', name:'Spirits'},
+    {id:'after-dinner', name:'After Dinner'},
+    {id:'soft-drinks', name:'Soft Drinks'},
+    {id:'coffees', name:'Coffees'}
+  ].forEach(function(spec){
+    var id=resolveCatId(cats, spec.id, spec.name);
+    (cats||[]).forEach(function(c){
+      if (c && c.id===id) {
+        c.name=spec.name;
+        c.visible=true;
+        if (spec.kind) c.kind=spec.kind;
+      }
+    });
+  });
+}
+function isWineListCat(catId){
+  var id=String(catId||'').toLowerCase();
+  if (/wine/.test(id)) return true;
+  var n='';
+  (STATE.menuCategories||[]).forEach(function(c){
+    if (c && c.id===catId) n=String(c.name||'').toLowerCase();
+  });
+  return /wine/.test(n);
 }
 function winePourMods(w){
   var opts=[];
@@ -2217,25 +2306,32 @@ function applyFoodFromMenuDoc(d){
 }
 function rebuildPosCatalog(){
   var cats = (STATE.foodCats||[]).slice();
-  var items = (STATE.foodItems||[]).slice();
+  ensureDrinkExtraCategories(cats);
+  var bottleCat=resolveWineBottleCatId(cats);
+  var items = (STATE.foodItems||[]).slice().map(function(it){
+    if (!it) return it;
+    if (it.category==='wine' || (it.catIds||[]).indexOf('wine')>=0) {
+      return Object.assign({}, it, {category:bottleCat, catIds:[bottleCat]});
+    }
+    return it;
+  });
   if ((STATE.wines||[]).length>=50) {
     items=items.filter(function(it){
       if (!it) return false;
-      if (it.category==='wine') return false;
-      if ((it.catIds||[]).indexOf('wine')>=0) return false;
+      if (it.category==='wine' || it.category===bottleCat) return false;
+      if ((it.catIds||[]).indexOf('wine')>=0 || (it.catIds||[]).indexOf(bottleCat)>=0) return false;
       return true;
     });
   }
   (STATE.bar||[]).forEach(function(it){
     if (!it || it.visible===false || !String(it.name||'').trim()) return;
-    var spec=barKindCat(it.kind);
+    var spec=barKindCat(it);
     var catId=resolveCatId(cats, spec.id, spec.name);
     items.push(mapBarToPos(it, catId));
   });
   (STATE.wines||[]).forEach(function(it){
     if (!it || it.visible===false || !String(it.name||'').trim()) return;
-    var catId=resolveCatId(cats, 'wine', 'Wine');
-    items.push(mapWineToPos(it, catId));
+    items.push(mapWineToPos(it, bottleCat));
   });
   var btg=(typeof EPICUREAN_SCALINI!=='undefined' && EPICUREAN_SCALINI.winesByGlass) || [];
   if (btg.length) {
@@ -2256,6 +2352,17 @@ function rebuildPosCatalog(){
   (STATE.retail||[]).forEach(function(it){
     if (!it || it.visible===false || !String(it.name||'').trim()) return;
     items.push(mapRetailToPos(it, retailCatId));
+  });
+  SEED_DRINK_EXTRAS.forEach(function(it){
+    var exists=items.some(function(x){
+      if (!x) return false;
+      if (x.id===it.id) return true;
+      return String(x.name||'').toLowerCase()===String(it.name||'').toLowerCase();
+    });
+    if (exists) return;
+    var spec=barKindCat(it);
+    var catId=resolveCatId(cats, spec.id, spec.name);
+    items.push(mapBarToPos(Object.assign({visible:true, desc:it.description||''}, it), catId));
   });
   STATE.menuCategories = cats;
   STATE.menuItems = items;
@@ -2288,8 +2395,33 @@ var SEED_CATEGORIES = [
   {id:'soups-salads',name:'Soups & Salads'},{id:'entrees',name:'Entrées'},
   {id:'sides',name:'Sides'},{id:'desserts',name:'Desserts'},
   {id:'kids',name:'Kids'},{id:'brunch',name:'Brunch'},
-  {id:'cocktails',name:'Cocktails'},{id:'beer',name:'Beer'},
-  {id:'spirits',name:'Spirits'},{id:'wine',name:'Wine'}
+  {id:'cocktails',name:'Cocktails'},{id:'mocktails',name:'Mocktails'},
+  {id:'beer',name:'Beer'},{id:'wine-glass',name:'Wines by the Glass'},
+  {id:'wine-bottle',name:'Wines by the Bottle'},{id:'spirits',name:'Spirits'},
+  {id:'after-dinner',name:'After Dinner'},{id:'soft-drinks',name:'Soft Drinks'},
+  {id:'coffees',name:'Coffees'}
+];
+
+var SEED_DRINK_EXTRAS = [
+  {id:'mk_spritz',name:'Virgin Spritz',price:8,kind:'mocktail',description:'Blood orange, soda, olive'},
+  {id:'mk_cucumber',name:'Cucumber cooler',price:8,kind:'mocktail',description:'Cucumber, lime, tonic'},
+  {id:'mk_soda',name:'Italian soda',price:6,kind:'mocktail',description:'Ask for flavor'},
+  {id:'sd_coke',name:'Coca-Cola',price:4,kind:'soft'},
+  {id:'sd_diet',name:'Diet Coke',price:4,kind:'soft'},
+  {id:'sd_sprite',name:'Sprite',price:4,kind:'soft'},
+  {id:'sd_ginger',name:'Ginger Ale',price:4,kind:'soft'},
+  {id:'sd_spark',name:'San Pellegrino',price:6,kind:'soft'},
+  {id:'sd_still',name:'Still water',price:0,kind:'soft'},
+  {id:'cf_esp',name:'Espresso',price:5,kind:'coffee'},
+  {id:'cf_mac',name:'Macchiato',price:5,kind:'coffee'},
+  {id:'cf_cap',name:'Cappuccino',price:6,kind:'coffee'},
+  {id:'cf_lat',name:'Caffè latte',price:6,kind:'coffee'},
+  {id:'cf_ame',name:'Americano',price:5,kind:'coffee'},
+  {id:'ad_amaro',name:'Amaro Nonino',price:14,kind:'after-dinner'},
+  {id:'ad_lim',name:'Limoncello',price:12,kind:'after-dinner'},
+  {id:'ad_grap',name:'Grappa',price:12,kind:'after-dinner'},
+  {id:'ad_port',name:'Fonseca Bin 27 Port',price:14,kind:'after-dinner'},
+  {id:'ad_cog',name:'Cognac VS',price:16,kind:'after-dinner'}
 ];
 
 var SEED_ITEMS = [
@@ -2303,8 +2435,8 @@ var SEED_ITEMS = [
   {id:'i8',code:'CK01',name:'Pisco Sour',price:14,category:'cocktails',station:'Bar',cookTime:3,modifiers:[],description:'Peruvian pisco, lime, egg white, Angostura bitters',allergens:['Egg'],dietaryFlags:['Vegetarian']},
   {id:'i9',code:'CK02',name:'Chocolate Old Fashioned',price:16,category:'cocktails',station:'Bar',cookTime:3,modifiers:[],description:'Bourbon, cacao nib-infused syrup, orange peel, chocolate bitters',allergens:[],dietaryFlags:['Vegan']},
   {id:'i10',code:'BE01',name:'Local Lager',price:8,category:'beer',station:'Bar',cookTime:1,modifiers:[],description:'Crisp craft lager from local brewery',allergens:['Gluten'],dietaryFlags:['Vegan']},
-  {id:'i11',code:'WN01',name:'Malbec Reserva',price:52,category:'wine',station:'Bar',cookTime:1,modifiers:[{group:'Pour',options:['Glass $14','Bottle $52']}],description:'Mendoza, Argentina. Full-bodied, dark fruit, spice, velvety tannins',allergens:['Sulfites'],dietaryFlags:['Vegan']},
-  {id:'i12',code:'WN02',name:'Chardonnay',price:44,category:'wine',station:'Bar',cookTime:1,modifiers:[{group:'Pour',options:['Glass $12','Bottle $44']}],description:'Sonoma Coast. Crisp citrus, green apple, light oak',allergens:['Sulfites'],dietaryFlags:['Vegan']},
+  {id:'i11',code:'WN01',name:'Malbec Reserva',price:52,category:'wine-bottle',station:'Bar',cookTime:1,modifiers:[{group:'Pour',options:['Glass $14','Bottle $52']}],description:'Mendoza, Argentina. Full-bodied, dark fruit, spice, velvety tannins',allergens:['Sulfites'],dietaryFlags:['Vegan']},
+  {id:'i12',code:'WN02',name:'Chardonnay',price:44,category:'wine-bottle',station:'Bar',cookTime:1,modifiers:[{group:'Pour',options:['Glass $12','Bottle $44']}],description:'Sonoma Coast. Crisp citrus, green apple, light oak',allergens:['Sulfites'],dietaryFlags:['Vegan']},
   {id:'i13',code:'SS01',name:'Soup of the Day',price:10,category:'soups-salads',station:'Sauté',cookTime:5,modifiers:[],description:'Chef\'s daily creation, ask your server for today\'s selection',allergens:['Dairy'],dietaryFlags:['Vegetarian']},
   {id:'i14',code:'SD01',name:'Truffle Fries',price:12,category:'sides',station:'Fry',cookTime:6,modifiers:[],description:'Hand-cut fries, truffle oil, parmesan, fresh herbs',allergens:['Dairy'],dietaryFlags:['Vegetarian']}
 ];
@@ -2347,6 +2479,7 @@ function seedOfflineCatalog(){
   STATE.menuCategories = SEED_CATEGORIES;
   STATE.menuItems = SEED_ITEMS;
   ensurePosBinwiseCellar();
+  rebuildPosCatalog();
 }
 function listenBohList(docName, key){
   fbDb.collection('boh_shared').doc(docName).onSnapshot(function(doc){
@@ -4552,6 +4685,7 @@ function collectDiningFireGroups(){
   tableDiningOrders().forEach(function(to){
     diningCourses(to).forEach(function(c,i){
       if (c.fired || c.skipped) return;
+      if (hideEntremetUntilDessert(c, to)) return;
       var key=diningFireGroupKey(to,c,i);
       if (!map[key]) {
         var label=diningCourseTitle(to,c);
@@ -4724,7 +4858,8 @@ function renderGuestAllergyStrip(){
   for (var i=1;i<=n;i++) collect(i);
   if (dining) {
     return '<div class="allergy-strip compact-line"><span>'+(bits.length?esc(bits.join(' · ')):'Allergies — tap a guest to flag')+'</span>'+
-      '<button type="button" onclick="openAllergyEditor()">Edit</button></div>';
+      '<button type="button" onclick="openAllergyEditor()">Edit</button>'+
+      '<button type="button" onclick="sendKitchenAllergyNote()">Send note</button></div>';
   }
   var open=STATE.allergySeat!=null?STATE.allergySeat:(STATE.activeSeat||'table');
   var html='<div class="allergy-strip"><div class="as-label">Allergies — tap a guest, then flag</div><div class="as-guests">';
@@ -4757,16 +4892,16 @@ function tickerTouchEnd(e){
   STATE.tilePage=(STATE.tilePage||0)+(d<0?1:-1);
   renderOrder();
 }
-function paginateTiles(tiles){
-  var per=12;
+function paginateTiles(tiles, mode){
+  var per=mode==='list'?10:12;
   var pages=Math.max(1, Math.ceil((tiles.length||1)/per));
   var page=STATE.tilePage||0;
   if (page<0) page=0;
   if (page>pages-1) page=pages-1;
   STATE.tilePage=page;
   var slice=tiles.slice(page*per, page*per+per);
-  var html='<div class="ts-grid-wrap ticker" ontouchstart="tickerTouchStart(event)" ontouchend="tickerTouchEnd(event)">';
-  html+='<div class="ts-grid" id="menu-items-list">'+slice.join('')+'</div>';
+  var html='<div class="ts-grid-wrap ticker'+(mode?' '+mode:'')+'" ontouchstart="tickerTouchStart(event)" ontouchend="tickerTouchEnd(event)">';
+  html+='<div class="ts-grid'+(mode?' '+mode:'')+'" id="menu-items-list">'+slice.join('')+'</div>';
   if (pages>1){
     html+='<div class="ticker-dots">';
     for (var i=0;i<pages;i++) html+='<button type="button" class="'+(i===page?'on':'')+'" onclick="STATE.tilePage='+i+';renderOrder()"></button>';
@@ -4796,7 +4931,7 @@ function renderMenuGrid(){
     if (!tiles.length) {
       return '<p style="color:var(--text-muted);font-size:0.85rem;padding:0.8rem 0.2rem;">No matches. Try shrimp, shrimp main, pork, medallions, mignon, or add app / main / des.</p>';
     }
-    return paginateTiles(tiles);
+    return paginateTiles(tiles, 'list');
   }
   if (nav.level==='root') {
     tiles.push('<button type="button" class="ts-tile food" onclick="setMenuFamily(\'food\')">FOOD</button>');
@@ -4830,19 +4965,12 @@ function renderMenuGrid(){
       if (i.catIds && i.catIds.length) return i.catIds.indexOf(STATE.orderCat)>-1;
       return i.category===STATE.orderCat;
     });
-    var wineCat=false;
-    (STATE.menuCategories||[]).forEach(function(c){
-      if (c && c.id===STATE.orderCat) {
-        var n=String(c.name||c.id||'').toLowerCase();
-        wineCat = n==='wine' || (n.indexOf('wine')>=0 && n.indexOf('glass')<0);
-      }
-    });
-    if (STATE.orderCat==='wine') wineCat=true;
-    if (wineCat && catItems.length>60) {
+    var wineCat=isWineListCat(STATE.orderCat);
+    if (wineCat && catItems.length>20) {
       var q=String(STATE._posWineFind||'').trim().toLowerCase();
-      extra='<div><input class="search-box" id="pos-wine-find" value="'+esc(STATE._posWineFind||'')+'" placeholder="Find a bottle ('+catItems.length+')" oninput="STATE._posWineFind=this.value;var s=this.selectionStart;renderOrder();var el=document.getElementById(\'pos-wine-find\');if(el){el.focus();try{el.setSelectionRange(s,s);}catch(e){}}"></div>';
+      extra='<div><input class="search-box" id="pos-wine-find" value="'+esc(STATE._posWineFind||'')+'" placeholder="Find a wine ('+catItems.length+')" oninput="STATE._posWineFind=this.value;var s=this.selectionStart;renderOrder();var el=document.getElementById(\'pos-wine-find\');if(el){el.focus();try{el.setSelectionRange(s,s);}catch(e){}}"></div>';
       if (q) catItems=catItems.filter(function(i){ return itemMatchesSearch(i,q); });
-      else catItems=catItems.slice(0,80);
+      else if (catItems.length>80) catItems=catItems.slice(0,80);
     }
     var findQ=String(STATE.menuSearch||'').trim();
     if (findQ) catItems=catItems.filter(function(i){ return itemMatchesSearch(i, findQ); });
@@ -4854,7 +4982,7 @@ function renderMenuGrid(){
       tiles.push(t+'</button>');
     });
   }
-  return extra+paginateTiles(tiles);
+  return extra+paginateTiles(tiles, isWineListCat(STATE.orderCat)?'list':'');
 }
 function menuNavBack(){
   var nav=STATE.menuNav||{level:'root'};
@@ -5094,6 +5222,101 @@ function guestAllergyHits(allergens){
   });
   return flagged;
 }
+function flaggedAllergies(){
+  var seats=sessionOf(STATE.selectedTable).allergies||{};
+  var out=[];
+  Object.keys(seats).forEach(function(k){
+    (seats[k]||[]).forEach(function(a){ if (out.indexOf(a)<0) out.push(a); });
+  });
+  return out;
+}
+function suggestedAllergyNote(flags){
+  flags=(flags||flaggedAllergies()).map(function(a){ return String(a).toLowerCase(); });
+  var notes=[];
+  if (flags.indexOf('fish')>-1) notes.push('ALLERGY FISH — replace smoked salmon with a non-fish welcome bite. FIRE stays Salmon.');
+  if (flags.indexOf('gluten')>-1) notes.push('ALLERGY GLUTEN — smoked salmon no bread; replace breaded zucchini.');
+  if (flags.indexOf('shellfish')>-1) notes.push('ALLERGY SHELLFISH — replace shrimp welcome bite.');
+  if (flags.some(function(a){ return /nut/.test(a); })) notes.push('ALLERGY NUTS — no nut garnish on entremet.');
+  return notes.join(' ');
+}
+function courseAllergyKitchenNote(c){
+  var flags=flaggedAllergies();
+  var name=String((c&&(c.choice||c.name||c.course))||'').toLowerCase();
+  var notes=[];
+  function has(a){ return flags.some(function(x){ return String(x).toLowerCase()===a; }); }
+  if (has('fish') && /salmon/.test(name)) notes.push('ALLERGY FISH — replace this salmon. Keep ticket as Salmon.');
+  if (has('gluten') && /salmon/.test(name)) notes.push('ALLERGY GLUTEN — no bread / no brioche.');
+  if (has('gluten') && /zucchini/.test(name)) notes.push('ALLERGY GLUTEN — replace breaded zucchini.');
+  if (has('shellfish') && /shrimp/.test(name)) notes.push('ALLERGY SHELLFISH — replace shrimp.');
+  if ((has('tree nut')||has('nuts')) && /coconut|sorbet|entremet/.test(name)) notes.push('ALLERGY NUTS — no nut garnish.');
+  return notes.join(' ');
+}
+function dessertHasBeenChosen(to){
+  if (to && to.dessertChosen) return true;
+  return diningCourses(to).some(function(c){
+    var name=String(c.choice||'');
+    if (!(c.later || c.mode==='later')) return false;
+    if (c.pending || courseNeedsDessertPick(c)) return false;
+    return !!(name && !/take after|^dolce$/i.test(name));
+  });
+}
+function hideEntremetUntilDessert(c, to){
+  return !!(c && (c.entremets || c.mode==='entremets') && !dessertHasBeenChosen(to));
+}
+function isWelcomeTrioCourse(c){
+  if (!c || !(c.auto || c.fireEach)) return false;
+  var hay=[c.course,c.choice,c.name,c.group].join(' ').toLowerCase();
+  return /primi piccolo|welcome/.test(hay) || /smoked salmon|zucchini|shrimp/.test(hay);
+}
+function welcomeTrioShort(c){
+  var n=String((c&&(c.choice||c.name))||'').toLowerCase();
+  if (/salmon/.test(n)) return 'Salmon';
+  if (/zucchini/.test(n)) return 'Zucchini';
+  if (/shrimp/.test(n)) return 'Shrimp';
+  var t=String((c&&(c.choice||c.name||c.course))||'').trim();
+  return t.split(/\s+/)[0] || 'Bite';
+}
+function applyDiningAllergyNotes(){
+  var tableNote=String(sessionOf(STATE.selectedTable).kitchenNote||'').trim();
+  tableDiningOrders().forEach(function(to){
+    diningCourses(to).forEach(function(c){
+      var auto=courseAllergyKitchenNote(c);
+      var keep=String(c.modNote||'');
+      var bits=[];
+      if (keep && keep.indexOf('ALLERGY')<0 && keep!==tableNote) bits.push(keep);
+      if (auto) bits.push(auto);
+      if (tableNote) bits.push(tableNote);
+      var seen={};
+      c.modNote=bits.filter(function(b){ if (!b || seen[b]) return false; seen[b]=1; return true; }).join(' · ');
+    });
+  });
+}
+function saveAllergyKitchenNote(){
+  var el=document.getElementById('allergy-kitchen-note');
+  if (el) sessionOf(STATE.selectedTable).kitchenNote=String(el.value||'').trim();
+  applyDiningAllergyNotes();
+}
+function sendKitchenAllergyNote(){
+  saveAllergyKitchenNote();
+  var flags=flaggedAllergies();
+  var sess=sessionOf(STATE.selectedTable);
+  var body=[suggestedAllergyNote(flags), String(sess.kitchenNote||'').trim(), flags.length?('Flags: '+flags.join(', ')):'No allergy flags'].filter(Boolean).join(' · ');
+  var order={
+    table: STATE.selectedTable,
+    server: STATE.currentServer?STATE.currentServer.name:'Unknown',
+    items:[{id:'note_'+Date.now(), name:'KITCHEN NOTE — allergies', station:'Expo', cookTime:0, modifiers:[], selectedMod:body, notes:body}],
+    status:'new', sentAt:Date.now(), clearedAt:null, isKitchenNote:true
+  };
+  var local=Object.assign({id:genId()}, order);
+  STATE.orders.push(local);
+  if (!STATE._localOrders) STATE._localOrders=[];
+  STATE._localOrders.push(local);
+  if (fbReady) fbDb.collection('orders').add(order).then(function(ref){ publishActiveOrder(order, ref.id); });
+  sess.kitchenNoteSent=true;
+  toast('Allergy note sent to kitchen');
+  closeSheet();
+  renderOrder();
+}
 
 function seedPrixFixeMenu(){
   return (SEED_PRIX_FIXE_MENUS && SEED_PRIX_FIXE_MENUS[0]) ? JSON.parse(JSON.stringify(SEED_PRIX_FIXE_MENUS[0])) : null;
@@ -5160,8 +5383,8 @@ function openPrixFixeSelector(pfId) {
       return;
     }
     if (mode==='entremets'){
-      html+='<div class="pf-course-select"><label>'+esc(c.label)+' — fire from the check</label>';
-      html+='<p class="pf-sel-sub">Coconut–lime sorbet. Check nut allergies — rum-glazed pineapple is on the plate. Use FIRE when you want it.</p></div>';
+      html+='<div class="pf-course-select"><label>'+esc(c.label)+' — after dessert is chosen</label>';
+      html+='<p class="pf-sel-sub">The complimentary palate cleanser stays off the check until dolce is taken.</p></div>';
       return;
     }
     if (mode==='later'){
@@ -5240,6 +5463,10 @@ function confirmPrixFixe(pfId) {
   var noteEl=document.getElementById('pf-mod-note');
   if (noteEl) kitchenNote=String(noteEl.value||'').trim();
   if (kitchenNote) selections.forEach(function(s){ s.modNote=s.modNote||kitchenNote; });
+  selections.forEach(function(s){
+    var auto=courseAllergyKitchenNote(s);
+    if (auto && String(s.modNote||'').indexOf(auto)<0) s.modNote=s.modNote ? (s.modNote+' · '+auto) : auto;
+  });
   var totalUpcharge=selections.reduce(function(s,x){ return s+(x.pending?0:(Number(x.upcharge)||0)); },0);
   var choiceStr=selections.filter(function(s){ return !s.pending; }).map(function(s){ return s.choice; }).join(', ');
   STATE.currentOrder.push({
@@ -5264,6 +5491,7 @@ function confirmPrixFixe(pfId) {
     selectedMod:choiceStr+(kitchenNote?(' · '+kitchenNote):'')
   });
   startDiningFromCheckLine(STATE.currentOrder[STATE.currentOrder.length-1]);
+  applyDiningAllergyNotes();
   closePfSelector();
   toast('+ '+pf.name+' · FIRE each course on the check');
   renderOrder();
@@ -6055,7 +6283,7 @@ function printCheck(){
 
 function openAllergyEditor(){
   var n=sessionOf(STATE.selectedTable).guestCount||2;
-  var html='<h2>Guest allergies</h2><p class="sheet-sub">Flags stay on this table for this shift. They do not change BOH recipes.</p>';
+  var html='<h2>Guest allergies</h2><p class="sheet-sub">Send the note to the kitchen before food starts. FIRE labels stay the original dish.</p>';
   function block(seat){
     var cur=seatAllergies(seat);
     var h='<div class="tasting-section-label">'+seatName(seat)+'</div><div class="chip-row">';
@@ -6067,13 +6295,19 @@ function openAllergyEditor(){
   }
   html+=block('table');
   for (var i=1;i<=n;i++) html+=block(i);
-  html+='<button class="primary-btn" onclick="closeSheet(); if(STATE.hhMode===\'check\') renderCheck(); else renderOrder();">Done</button>';
+  var suggested=suggestedAllergyNote(flaggedAllergies());
+  html+='<div class="tasting-section-label">Note for the kitchen</div>';
+  if (suggested) html+='<p class="sheet-sub">'+esc(suggested)+'</p>';
+  html+='<textarea class="search-box" id="allergy-kitchen-note" rows="3" placeholder="Allergy to fish — replace salmon. Gluten — salmon no bread, replace zucchini…">'+esc(sessionOf(STATE.selectedTable).kitchenNote||'')+'</textarea>';
+  html+='<button class="primary-btn" onclick="sendKitchenAllergyNote()">Send note to kitchen</button>';
+  html+='<button class="ghost-btn" onclick="saveAllergyKitchenNote();closeSheet(); if(STATE.hhMode===\'check\') renderCheck(); else renderOrder();">Save</button>';
   openSheet(html);
 }
 function toggleAllergy(seat, name, stay){
   var list=seatAllergies(seat);
   var i=list.indexOf(name);
   if (i>-1) list.splice(i,1); else list.push(name);
+  applyDiningAllergyNotes();
   if (stay) { renderOrder(); return; }
   openAllergyEditor();
 }
@@ -6283,6 +6517,13 @@ function fireDiningCourse(to, quiet, idx){
   if (nextCourse.desc) notes.push(nextCourse.desc);
   if (nextCourse.cookNote) notes.push(nextCourse.cookNote);
   if (nextCourse.modNote) notes.push(nextCourse.modNote);
+  var allergyNote=courseAllergyKitchenNote(nextCourse);
+  var tableNote=String(sessionOf(to.table||STATE.selectedTable).kitchenNote||'').trim();
+  if (allergyNote && notes.indexOf(allergyNote)<0) notes.push(allergyNote);
+  if (tableNote && notes.indexOf(tableNote)<0) notes.push(tableNote);
+  if (allergyNote && String(nextCourse.modNote||'').indexOf(allergyNote)<0) {
+    nextCourse.modNote=nextCourse.modNote ? (nextCourse.modNote+' · '+allergyNote) : allergyNote;
+  }
   if (nextCourse.scoopChoice) notes.push('Scoops: '+nextCourse.scoopChoice);
   var courseOrder={
     table: to.table,
@@ -6369,9 +6610,32 @@ function renderDiningProgress(){
   var html='';
   list.forEach(function(to){
     var courses=diningCourses(to);
-    var done=courses.filter(function(c){ return c.fired || c.skipped; }).length;
-    html+='<div class="ts-sec-label">'+esc(to.tastingName||to.prixFixeName)+' · '+esc(seatName(to.seat||'table'))+' · '+done+' / '+courses.length+' fired</div>';
+    var visible=courses.filter(function(c){ return !hideEntremetUntilDessert(c,to); });
+    var done=visible.filter(function(c){ return c.fired || c.skipped; }).length;
+    html+='<div class="ts-sec-label">'+esc(to.tastingName||to.prixFixeName)+' · '+esc(seatName(to.seat||'table'))+' · '+done+' / '+visible.length+' fired</div>';
+    var welcome=[];
     courses.forEach(function(c,i){
+      if (hideEntremetUntilDessert(c,to)) return;
+      if (isWelcomeTrioCourse(c)) welcome.push({c:c,i:i});
+    });
+    if (welcome.length) {
+      var names=welcome.map(function(w){ return welcomeTrioShort(w.c); }).join(' / ');
+      var welcomeFired=welcome.every(function(w){ return w.c.fired || w.c.skipped; });
+      var welcomeMods=[];
+      welcome.forEach(function(w){
+        if (w.c.modNote) welcomeMods.push(welcomeTrioShort(w.c)+': '+w.c.modNote);
+        var hits=guestAllergyHits(w.c.allergens);
+        if (hits.length) welcomeMods.push(welcomeTrioShort(w.c)+' ⚠ '+hits.join(', '));
+      });
+      html+='<div class="ts-line lc-line dining-line welcome-trio '+(welcomeFired?'sent':'unsent')+'">'+
+        '<div><div class="ts-name">'+esc(names)+'</div>'+
+        '<div class="ts-mod">complimentary welcome</div>'+
+        (welcomeMods.length?'<div class="ts-mod">'+esc(welcomeMods.join(' · '))+'</div>':'')+
+        '</div></div>';
+    }
+    courses.forEach(function(c,i){
+      if (hideEntremetUntilDessert(c,to)) return;
+      if (isWelcomeTrioCourse(c)) return;
       var title=diningCourseTitle(to,c);
       var st=c.skipped?'skipped':c.fired?'fired':(courseNeedsDessertPick(c)?'choose dolce':'ready');
       var mods=[];
@@ -6476,6 +6740,7 @@ function confirmDessert(orderId){
     }
   });
   to.totalPrice=(Number(to.totalPrice)||0)+(Number(opt.upcharge)||0);
+  to.dessertChosen=true;
   closePfSelector();
   toast('Dessert saved — fire entremets next');
   renderOrder();
