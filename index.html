@@ -3312,10 +3312,7 @@ function roomObjectList(roomId){
   if (Array.isArray(objs)) {
     return objs.filter(function(o){ return !roomId || String(objectRoomId(o))===String(roomId); });
   }
-  if (roomId) {
-    var named=asObjArray(objs[roomId]);
-    if (named.length) return named;
-  }
+  if (roomId) return asObjArray(objs[roomId]);
   var all=[];
   Object.keys(objs).forEach(function(id){
     asObjArray(objs[id]).forEach(function(o){ all.push(o); });
