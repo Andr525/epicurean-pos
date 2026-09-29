@@ -18,7 +18,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <title>Epicurean POS</title>
-<!-- pos-build: scalini-print-v44 -->
+<!-- pos-build: scalini-print-v45 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
@@ -642,7 +642,7 @@ body.hh-on.floor-drawing .floor-stage { outline:2px dashed var(--primary); }
 .lc-line.unsent { color:var(--primary-light); }
 .lc-line.held { color:var(--warning); }
 .lc-line.sent { color:var(--success); }
-.lc-line.picked { background:var(--primary-glow); border-radius:8px; padding:0.4rem 0.35rem; }
+.lc-line.picked { background:var(--primary-glow); border-radius:8px; padding:0.4rem 0.35rem; outline:3px solid #2f6fdb; outline-offset:-1px; }
 .lc-line .lc-meta { font-size:0.68rem; color:var(--text-muted); }
 .ts-check-lines { overflow-y:auto; -webkit-overflow-scrolling:touch; min-height:72px; max-height:22vh; }
 .course-fire-row { display:flex; flex-wrap:wrap; gap:6px; margin:0.35rem 0 0.15rem; flex-shrink:0; }
@@ -811,10 +811,11 @@ body.hh-on.floor-drawing .floor-stage { outline:2px dashed var(--primary); }
 }
 .toast-ops .pay-now { background:#d6e4ff; color:#102033; border-color:#d6e4ff; }
 .add-items-row {
-  display:flex; align-items:center; gap:8px; flex-shrink:0; padding:0.15rem 0 0.35rem;
+  display:flex; flex-direction:column; align-items:stretch; gap:6px;
+  flex-shrink:0; padding:0.15rem 0 0.45rem;
 }
-.add-items-row .add-items-label { font-weight:800; font-size:0.95rem; flex:1; }
-.add-items-row .add-search { margin:0; min-height:40px; flex:1.4; }
+.add-items-row .add-items-label { font-weight:800; font-size:0.95rem; }
+.add-items-row .add-search { margin:0; width:100%; min-height:52px; font-size:1rem; }
 .period-tabs {
   display:flex; gap:0; flex-shrink:0; border-bottom:1px solid var(--border); margin-bottom:0.45rem;
   overflow-x:auto; -webkit-overflow-scrolling:touch;
@@ -1069,6 +1070,14 @@ body.hh-on .ts-grid-wrap {
 }
 body.hh-on .ts-console.toast-go.has-dining .ts-grid-wrap { min-height:50vh; }
 body.hh-on .ts-console.toast-go.has-dining.searching .ts-grid-wrap { min-height:64vh; flex:1 1 70vh; }
+body.hh-on .add-items-row .add-search { min-height:64px; font-size:1.08rem; width:100%; }
+body.hh-on .ts-line.picked, body.hh-on .lc-line.picked { background:#e8f0ff; outline:3px solid #2f6fdb; }
+.ts-line.extra-line { touch-action:none; user-select:none; -webkit-user-select:none; cursor:grab; }
+.ts-line.extra-line.dragging { opacity:0.5; cursor:grabbing; }
+.ts-line.drop-hover { outline:2px dashed #2f6fdb; outline-offset:-2px; }
+.ts-console.toast-go .ts-line.extra-line {
+  grid-template-columns:minmax(0,1fr) 28px 40px 44px 28px;
+}
 body.hh-on .pf-back { background:#fff; color:#000; border-color:#c5ced8; }
 body.hh-on .line-edit-bar button { background:#fff; color:#000; border-color:#c5ced8; }
 body.hh-on .line-edit-bar button.erase { background:#3b1212; color:#fecaca; }
@@ -1211,7 +1220,7 @@ body.hh-on .floor-retry { background:#fff; color:#000; border-color:#c5ced8; }
 <div id="login-screen" class="screen active">
   <h1>Epicurean POS</h1>
   <p class="subtitle">Enter your 4-digit code</p>
-  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 44</p>
+  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 45</p>
   <div class="pin-display" id="pin-display">
     <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
   </div>
@@ -1668,7 +1677,9 @@ function guestCheckItems(checkId){
     rows.push({
       lineId:i.lineId, name:i.name, qty:parseInt(i.qty,10)||1, price:Number(i.price)||0,
       seat:i.seat||'table', course:i.course||null, notes:i.notes||'', mods:i.selectedMod||'',
-      status:i.held?'held':'unsent', checkId:i.checkId||cid
+      status:i.held?'held':'unsent', checkId:i.checkId||cid,
+      extraPlate:!!i.extraPlate, pfExtra:!!i.pfExtra, pfCourseKind:i.pfCourseKind||null,
+      ticketPos:i.ticketPos!=null?Number(i.ticketPos):null
     });
   });
   var sentMap={};
@@ -1683,7 +1694,9 @@ function guestCheckItems(checkId){
           lineId:lid, name:i.name, qty:0,
           price:found?Number(found.price)||Number(i.price)||0:Number(i.price)||0,
           seat:i.seat||'table', course:i.course||null, notes:i.notes||'', mods:i.selectedMod||'',
-          status:'sent', checkId:itemCid
+          status:'sent', checkId:itemCid,
+          extraPlate:!!i.extraPlate, pfExtra:!!i.pfExtra, pfCourseKind:i.pfCourseKind||null,
+          ticketPos:i.ticketPos!=null?Number(i.ticketPos):null
         };
       }
       sentMap[lid].qty += Math.max(1, parseInt(i.qty,10)||1);
@@ -1801,6 +1814,33 @@ function extraPlateFeeByKind(kind){
   if (kind==='app') return 38;
   return 48;
 }
+function extraKindOf(line){
+  if (!line) return 'main';
+  var kind=line.pfCourseKind;
+  if (kind==='app' || kind==='main' || kind==='des' || kind==='drink') return kind;
+  var n=Number(line.course);
+  var hay=[line.name, line.category, line.courseLabel, line.source, ((line.catIds)||[]).join(' ')].join(' ').toLowerCase();
+  if (n===1 || ((/cocktail|beer|wine|spirit|drink|bev/.test(hay)) && !/pasta|raviolo|food|dish|entree|primi/.test(hay))) return 'drink';
+  if (n===4 || /dolce|dessert|pastry|gelato|formaggio|sweet/.test(hay)) return 'des';
+  if (n===2 || /primi|primo|raviolo|ravioli|agnolotti|bolognese|tagliatelle|linguini|pescatore|appetizer|starter|small-plate|small plates|salad|soup|ceviche/.test(hay)) return 'app';
+  return 'main';
+}
+function defaultTicketPosForKind(kind){
+  return ({drink:40, welcome:80, app:200, entremet:260, main:300, des:400})[kind] || 300;
+}
+function extraTicketPos(line){
+  if (line && line.ticketPos!=null && isFinite(Number(line.ticketPos))) return Number(line.ticketPos);
+  return defaultTicketPosForKind(extraKindOf(line))+1;
+}
+function diningCourseKind(c){
+  if (!c) return 'main';
+  if (isWelcomeTrioCourse(c)) return 'welcome';
+  if (c.entremets || c.mode==='entremets') return 'entremet';
+  return pfCourseKind(c.course||c.name||c.choice||'');
+}
+function diningCourseTicketPos(c, idx){
+  return defaultTicketPosForKind(diningCourseKind(c))+(Number(idx)||0)*0.01;
+}
 function pfCourseKind(label){
   var s=String(label||'').toLowerCase();
   if (/dolce|dessert|entremet|pastry|gelato|formaggio|sweet/.test(s)) return 'des';
@@ -1913,6 +1953,7 @@ function beginAddPrixFixeExtra(key){
     itemSurcharge:surcharge,
     pfExtra:true,
     pfCourseKind:kind,
+    ticketPos:defaultTicketPosForKind(kind)+1,
     pfId:dish.pfId||'',
     pfOptionId:dish.id||'',
     id:'pfx_'+String(dish.id||'dish')+'_'+Date.now(),
@@ -1988,6 +2029,9 @@ document.addEventListener('click', function(e){
   e.preventDefault();
   e.stopPropagation();
 }, true);
+document.addEventListener('pointermove', function(e){ extraDragMove(e); }, {passive:false});
+document.addEventListener('pointerup', function(e){ extraDragEnd(e); });
+document.addEventListener('pointercancel', function(e){ extraDragEnd(e); });
 function closeOverflow(){ document.getElementById('hh-overflow').classList.remove('show'); }
 function openOverflow(){ document.getElementById('hh-overflow').classList.add('show'); }
 function paintChrome(){
@@ -4930,11 +4974,13 @@ function liveCheckHtml(){
   html+='<div class="ts-check-meta"><div>#'+esc(String(STATE.selectedTable))+', Table '+esc(String(STATE.selectedTable))+'</div>';
   html+='<span>'+esc(STATE.currentServer?STATE.currentServer.name:'Food Master')+'</span></div>';
   html+='<div class="ts-check-head"><div>Name</div><div>Qty</div><div>Each</div><div>Total</div><div></div></div>';
+  html+=lineEditBarHtml();
   html+='<div class="ts-check-lines">';
   if (!rows.length && !dining.length) html+='<div class="ts-empty lc-empty">Tap a tile to add food or drinks.</div>';
   rows.forEach(function(row){
     var src=STATE.currentOrder.filter(function(i){ return i.lineId===row.lineId; })[0];
     if (src && (src.isPrixFixe || src.isTasting) && dining.length) return;
+    if (dining.length && (row.extraPlate || (src && src.extraPlate))) return;
     var picked=!!(STATE.selectedLineIds && STATE.selectedLineIds[row.lineId]);
     var each=Number(row.price)||0;
     var qty=parseInt(row.qty,10)||1;
@@ -6017,6 +6063,10 @@ function beginAddItem(itemId) {
     byTheGlass:!!item.byTheGlass,
     scaliniOnly:!!item.scaliniOnly
   };
+  if (dining) {
+    STATE.pendingItem.pfCourseKind=extraKindOf(STATE.pendingItem);
+    STATE.pendingItem.ticketPos=defaultTicketPosForKind(STATE.pendingItem.pfCourseKind)+1;
+  }
   if (dining || isPosWineItem(item) || (STATE.pendingItem.modifiers&&STATE.pendingItem.modifiers.length)) {
     renderModifierSheet();
     return;
@@ -6042,13 +6092,6 @@ function renderModifierSheet(){
   html+='<button type="button" onclick="STATE.pendingItem.qty=Math.max(1,(STATE.pendingItem.qty||1)-1);renderModifierSheet()">−</button>';
   html+='<div style="font-size:1.3rem;font-weight:800;">'+(p.qty||1)+'</div>';
   html+='<button type="button" onclick="STATE.pendingItem.qty=(STATE.pendingItem.qty||1)+1;renderModifierSheet()">+</button></div>';
-  if (!p.extraPlate) {
-    html+='<div class="tasting-section-label">Course</div><div class="chip-row">';
-    [1,2,3,4].forEach(function(cn){
-      html+='<button type="button" class="chip'+(Number(p.course)===cn?' active':'')+'" onclick="setPendingCourse('+cn+')">'+cn+' '+courseName(cn)+'</button>';
-    });
-    html+='</div>';
-  }
   (p.modifiers||[]).forEach(function(mod,mi){
     var chosen=p.mods[mod.group];
     html+='<div class="tasting-section-label">'+mod.group+' <span style="color:var(--danger)">*</span></div><div class="chip-row">';
@@ -6120,6 +6163,9 @@ function maybeAllergyThenAdd(){
 function commitPendingItem(){
   var p=STATE.pendingItem; if(!p) return;
   if (!modifiersReady(p)) { toast('Choose required modifiers'); return; }
+  if (p.extraPlate && (p.ticketPos==null || !isFinite(Number(p.ticketPos)))) {
+    p.ticketPos=defaultTicketPosForKind(extraKindOf(p))+1;
+  }
   if (STATE._editingLineId) {
     var replaced=false;
     STATE.currentOrder=STATE.currentOrder.map(function(i){
@@ -6697,7 +6743,9 @@ function kitchenItemsFrom(lines){
         modifiers:i.modifiers||[], selectedMod:i.selectedMod||null,
         seat:i.seat||'table', course:i.course||null, notes:i.notes||'',
         qty:1, allergens:i.allergens||[], price:Number(i.price)||0,
-        lineId:i.lineId, checkId:i.checkId||cid
+        lineId:i.lineId, checkId:i.checkId||cid,
+        extraPlate:!!i.extraPlate, pfExtra:!!i.pfExtra, pfCourseKind:i.pfCourseKind||null,
+        ticketPos:i.ticketPos!=null?Number(i.ticketPos):null
       });
     }
   });
@@ -6969,11 +7017,172 @@ function saveCourseNote(orderId, idx){
   toast('Note saved');
 }
 
+function extraInvoiceEntries(){
+  if (!tableDiningOrders().length) return [];
+  return guestCheckItems().filter(function(row){
+    if (row.extraPlate) return true;
+    var src=(STATE.currentOrder||[]).filter(function(i){ return i.lineId===row.lineId; })[0];
+    return !!(src && src.extraPlate);
+  }).map(function(row){
+    var src=(STATE.currentOrder||[]).filter(function(i){ return i.lineId===row.lineId; })[0];
+    var line=src||row;
+    return {
+      lineId:row.lineId,
+      name:row.name,
+      qty:parseInt(row.qty,10)||1,
+      price:Number(row.price)||0,
+      seat:row.seat,
+      status:row.status,
+      mods:row.mods,
+      notes:row.notes,
+      extraPlate:true,
+      pfCourseKind:line.pfCourseKind||row.pfCourseKind,
+      course:line.course||row.course,
+      ticketPos:extraTicketPos(line),
+      src:line
+    };
+  });
+}
+function extraBelongsToDining(ex, to, list, toIndex){
+  var extraSeat=normSeatKey(ex.seat);
+  var toSeat=normSeatKey(to.seat);
+  if (extraSeat===toSeat && extraSeat!=='table') return true;
+  if (extraSeat==='table') return toIndex===0;
+  var hasSeatDining=list.some(function(o){ return normSeatKey(o.seat)===extraSeat; });
+  if (!hasSeatDining) return toIndex===0;
+  return false;
+}
+function extraInvoiceLineHtml(ex){
+  var picked=!!(STATE.selectedLineIds && STATE.selectedLineIds[ex.lineId]);
+  var mods=[];
+  if (ex.mods) mods.push(ex.mods);
+  if (ex.notes) mods.push(ex.notes);
+  if (mods.join(' ').indexOf('Extra plate')<0) mods.push('Extra plate');
+  var each=Number(ex.price)||0;
+  var qty=parseInt(ex.qty,10)||1;
+  var kind=extraKindOf(ex.src||ex);
+  var pos=extraTicketPos(ex.src||ex);
+  return '<div class="ts-line lc-line extra-line '+ex.status+(picked?' picked':'')+'" data-extra-line="'+esc(ex.lineId)+'" data-drop-kind="'+esc(kind)+'" data-drop-pos="'+pos+'" onpointerdown="extraDragStart(event,'+JSON.stringify(String(ex.lineId))+')">'+
+    '<div><div class="ts-name">'+esc(ex.name)+'</div>'+
+    mods.map(function(m){ return '<div class="ts-mod">'+esc(m)+'</div>'; }).join('')+
+    '<div class="ts-meta lc-meta">'+seatName(ex.seat)+' · '+String(ex.status||'').toUpperCase()+'</div></div>'+
+    '<div class="ts-qty">'+qty+'</div>'+
+    '<div class="ts-money">'+(each?posLineMoney(each):'')+'</div>'+
+    '<div class="ts-money">'+(each?posLineMoney(each*qty):'')+'</div>'+
+    lineKebabBtn({ lineId:ex.lineId })+'</div>';
+}
+function diningCourseLineHtml(to, c, i){
+  var title=diningCourseTitle(to,c);
+  var st=c.skipped?'skipped':c.fired?'fired':(courseNeedsDessertPick(c)?'choose dolce':'ready');
+  var mods=[];
+  if (c.course && to.type!=='tasting') mods.push(c.course);
+  if (c.auto || c.fireEach) mods.push('complimentary');
+  if (c.entremets || c.mode==='entremets') mods.push('entremet');
+  if (c.later || c.mode==='later') mods.push('dolce');
+  if (c.selectedTemp) mods.push(c.selectedTemp);
+  if (c.modNote) mods.push(c.modNote);
+  if (c.scoopChoice) mods.push(c.scoopChoice);
+  if (c.upcharge) mods.push('+$'+Number(c.upcharge).toFixed(0));
+  var hits=guestAllergyHits(c.allergens);
+  if (hits.length) mods.push('⚠ '+hits.join(', '));
+  var dKey=diningLineKey(to.id, i);
+  var picked=!!(STATE.selectedLineIds && STATE.selectedLineIds[dKey]);
+  var kind=diningCourseKind(c);
+  var pos=diningCourseTicketPos(c, i);
+  return '<div class="ts-line lc-line dining-line '+(c.fired?'sent':c.skipped?'held':'unsent')+(picked?' picked':'')+'" data-drop-kind="'+esc(kind)+'" data-drop-pos="'+pos+'" onclick=\'toggleLineSelect('+JSON.stringify(dKey)+')\'>'+
+    '<div><div class="ts-name">'+esc(title)+'</div>'+
+    (mods.length?'<div class="ts-mod">'+esc(mods.join(' · '))+'</div>':'')+
+    '<div class="ts-meta lc-meta">'+st.toUpperCase()+'</div></div>'+
+    (c.fired||c.skipped ? '<div class="fired-pill">'+(c.skipped?'SKIPPED':'FIRED')+'</div>' : lineKebabBtn({ type:'dining', toId:to.id, idx:i }))+
+    '</div>';
+}
+function findMutableExtra(lineId){
+  var unsent=(STATE.currentOrder||[]).filter(function(i){ return i.lineId===lineId; })[0];
+  if (unsent) return unsent;
+  var found=null;
+  (STATE.orders||[]).forEach(function(o){
+    (o.items||[]).forEach(function(i){
+      if (!found && i.lineId===lineId) found=i;
+    });
+  });
+  return found;
+}
+function extraDragStart(ev, lineId){
+  if (ev.button!=null && ev.button!==0) return;
+  if (ev.target && ev.target.closest && ev.target.closest('.line-kebab')) return;
+  STATE._extraDrag={
+    lineId:String(lineId),
+    x:ev.clientX, y:ev.clientY,
+    moved:false,
+    pointerId:ev.pointerId,
+    el:ev.currentTarget
+  };
+}
+function extraDropRowAt(x, y){
+  var hit=document.elementFromPoint(x, y);
+  return hit && hit.closest ? hit.closest('.ts-line[data-drop-pos]') : null;
+}
+function extraDragMove(ev){
+  var drag=STATE._extraDrag; if (!drag) return;
+  var dx=ev.clientX-drag.x, dy=ev.clientY-drag.y;
+  if (!drag.moved && (dx*dx+dy*dy)<196) return;
+  drag.moved=true;
+  if (drag.el) {
+    drag.el.classList.add('dragging');
+    drag.el.style.pointerEvents='none';
+  }
+  try { ev.preventDefault(); } catch (e) {}
+  var rows=document.querySelectorAll('.ts-line.drop-hover');
+  for (var i=0;i<rows.length;i++) rows[i].classList.remove('drop-hover');
+  var row=extraDropRowAt(ev.clientX, ev.clientY);
+  if (row && row.getAttribute('data-extra-line')!==drag.lineId) row.classList.add('drop-hover');
+}
+function extraDragEnd(ev){
+  var drag=STATE._extraDrag; if (!drag) return;
+  STATE._extraDrag=null;
+  if (drag.el) {
+    drag.el.classList.remove('dragging');
+    drag.el.style.pointerEvents='';
+  }
+  var rows=document.querySelectorAll('.ts-line.drop-hover');
+  for (var i=0;i<rows.length;i++) rows[i].classList.remove('drop-hover');
+  if (!drag.moved) { toggleLineSelect(drag.lineId); return; }
+  var row=extraDropRowAt(ev.clientX, ev.clientY);
+  if (!row) return;
+  applyExtraDrop(drag.lineId, row, ev.clientY);
+}
+function applyExtraDrop(lineId, row, clientY){
+  var extra=findMutableExtra(lineId);
+  if (!extra || !row) return;
+  if (row.getAttribute('data-extra-line')===String(lineId)) return;
+  var kind=row.getAttribute('data-drop-kind')||'';
+  var pos=Number(row.getAttribute('data-drop-pos'));
+  var otherId=row.getAttribute('data-extra-line');
+  var rect=row.getBoundingClientRect();
+  var after=clientY>(rect.top+rect.height/2);
+  var base=isFinite(pos)?pos:extraTicketPos(extra);
+  extra.ticketPos=after ? base+0.5 : base-0.5;
+  if (kind==='app' || kind==='main' || kind==='des') {
+    extra.pfCourseKind=kind;
+    extra.course=kind==='des'?4:(kind==='app'?2:3);
+  } else if (otherId) {
+    var other=findMutableExtra(otherId);
+    if (other) {
+      extra.pfCourseKind=extraKindOf(other);
+      extra.course=extra.pfCourseKind==='des'?4:(extra.pfCourseKind==='app'?2:(extra.pfCourseKind==='drink'?1:3));
+    }
+  }
+  persistCheck(ensureOpenCheck(STATE.selectedTable));
+  renderOrder();
+}
+
 function renderDiningProgress(){
   var list=tableDiningOrders();
   if (!list.length) return '';
+  var usedExtra={};
+  var allExtras=extraInvoiceEntries();
   var html='';
-  list.forEach(function(to){
+  list.forEach(function(to, toIndex){
     var courses=diningCourses(to);
     var visible=courses.filter(function(c){ return !hideEntremetUntilDessert(c,to); });
     var done=visible.filter(function(c){ return c.fired || c.skipped; }).length;
@@ -6992,36 +7201,34 @@ function renderDiningProgress(){
         var hits=guestAllergyHits(w.c.allergens);
         if (hits.length) welcomeMods.push(welcomeTrioShort(w.c)+' ⚠ '+hits.join(', '));
       });
-      html+='<div class="ts-line lc-line dining-line welcome-trio '+(welcomeFired?'sent':'unsent')+'">'+
+      html+='<div class="ts-line lc-line dining-line welcome-trio '+(welcomeFired?'sent':'unsent')+'" data-drop-kind="welcome" data-drop-pos="'+defaultTicketPosForKind('welcome')+'">'+
         '<div><div class="ts-name">'+esc(names)+'</div>'+
         '<div class="ts-mod">complimentary welcome</div>'+
         (welcomeMods.length?'<div class="ts-mod">'+esc(welcomeMods.join(' · '))+'</div>':'')+
         '</div></div>';
     }
+    var extras=allExtras.filter(function(ex){
+      if (usedExtra[ex.lineId]) return false;
+      if (!extraBelongsToDining(ex, to, list, toIndex)) return false;
+      usedExtra[ex.lineId]=1;
+      return true;
+    });
+    var mixed=[];
     courses.forEach(function(c,i){
       if (hideEntremetUntilDessert(c,to)) return;
       if (isWelcomeTrioCourse(c)) return;
-      var title=diningCourseTitle(to,c);
-      var st=c.skipped?'skipped':c.fired?'fired':(courseNeedsDessertPick(c)?'choose dolce':'ready');
-      var mods=[];
-      if (c.course && to.type!=='tasting') mods.push(c.course);
-      if (c.auto || c.fireEach) mods.push('complimentary');
-      if (c.entremets || c.mode==='entremets') mods.push('entremet');
-      if (c.later || c.mode==='later') mods.push('dolce');
-      if (c.selectedTemp) mods.push(c.selectedTemp);
-      if (c.modNote) mods.push(c.modNote);
-      if (c.scoopChoice) mods.push(c.scoopChoice);
-      if (c.upcharge) mods.push('+$'+Number(c.upcharge).toFixed(0));
-      var hits=guestAllergyHits(c.allergens);
-      if (hits.length) mods.push('⚠ '+hits.join(', '));
-      var dKey=diningLineKey(to.id, i);
-      var picked=!!(STATE.selectedLineIds && STATE.selectedLineIds[dKey]);
-      html+='<div class="ts-line lc-line dining-line '+(c.fired?'sent':c.skipped?'held':'unsent')+(picked?' picked':'')+'" onclick=\'toggleLineSelect('+JSON.stringify(dKey)+')\'>'+
-        '<div><div class="ts-name">'+esc(title)+'</div>'+
-        (mods.length?'<div class="ts-mod">'+esc(mods.join(' · '))+'</div>':'')+
-        '<div class="ts-meta lc-meta">'+st.toUpperCase()+'</div></div>'+
-        (c.fired||c.skipped ? '<div class="fired-pill">'+(c.skipped?'SKIPPED':'FIRED')+'</div>' : lineKebabBtn({ type:'dining', toId:to.id, idx:i }))+
-        '</div>';
+      mixed.push({ type:'dining', c:c, i:i, ticketPos:diningCourseTicketPos(c,i) });
+    });
+    extras.forEach(function(ex){
+      mixed.push({ type:'extra', extra:ex, ticketPos:ex.ticketPos });
+    });
+    mixed.sort(function(a,b){
+      if (a.ticketPos!==b.ticketPos) return a.ticketPos-b.ticketPos;
+      return (a.type==='dining'?0:1)-(b.type==='dining'?0:1);
+    });
+    mixed.forEach(function(m){
+      if (m.type==='dining') html+=diningCourseLineHtml(to, m.c, m.i);
+      else html+=extraInvoiceLineHtml(m.extra);
     });
   });
   return html;
