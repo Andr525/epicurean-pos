@@ -18,7 +18,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <title>Epicurean POS</title>
-<!-- pos-build: scalini-print-v45 -->
+<!-- pos-build: scalini-print-v46 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
@@ -118,6 +118,9 @@ body { font-family:var(--font); color:var(--text); background:var(--bg); -webkit
 .pf-sel-actions { display:flex; gap:0.5rem; margin-top:1.2rem; }
 .pf-temp-row { display:flex; flex-wrap:wrap; gap:6px; margin:0.35rem 0 0.55rem 1.4rem; }
 .pf-temp-row .chip { min-height:36px; padding:0.35rem 0.7rem; font-size:0.78rem; }
+.pf-none-row { margin:0 0 0.45rem; }
+.pf-none-tab { min-height:40px; padding:0 1.05rem; font-weight:800; letter-spacing:0.04em; text-transform:uppercase; }
+.pf-none-tab:has(input:checked) { outline:2px solid #2f6fdb; outline-offset:-2px; }
 .wine-notes-btn {
   margin-top:0.35rem; font-size:0.68rem; font-weight:700; letter-spacing:0.04em;
   color:#E8D5A3; text-transform:uppercase; border:1px solid rgba(201,168,76,0.45);
@@ -1220,7 +1223,7 @@ body.hh-on .floor-retry { background:#fff; color:#000; border-color:#c5ced8; }
 <div id="login-screen" class="screen active">
   <h1>Epicurean POS</h1>
   <p class="subtitle">Enter your 4-digit code</p>
-  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 45</p>
+  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 46</p>
   <div class="pin-display" id="pin-display">
     <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
   </div>
@@ -4033,12 +4036,8 @@ function combineTargetFromDrag(dragEl, clientX, clientY, skipNum){
   if (best && bestR>=JOIN_EDGE_IGNORE) return best;
   return '';
 }
-function commitTableMove(tNum, canvasDx, canvasDy){
-  var live=liveFloorTable(resolveTableNumber(tNum));
-  if (!live) return;
-  live.x=(live.x||0)+canvasDx;
-  live.y=(live.y||0)+canvasDy;
-  persistPosLayout();
+function commitTableMove(){
+  return;
 }
 function bindFloorGestures(){
   var stage=document.getElementById('floor-stage');
@@ -4217,8 +4216,7 @@ function bindFloorGestures(){
     if (hit && String(hit)!==String(startTable)) {
       combineTables(startTable, hit);
     } else {
-      var z=STATE.floorZoom||1;
-      commitTableMove(startTable, (x-tapX)/z, (y-tapY)/z);
+      cancelTableDrag();
       renderTables();
     }
     startTable='';
@@ -5446,13 +5444,52 @@ function pfGuestChoiceMode(c){
   var m=pfCourseMode(c);
   return m==='choose' || m==='later';
 }
+function pfNoneRadioHtml(name, checked, onchange){
+  return '<div class="pf-none-row"><label class="chip pf-none-tab'+(checked?' active':'')+'"><input type="radio" name="'+name+'" value="none"'+(checked?' checked':'')+(onchange?' onchange="'+onchange+'"':'')+'> None</label></div>';
+}
+function isPfNonePick(v){
+  return v==='none' || v==='-1';
+}
+function nonePrixFixeSelection(course, flags){
+  flags=flags||{};
+  return {
+    course: course.label || course.name || '',
+    choice: 'None',
+    name: 'None',
+    desc: 'No prix-fixe dish — order through Add items if needed.',
+    upcharge: 0,
+    station: 'Expo',
+    allergens: [],
+    skipped: true,
+    noneChoice: true,
+    pending: false,
+    later: !!flags.later,
+    fired: false,
+    firedAt: null
+  };
+}
+function applyNoneToDiningCourse(c, flags){
+  flags=flags||{};
+  if (!c) return;
+  c.choice='None';
+  c.name='None';
+  c.desc='No prix-fixe dish — order through Add items if needed.';
+  c.upcharge=0;
+  c.pending=false;
+  c.skipped=true;
+  c.noneChoice=true;
+  c.selectedTemp='';
+  c.scoopChoice='';
+  c.allergens=[];
+  if (flags.later) c.later=true;
+}
 function togglePfScoops(ci, active){
   document.querySelectorAll('[id^="pf-scoops-'+ci+'-"]').forEach(function(el){
     el.style.display = el.id==='pf-scoops-'+ci+'-'+active ? 'block' : 'none';
   });
 }
 function pfOptionRadiosHtml(c, ci, selectedName){
-  var html='';
+  var html=pfNoneRadioHtml('pf-course-'+ci, selectedName==='None' || selectedName==='none', 'togglePfScoops('+ci+',"none")');
   (c.options||[]).forEach(function(o,oi){
     if (!o || o.headingOnly || !String(o.name||'').trim()) return;
     var hits=guestAllergyHits(o.allergens);
@@ -5521,6 +5558,10 @@ function buildPrixFixeSelections(pf, pickedByIndex){
       return;
     }
     if (mode==='later'){
+      if (isPfNonePick(pickedByIndex[ci])) {
+        selections.push(nonePrixFixeSelection(c,{later:true}));
+        return;
+      }
       var opt=opts[pickedByIndex[ci]];
       if (opt) {
         var laterSel=selFromOption(c,opt,{later:true,pending:false});
@@ -5540,7 +5581,11 @@ function buildPrixFixeSelections(pf, pickedByIndex){
       }
       return;
     }
-    var opt=opts[pickedByIndex[ci]||0] || opts[0];
+    if (isPfNonePick(pickedByIndex[ci])) {
+      selections.push(nonePrixFixeSelection(c,{}));
+      return;
+    }
+    var opt=opts[pickedByIndex[ci]];
     if (opt) selections.push(selFromOption(c,opt,{}));
   });
   return selections;
@@ -5559,6 +5604,7 @@ function nextDiningFire(to){
 }
 function courseNeedsDessertPick(c){
   if (!c) return false;
+  if (c.noneChoice || c.skipped) return false;
   if (!(c.later || c.mode==='later')) return false;
   var choice=String(c.choice||c.name||'');
   return !choice || /take after/i.test(choice);
@@ -5633,8 +5679,9 @@ function dessertHasBeenChosen(to){
   return diningCourses(to).some(function(c){
     var name=String(c.choice||'');
     if (!(c.later || c.mode==='later')) return false;
+    if (c.noneChoice || c.skipped) return true;
     if (c.pending || courseNeedsDessertPick(c)) return false;
-    return !!(name && !/take after|^dolce$/i.test(name));
+    return !!(name && !/take after|^dolce$|^none$/i.test(name));
   });
 }
 function hideEntremetUntilDessert(c, to){
@@ -5753,7 +5800,7 @@ function openPrixFixeSelector(pfId) {
   var html='<div class="pf-selector">';
   html+='<button type="button" class="pf-back" onclick="backToOrderScreen()">← Order</button>';
   html+='<h3>'+esc(pf.name)+' — '+posLineMoney(Number(pf.price)||0)+'</h3>';
-  html+='<p class="pf-sel-sub">One appetizer, one main, and one dessert per seat — all included in '+posLineMoney(Number(pf.price)||0)+'. Extra dishes go through Add items. Welcome bites and entremet fire from the check.</p>';
+  html+='<p class="pf-sel-sub">One appetizer and one main per seat — or None. Dessert is chosen later from the check, at any point. Extra dishes go through Add items. Welcome bites and entremet fire from the check.</p>';
   if (!courses.length) html+='<p class="pf-sel-sub">No courses on this menu yet.</p>';
   courses.forEach(function(c,ci){
     var mode=pfCourseMode(c);
@@ -5768,6 +5815,13 @@ function openPrixFixeSelector(pfId) {
     if (mode==='entremets'){
       html+='<div class="pf-course-select"><label>'+esc(c.label)+' — automatic palate cleanser</label>';
       html+='<p class="pf-sel-sub">Fires from the check before dessert. Not a guest choice.</p></div>';
+      return;
+    }
+    if (mode==='later'){
+      html+='<div class="pf-course-select"><label>'+esc(c.label)+' — later</label>';
+      html+='<p class="pf-sel-sub">Dessert is chosen later from the check. Tap None only if this guest skips dessert. Extra desserts go through Add items.</p>';
+      html+=pfNoneRadioHtml('pf-course-'+ci, false);
+      html+='</div>';
       return;
     }
     html+='<div class="pf-course-select"><label>'+esc(c.label)+' — choose one</label><div class="pf-options">';
@@ -5803,8 +5857,13 @@ function confirmPrixFixe(pfId) {
     if (!pfGuestChoiceMode(c)) return;
     var radios=document.querySelectorAll('input[name="pf-course-'+ci+'"]');
     var got=false;
-    radios.forEach(function(r){ if(r.checked){ picked[ci]=parseInt(r.value,10); got=true; } });
-    if (!got) return;
+    radios.forEach(function(r){
+      if (!r.checked) return;
+      got=true;
+      if (isPfNonePick(r.value)) picked[ci]='none';
+      else picked[ci]=parseInt(r.value,10);
+    });
+    if (!got || isPfNonePick(picked[ci])) return;
     var opt=(c.options||[])[picked[ci]];
     if (opt && prixFixeTempOptions(opt.askTemp, opt).length){
       var tEl=document.querySelector('input[name="pf-temp-'+ci+'-'+picked[ci]+'"]:checked');
@@ -5823,9 +5882,12 @@ function confirmPrixFixe(pfId) {
   });
   if (missingTemp) { toast('Choose temperature for '+missingTemp); return; }
   if (missingScoops) { toast('Choose scoops for '+missingScoops); return; }
-  var need=(pf.courses||[]).filter(function(c){ return pfGuestChoiceMode(c) && (c.options||[]).filter(function(o){ return o && !o.headingOnly && String(o.name||'').trim(); }).length; });
+  var need=(pf.courses||[]).filter(function(c){
+    if (pfCourseMode(c)!=='choose') return false;
+    return (c.options||[]).filter(function(o){ return o && !o.headingOnly && String(o.name||'').trim(); }).length;
+  });
   if (Object.keys(picked).length < need.length) {
-    toast('Choose one appetizer, one main, and one dessert');
+    toast('Choose an appetizer and a main, or None');
     return;
   }
   var selections=buildPrixFixeSelections(pf, picked);
@@ -7073,7 +7135,7 @@ function extraInvoiceLineHtml(ex){
 }
 function diningCourseLineHtml(to, c, i){
   var title=diningCourseTitle(to,c);
-  var st=c.skipped?'skipped':c.fired?'fired':(courseNeedsDessertPick(c)?'choose dolce':'ready');
+  var st=c.noneChoice?'none':c.skipped?'skipped':c.fired?'fired':(courseNeedsDessertPick(c)?'choose dolce':'ready');
   var mods=[];
   if (c.course && to.type!=='tasting') mods.push(c.course);
   if (c.auto || c.fireEach) mods.push('complimentary');
@@ -7082,6 +7144,7 @@ function diningCourseLineHtml(to, c, i){
   if (c.selectedTemp) mods.push(c.selectedTemp);
   if (c.modNote) mods.push(c.modNote);
   if (c.scoopChoice) mods.push(c.scoopChoice);
+  if (c.noneChoice) mods.push('no prix-fixe dish');
   if (c.upcharge) mods.push('+$'+Number(c.upcharge).toFixed(0));
   var hits=guestAllergyHits(c.allergens);
   if (hits.length) mods.push('⚠ '+hits.join(', '));
@@ -7089,11 +7152,11 @@ function diningCourseLineHtml(to, c, i){
   var picked=!!(STATE.selectedLineIds && STATE.selectedLineIds[dKey]);
   var kind=diningCourseKind(c);
   var pos=diningCourseTicketPos(c, i);
-  return '<div class="ts-line lc-line dining-line '+(c.fired?'sent':c.skipped?'held':'unsent')+(picked?' picked':'')+'" data-drop-kind="'+esc(kind)+'" data-drop-pos="'+pos+'" onclick=\'toggleLineSelect('+JSON.stringify(dKey)+')\'>'+
+  return '<div class="ts-line lc-line dining-line '+(c.fired?'sent':(c.skipped||c.noneChoice)?'held':'unsent')+(picked?' picked':'')+'" data-drop-kind="'+esc(kind)+'" data-drop-pos="'+pos+'" onclick=\'toggleLineSelect('+JSON.stringify(dKey)+')\'>'+
     '<div><div class="ts-name">'+esc(title)+'</div>'+
     (mods.length?'<div class="ts-mod">'+esc(mods.join(' · '))+'</div>':'')+
     '<div class="ts-meta lc-meta">'+st.toUpperCase()+'</div></div>'+
-    (c.fired||c.skipped ? '<div class="fired-pill">'+(c.skipped?'SKIPPED':'FIRED')+'</div>' : lineKebabBtn({ type:'dining', toId:to.id, idx:i }))+
+    (c.fired || (c.skipped && !c.noneChoice) ? '<div class="fired-pill">'+(c.skipped?'SKIPPED':'FIRED')+'</div>' : lineKebabBtn({ type:'dining', toId:to.id, idx:i }))+
     '</div>';
 }
 function findMutableExtra(lineId){
@@ -7252,6 +7315,8 @@ function applyOptionToDiningCourse(c, opt, extras){
   extras=extras||{};
   if (!c || !opt) return;
   c.pending=false;
+  c.skipped=false;
+  c.noneChoice=false;
   c.choice=opt.name;
   c.name=opt.name;
   c.desc=opt.desc||'';
@@ -7275,7 +7340,7 @@ function openDiningCourseEditor(toId, idx){
   if (!to) return;
   var c=diningCourses(to)[idx];
   if (!c) return;
-  if (c.fired || c.skipped) { toast('Already fired'); return; }
+  if (c.fired || (c.skipped && !c.noneChoice)) { toast('Already fired'); return; }
   if (c.auto || c.fireEach || c.entremets || c.mode==='entremets') {
     openCourseNoteSheet(toId, idx);
     return;
@@ -7290,8 +7355,9 @@ function openDiningCourseEditor(toId, idx){
   var html='<div class="pf-selector">';
   html+='<button type="button" class="pf-back" onclick="backToOrderScreen()">← Order</button>';
   html+='<h3>Modify '+esc(c.course||'course')+'</h3>';
-  html+='<p class="pf-sel-sub">One choice for this seat. Extra dishes go through Add items.</p>';
+  html+='<p class="pf-sel-sub">One choice for this seat, or None. Extra dishes go through Add items.</p>';
   html+='<div class="pf-course-select"><label>Choose one</label><div class="pf-options">';
+  html+=pfNoneRadioHtml('pf-edit-opt', !!(c.noneChoice || /^none$/i.test(current)));
   options.forEach(function(o,oi){
     var hits=guestAllergyHits(o.allergens);
     var temps=prixFixeTempOptions(o.askTemp, o);
@@ -7323,8 +7389,18 @@ function confirmDiningCourseEdit(toId, idx){
   var options=diningCourseOptions(to, c);
   var radios=document.querySelectorAll('input[name="pf-edit-opt"]');
   var sel=-1;
-  radios.forEach(function(r){ if(r.checked) sel=parseInt(r.value,10); });
-  if (sel<0) { toast('Choose one dish'); return; }
+  radios.forEach(function(r){ if(r.checked) sel=r.value; });
+  if (isPfNonePick(sel)) {
+    applyNoneToDiningCourse(c);
+    var line=(STATE.currentOrder||[]).filter(function(i){ return i.diningOrderId===to.id || i.lineId===to._boundLine; })[0];
+    if (line && line.selections && line.selections[idx]) line.selections[idx]=Object.assign({}, c);
+    closePfSelector();
+    renderOrder();
+    toast('No prix-fixe dish — add through Add items if needed');
+    return;
+  }
+  sel=parseInt(sel,10);
+  if (!(sel>=0)) { toast('Choose one dish or None'); return; }
   var opt=options[sel];
   if (!opt) return;
   var extras={};
@@ -7345,7 +7421,7 @@ function eraseDiningCourse(toId, idx, quiet){
   if (!to) return;
   var c=diningCourses(to)[idx];
   if (!c) return;
-  if (c.fired || c.skipped) { toast('Already fired'); return; }
+  if (c.fired || (c.skipped && !c.noneChoice)) { toast('Already fired'); return; }
   if (c.auto || c.fireEach || c.entremets || c.mode==='entremets') {
     toast('Complimentary course — add a kitchen note instead');
     return;
@@ -7357,6 +7433,8 @@ function eraseDiningCourse(toId, idx, quiet){
     c.later=true;
     c.scoopChoice='';
     c.selectedTemp='';
+    c.skipped=false;
+    c.noneChoice=false;
     to.dessertChosen=false;
   } else {
     c.choice='';
@@ -7364,6 +7442,8 @@ function eraseDiningCourse(toId, idx, quiet){
     c.pending=true;
     c.selectedTemp='';
     c.scoopChoice='';
+    c.skipped=false;
+    c.noneChoice=false;
   }
   var dKey=diningLineKey(toId, idx);
   if (STATE.selectedLineIds) delete STATE.selectedLineIds[dKey];
@@ -7384,8 +7464,9 @@ function openDessertSelector(orderId){
   var html='<div class="pf-selector">';
   html+='<button type="button" class="pf-back" onclick="backToOrderScreen()">← Order</button>';
   html+='<h3>Dolce</h3>';
-  html+='<p class="pf-sel-sub">One dessert per seat, included in the prix fixe. Extra desserts go through Add items. Gelato is three scoops.</p>';
+  html+='<p class="pf-sel-sub">Dessert can be chosen at any point. Tap None if this guest skips dessert. Extra desserts go through Add items. Gelato is three scoops.</p>';
   html+='<div class="pf-course-select"><label>Dessert — choose one</label><div class="pf-options">';
+  html+=pfNoneRadioHtml('dessert-opt', !!(later && (later.noneChoice || /^none$/i.test(current))), 'toggleDessertScoops("none")');
   options.forEach(function(o,oi){
     var hits=guestAllergyHits(o.allergens);
     var checked=current ? String(o.name)===current : false;
@@ -7423,8 +7504,20 @@ function confirmDessert(orderId){
   var options=dessertOptionsFor(to);
   var radios=document.querySelectorAll('input[name="dessert-opt"]');
   var sel=-1;
-  radios.forEach(function(r){ if(r.checked) sel=parseInt(r.value,10); });
-  if (sel<0) { toast('Choose one dessert'); return; }
+  radios.forEach(function(r){ if(r.checked) sel=r.value; });
+  if (isPfNonePick(sel)) {
+    diningCourses(to).forEach(function(c){
+      if (c.entremets || c.mode==='entremets') c.pending=false;
+      if (c.later || c.mode==='later') applyNoneToDiningCourse(c,{later:true});
+    });
+    to.dessertChosen=true;
+    closePfSelector();
+    toast('No dessert — add through Add items if needed');
+    renderOrder();
+    return;
+  }
+  sel=parseInt(sel,10);
+  if (!(sel>=0)) { toast('Choose a dessert, or None'); return; }
   var opt=options[sel];
   if (!opt) return;
   var scoopNames=[];
@@ -7447,6 +7540,8 @@ function confirmDessert(orderId){
     }
     if (c.later || c.mode==='later'){
       c.pending=false;
+      c.skipped=false;
+      c.noneChoice=false;
       c.later=false;
       c.choice=opt.name;
       c.name=opt.name;
