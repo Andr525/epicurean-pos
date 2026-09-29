@@ -1944,14 +1944,19 @@ function normSeatKey(seat){
   return String(seat);
 }
 function seatHasPrixFixe(seat){
-  var s=normSeatKey(seat==null?STATE.activeSeat:'table');
+  var s=normSeatKey(seat==null?STATE.activeSeat:seat);
   var inDining=tableDiningOrders().some(function(to){
-    return to && to.type==='prix-fixe' && to.status==='active' && normSeatKey(to.seat)===s;
+    if (!to || to.status==='void') return false;
+    if (to.type==='tasting' && !to.prixFixeId) return false;
+    return normSeatKey(to.seat)===s;
   });
   if (inDining) return true;
   return (STATE.currentOrder||[]).some(function(i){
-    return i && i.isPrixFixe && normSeatKey(i.seat)===s;
+    return i && i.isPrixFixe && String(i.table)===String(STATE.selectedTable) && normSeatKey(i.seat)===s;
   });
+}
+function warnPrixFixeAlreadyOnSeat(){
+  toast('This seat already has the $89 prix fixe. Extra dishes go through Add items.');
 }
 function extraDishSearchOnly(){
   if (!tableHasDining()) return false;
@@ -5296,6 +5301,10 @@ function filterCat(catId) {
   STATE.tilePage=0;
   renderOrder();
   if (catId==='__prixfixe__') {
+    if (seatHasPrixFixe(STATE.activeSeat)) {
+      warnPrixFixeAlreadyOnSeat();
+      return;
+    }
     var menus=(STATE.prixFixeMenus||[]).map(hydratePrixFixeMenu).filter(function(p){ return p && p.id; });
     if (menus.length===1) openPrixFixeSelector(menus[0].id);
   }
@@ -5687,7 +5696,7 @@ function prixFixeTempOptions(kind, opt){
 
 function openPrixFixeSelector(pfId) {
   if (seatHasPrixFixe(STATE.activeSeat)) {
-    toast('This seat already has the $89 prix fixe. Extra dishes go through Add items.');
+    warnPrixFixeAlreadyOnSeat();
     return;
   }
   var pf=findPrixFixeMenu(pfId);
@@ -5734,7 +5743,7 @@ function closePfSelector() {
 
 function confirmPrixFixe(pfId) {
   if (seatHasPrixFixe(STATE.activeSeat)) {
-    toast('This seat already has the $89 prix fixe. Extra dishes go through Add items.');
+    warnPrixFixeAlreadyOnSeat();
     return;
   }
   var pf=findPrixFixeMenu(pfId);
