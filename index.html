@@ -18,7 +18,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <title>Epicurean POS</title>
-<!-- pos-build: scalini-print-v43 -->
+<!-- pos-build: scalini-print-v44 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
@@ -96,6 +96,12 @@ body { font-family:var(--font); color:var(--text); background:var(--bg); -webkit
 #pf-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.8); display:none; align-items:center; justify-content:center; z-index:9000; padding:1rem; padding-bottom:calc(1rem + env(safe-area-inset-bottom)); pointer-events:none; }
 #pf-overlay.show { display:flex; pointer-events:auto; }
 .pf-selector { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:1.5rem; max-width:560px; width:100%; max-height:80vh; overflow-y:auto; position:relative; z-index:1; }
+.pf-back {
+  display:inline-flex; align-items:center; margin-bottom:0.7rem;
+  min-height:36px; padding:0 0.75rem; border:1px solid var(--border);
+  background:var(--surface-2); color:var(--text); font-weight:800; font-size:0.82rem;
+  border-radius:8px; cursor:pointer;
+}
 .pf-opt-desc { display:block; font-size:0.72rem; color:var(--text-muted); margin-left:1.4rem; margin-top:0.15rem; }
 .pf-auto-list { margin:0 0 1rem; padding-left:1.1rem; color:var(--text-secondary); font-size:0.82rem; }
 .pf-auto-list li { margin:0.25rem 0; }
@@ -709,9 +715,9 @@ body.hh-on.floor-drawing .floor-stage { outline:2px dashed var(--primary); }
 .ts-console.toast-go.has-dining .ts-check {
   max-height:42vh; flex:0 1 42vh; min-height:0;
 }
-.ts-console.toast-go.has-dining .ts-grid-wrap { flex:1 1 42vh; min-height:220px; overflow:auto; }
-.ts-console.toast-go.has-dining.searching .ts-check { max-height:26vh; flex:0 1 26vh; }
-.ts-console.toast-go.has-dining.searching .ts-grid-wrap { flex:1 1 56vh; min-height:280px; overflow:auto; }
+.ts-console.toast-go.has-dining .ts-grid-wrap { flex:1 1 46vh; min-height:240px; overflow:auto; }
+.ts-console.toast-go.has-dining.searching .ts-check { max-height:22vh; flex:0 1 22vh; }
+.ts-console.toast-go.has-dining.searching .ts-grid-wrap { flex:1 1 62vh; min-height:320px; overflow:auto; }
 .ts-console.toast-go .ts-check-head, .ts-console.toast-go .ts-line {
   grid-template-columns:minmax(0,1fr) 28px 40px 44px 28px;
 }
@@ -734,6 +740,13 @@ body.hh-on.floor-drawing .floor-stage { outline:2px dashed var(--primary); }
   color:#fff; font-weight:700; font-size:0.82rem; padding:0.7rem 0.9rem; cursor:pointer;
 }
 .line-menu-pop button:active { background:#2a3544; }
+.line-edit-bar { display:flex; gap:6px; padding:0.25rem 0 0.45rem; }
+.line-edit-bar button {
+  flex:1; min-height:38px; font-weight:800; font-size:0.78rem;
+  border:1px solid var(--border); background:var(--surface-2); color:var(--text);
+  border-radius:8px; cursor:pointer;
+}
+.line-edit-bar button.erase { background:#3b1212; color:#fecaca; border-color:#7f1d1d; }
 .seat-pick-list { display:flex; flex-direction:column; gap:0; margin:0.4rem 0 0.8rem; }
 .seat-pick-list button {
   width:100%; min-height:48px; text-align:left; padding:0 0.9rem;
@@ -1048,14 +1061,17 @@ body.hh-on .ts-console.toast-go .ts-check {
   background:#fff; border:1px solid #c5ced8; border-radius:0; max-height:42vh;
   padding:0.35rem 0.45rem 0.2rem; color:#000; overflow-y:auto; -webkit-overflow-scrolling:touch;
 }
-body.hh-on .ts-console.toast-go.has-dining .ts-check { max-height:36vh; flex:0 1 36vh; }
-body.hh-on .ts-console.toast-go.has-dining.searching .ts-check { max-height:24vh; flex:0 1 24vh; }
+body.hh-on .ts-console.toast-go.has-dining .ts-check { max-height:28vh; flex:0 1 28vh; }
+body.hh-on .ts-console.toast-go.has-dining.searching .ts-check { max-height:16vh; flex:0 1 16vh; }
 body.hh-on .ts-grid-wrap {
-  flex:1 1 auto; min-height:32vh; overflow-x:auto; overflow-y:auto;
+  flex:1 1 auto; min-height:40vh; overflow-x:auto; overflow-y:auto;
   -webkit-overflow-scrolling:touch;
 }
-body.hh-on .ts-console.toast-go.has-dining .ts-grid-wrap { min-height:38vh; }
-body.hh-on .ts-console.toast-go.has-dining.searching .ts-grid-wrap { min-height:48vh; flex:1 1 52vh; }
+body.hh-on .ts-console.toast-go.has-dining .ts-grid-wrap { min-height:50vh; }
+body.hh-on .ts-console.toast-go.has-dining.searching .ts-grid-wrap { min-height:64vh; flex:1 1 70vh; }
+body.hh-on .pf-back { background:#fff; color:#000; border-color:#c5ced8; }
+body.hh-on .line-edit-bar button { background:#fff; color:#000; border-color:#c5ced8; }
+body.hh-on .line-edit-bar button.erase { background:#3b1212; color:#fecaca; }
 body.hh-on .ts-console.toast-go .ts-grid {
   grid-template-columns:repeat(4, minmax(72px,1fr));
   grid-auto-rows:minmax(58px, auto);
@@ -1187,7 +1203,7 @@ body.hh-on .floor-retry { background:#fff; color:#000; border-color:#c5ced8; }
     <button class="ghost-btn" onclick="closeOverflow();openAllergyEditor()">Guest allergies</button>
     <button class="ghost-btn" onclick="closeOverflow();openGuestNotesSheet()">Guest notes</button>
     <button class="ghost-btn" onclick="closeOverflow();logout()">Sign out</button>
-    <button class="primary-btn" style="margin-top:0.8rem;" onclick="closeOverflow()">Close</button>
+    <button class="primary-btn" style="margin-top:0.8rem;" onclick="closeOverflow();backToOrderScreen()">Back to order</button>
   </div>
 </div>
 
@@ -1195,7 +1211,7 @@ body.hh-on .floor-retry { background:#fff; color:#000; border-color:#c5ced8; }
 <div id="login-screen" class="screen active">
   <h1>Epicurean POS</h1>
   <p class="subtitle">Enter your 4-digit code</p>
-  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 43</p>
+  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 44</p>
   <div class="pin-display" id="pin-display">
     <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
   </div>
@@ -1923,6 +1939,26 @@ function prixFixeExtraTileHtml(d){
 function tableHasDining(){
   return tableDiningOrders().length>0;
 }
+function normSeatKey(seat){
+  if (seat==='table' || seat==='TABLE' || seat==null || seat==='') return 'table';
+  return String(seat);
+}
+function seatHasPrixFixe(seat){
+  var s=normSeatKey(seat==null?STATE.activeSeat:'table');
+  var inDining=tableDiningOrders().some(function(to){
+    return to && to.type==='prix-fixe' && to.status==='active' && normSeatKey(to.seat)===s;
+  });
+  if (inDining) return true;
+  return (STATE.currentOrder||[]).some(function(i){
+    return i && i.isPrixFixe && normSeatKey(i.seat)===s;
+  });
+}
+function extraDishSearchOnly(){
+  if (!tableHasDining()) return false;
+  if (STATE.menuFamily==='drinks') return false;
+  if (isWineListCat(STATE.orderCat)) return false;
+  return true;
+}
 function isDrinkItem(item){
   return defaultCourse(item)===1;
 }
@@ -1930,6 +1966,7 @@ function closeSheet(){
   var el=document.getElementById('sheet-overlay');
   el.classList.remove('show'); el.innerHTML='';
   STATE.pendingItem=null; STATE.pendingSend=null;
+  STATE._editingLineId=null;
   STATE._sheetOpenedAt=0;
 }
 function openSheet(html){
@@ -1999,7 +2036,7 @@ function renderHandheldTop(){
   var sess=sessionOf(STATE.selectedTable);
   var warn=reservationWarning(STATE.selectedTable);
   document.getElementById('hh-top').innerHTML=
-    '<button class="hh-back" onclick="backToFloor()" aria-label="Back">←</button>'+
+    '<button class="hh-back" onclick="handheldBack()" aria-label="Back">←</button>'+
     '<div class="hh-title">#'+esc(String(STATE.selectedTable))+' · Table '+esc(String(STATE.selectedTable))+
       '<span>'+sess.guestCount+' guests · '+(STATE.currentServer?esc(STATE.currentServer.name):'')+
       ' · <span id="hh-seated">'+seatedLabelFor(STATE.selectedTable)+'</span></span></div>'+
@@ -2014,7 +2051,7 @@ function renderHandheldTop(){
 }
 function renderHandheldBar(){
   var t=checkTotals();
-  var selected=Object.keys(STATE.selectedLineIds||{}).length;
+  var selected=Object.keys(selectedOrderLineIds()).length;
   var canFire=!!(t.sendable||selected);
   var sendLabel=selected?'SEND '+selected:(t.sendable?'SEND':'SEND');
   document.getElementById('hh-bar').innerHTML=
@@ -2030,6 +2067,45 @@ function setHhMode(mode){
   STATE.activeTab='order';
   renderOrder();
   paintChrome();
+}
+function overlayIsOpen(){
+  function shown(id){
+    var el=document.getElementById(id);
+    return !!(el && el.classList.contains('show'));
+  }
+  return shown('pf-overlay') || shown('sheet-overlay') || shown('payment-overlay') || shown('split-overlay') || shown('hh-overflow');
+}
+function backToOrderScreen(){
+  closeLineMenu();
+  closeOverflow();
+  closePfSelector();
+  closeSheet();
+  var split=document.getElementById('split-overlay');
+  if (split) split.classList.remove('show');
+  var pay=document.getElementById('payment-overlay');
+  if (pay) pay.classList.remove('show');
+  if (typeof squareCard!=='undefined' && squareCard) { squareCard.destroy().catch(function(){}); squareCard=null; }
+  STATE.menuSearch='';
+  STATE._posWineFind='';
+  STATE.menuNav={ level:'root' };
+  STATE.orderCat=null;
+  STATE.menuFamily='food';
+  STATE.hhMode='service';
+  STATE.checkFocus=false;
+  STATE.tilePage=0;
+  STATE.pendingItem=null;
+  STATE._editingLineId=null;
+  STATE.activeTab='order';
+  renderOrder();
+  paintChrome();
+}
+function handheldBack(){
+  var nested=overlayIsOpen() ||
+    (STATE.menuNav && STATE.menuNav.level && STATE.menuNav.level!=='root') ||
+    !!String(STATE.menuSearch||'').trim() ||
+    !!STATE.checkFocus;
+  if (nested) { backToOrderScreen(); return; }
+  backToFloor();
 }
 function backToFloor(){
   STATE.hhMode='service';
@@ -4730,9 +4806,13 @@ function toggleLineMenu(ev, spec){
   if (spec && spec.type==='dining') {
     html+='<button type="button" onclick=\'closeLineMenu();fireIndependentDining('+JSON.stringify(String(spec.toId))+','+spec.idx+')\'>Fire this item</button>';
     html+='<button type="button" onclick=\'closeLineMenu();openCourseNoteSheet('+JSON.stringify(String(spec.toId))+','+spec.idx+')\'>Kitchen note</button>';
+    html+='<button type="button" onclick=\'closeLineMenu();openDiningCourseEditor('+JSON.stringify(String(spec.toId))+','+spec.idx+')\'>Modify</button>';
+    html+='<button type="button" onclick=\'closeLineMenu();eraseDiningCourse('+JSON.stringify(String(spec.toId))+','+spec.idx+')\'>Erase</button>';
   } else if (spec && spec.lineId) {
     html+='<button type="button" onclick=\'closeLineMenu();fireIndependentLine('+JSON.stringify(String(spec.lineId))+')\'>Fire this item</button>';
     html+='<button type="button" onclick=\'closeLineMenu();openLineNoteSheet('+JSON.stringify(String(spec.lineId))+')\'>Kitchen note</button>';
+    html+='<button type="button" onclick=\'closeLineMenu();beginModifyLine('+JSON.stringify(String(spec.lineId))+')\'>Modify</button>';
+    html+='<button type="button" onclick=\'closeLineMenu();eraseOrderLine('+JSON.stringify(String(spec.lineId))+')\'>Erase</button>';
   }
   pop.innerHTML=html;
   pop.hidden=false;
@@ -4868,9 +4948,10 @@ function liveCheckHtml(){
   });
   html+=renderDiningProgress();
   html+='</div>';
+  html+=lineEditBarHtml();
   html+=renderCourseFireRow();
   var t=checkTotals();
-  var canFire=!!(t.sendable||Object.keys(STATE.selectedLineIds||{}).length);
+  var canFire=!!(t.sendable||Object.keys(selectedOrderLineIds()).length);
   html+='<div class="toast-check-actions">';
   html+='<button type="button" onclick="openOverflow()">Tab</button>';
   html+='<button type="button" onclick="STATE.menuOpen=true;setMenuFamily(\'food\')">+ Item</button>';
@@ -4897,6 +4978,93 @@ function toggleLineSelect(lineId){
   if (!STATE.selectedLineIds) STATE.selectedLineIds={};
   if (STATE.selectedLineIds[lineId]) delete STATE.selectedLineIds[lineId];
   else STATE.selectedLineIds[lineId]=1;
+  renderOrder();
+  paintChrome();
+}
+function diningLineKey(toId, idx){ return 'd|'+String(toId)+'|'+idx; }
+function parseSelKey(key){
+  var s=String(key||'');
+  if (s.indexOf('d|')===0){
+    var rest=s.slice(2);
+    var i=rest.lastIndexOf('|');
+    return { type:'dining', toId:rest.slice(0,i), idx:parseInt(rest.slice(i+1),10) };
+  }
+  return { type:'line', lineId:s };
+}
+function lineEditBarHtml(){
+  var n=Object.keys(STATE.selectedLineIds||{}).length;
+  if (!n) return '';
+  return '<div class="line-edit-bar">'+
+    '<button type="button" onclick="modifySelectedLine()">Modify</button>'+
+    '<button type="button" class="erase" onclick="eraseSelectedLines()">Erase</button>'+
+    '</div>';
+}
+function selectedLineKeys(){
+  return Object.keys(STATE.selectedLineIds||{});
+}
+function selectedOrderLineIds(){
+  var out={};
+  selectedLineKeys().forEach(function(k){
+    var spec=parseSelKey(k);
+    if (spec.type==='line' && spec.lineId) out[spec.lineId]=1;
+  });
+  return out;
+}
+function beginModifyLine(lineId){
+  var line=(STATE.currentOrder||[]).filter(function(i){ return i.lineId===lineId; })[0];
+  if (!line) { toast('Sent items cannot be modified here'); return; }
+  if (line.isPrixFixe || line.isTasting) { toast('Tap a course on the check to change it'); return; }
+  STATE._editingLineId=lineId;
+  STATE.pendingItem=JSON.parse(JSON.stringify(line));
+  renderModifierSheet();
+}
+function eraseOrderLine(lineId){
+  var line=(STATE.currentOrder||[]).filter(function(i){ return i.lineId===lineId; })[0];
+  if (!line) { toast('Already sent — cannot erase from here'); return; }
+  if (line.isPrixFixe || line.isTasting) {
+    erasePrixFixeLine(line);
+    return;
+  }
+  STATE.currentOrder=STATE.currentOrder.filter(function(i){ return i.lineId!==lineId; });
+  if (STATE.selectedLineIds) delete STATE.selectedLineIds[lineId];
+  persistCheck(ensureOpenCheck(STATE.selectedTable));
+  renderOrder();
+  paintChrome();
+  toast('Erased');
+}
+function erasePrixFixeLine(line){
+  var dining=(STATE.activeTastingOrders||[]).filter(function(to){ return to._boundLine===line.lineId || to.id===line.diningOrderId; })[0];
+  if (dining && diningCourses(dining).some(function(c){ return c.fired || c.skipped; })) {
+    toast('Courses already fired — cannot erase the prix fixe');
+    return;
+  }
+  STATE.currentOrder=STATE.currentOrder.filter(function(i){ return i.lineId!==line.lineId; });
+  if (dining) {
+    dining.status='void';
+    STATE.activeTastingOrders=(STATE.activeTastingOrders||[]).filter(function(to){ return to.id!==dining.id; });
+  }
+  if (STATE.selectedLineIds) delete STATE.selectedLineIds[line.lineId];
+  persistCheck(ensureOpenCheck(STATE.selectedTable));
+  renderOrder();
+  paintChrome();
+  toast('Prix fixe removed');
+}
+function modifySelectedLine(){
+  var keys=selectedLineKeys();
+  if (keys.length!==1) { toast('Highlight one item to modify'); return; }
+  var spec=parseSelKey(keys[0]);
+  if (spec.type==='dining') { openDiningCourseEditor(spec.toId, spec.idx); return; }
+  beginModifyLine(spec.lineId);
+}
+function eraseSelectedLines(){
+  var keys=selectedLineKeys();
+  if (!keys.length) { toast('Highlight an item to erase'); return; }
+  keys.forEach(function(key){
+    var spec=parseSelKey(key);
+    if (spec.type==='dining') eraseDiningCourse(spec.toId, spec.idx, true);
+    else eraseOrderLine(spec.lineId);
+  });
+  STATE.selectedLineIds={};
   renderOrder();
   paintChrome();
 }
@@ -4930,11 +5098,8 @@ function renderOrder() {
   paintChrome();
 }
 function addItemsHeaderHtml(){
-  var dining=tableHasDining();
-  var extra=dining?'<div class="extra-plate-hint">Extra dish — raviolo · porcini · bolognese · shrimp · pork · mignon</div>':'';
-  var ph=dining?'raviolo · porcini · bolognese · shrimp · pork':'Search';
-  return '<div class="add-items-row"><div class="add-items-label">Add items</div>'+extra+
-    '<input class="search-box add-search" id="pos-item-find" value="'+esc(STATE.menuSearch||'')+'" placeholder="'+esc(ph)+'" oninput="STATE.menuSearch=this.value;var s=this.selectionStart;renderOrder();var el=document.getElementById(\'pos-item-find\');if(el){el.focus();try{el.setSelectionRange(s,s);}catch(e){}}"></div>';
+  return '<div class="add-items-row"><div class="add-items-label">Add items</div>'+
+    '<input class="search-box add-search" id="pos-item-find" value="'+esc(STATE.menuSearch||'')+'" placeholder="Search" oninput="STATE.menuSearch=this.value;var s=this.selectionStart;renderOrder();var el=document.getElementById(\'pos-item-find\');if(el){el.focus();try{el.setSelectionRange(s,s);}catch(e){}}"></div>';
 }
 function periodTabsHtml(){
   var nav=STATE.menuNav||{};
@@ -5020,8 +5185,12 @@ function renderMenuGrid(){
   var top='';
   var findQ=String(STATE.menuSearch||'').trim();
   if (findQ) {
-    if (tableHasDining()) {
+    if (extraDishSearchOnly()) {
       matchPrixFixeExtraDishes(findQ).forEach(function(d){ tiles.push(prixFixeExtraTileHtml(d)); });
+      if (!tiles.length) {
+        return '<p style="color:var(--text-muted);font-size:0.85rem;padding:0.8rem 0.2rem;">No matching prix fixe dishes. Drinks and wine have their own window.</p>';
+      }
+      return paginateTiles(tiles, 'list');
     }
     var q=findQ.toLowerCase();
     items.forEach(function(item){
@@ -5032,7 +5201,7 @@ function renderMenuGrid(){
       tiles.push(t);
     });
     if (!tiles.length) {
-      return '<p style="color:var(--text-muted);font-size:0.85rem;padding:0.8rem 0.2rem;">No matches. Try raviolo, porcini, bolognese, shrimp, pork, or mignon.</p>';
+      return '<p style="color:var(--text-muted);font-size:0.85rem;padding:0.8rem 0.2rem;">No matches.</p>';
     }
     return paginateTiles(tiles, 'list');
   }
@@ -5218,6 +5387,48 @@ function pfCourseMode(c){
   if (c.mode) return c.mode;
   return c.fireEach ? 'auto' : 'choose';
 }
+function pfGuestChoiceMode(c){
+  var m=pfCourseMode(c);
+  return m==='choose' || m==='later';
+}
+function togglePfScoops(ci, active){
+  document.querySelectorAll('[id^="pf-scoops-'+ci+'-"]').forEach(function(el){
+    el.style.display = el.id==='pf-scoops-'+ci+'-'+active ? 'block' : 'none';
+  });
+}
+function pfOptionRadiosHtml(c, ci, selectedName){
+  var html='';
+  (c.options||[]).forEach(function(o,oi){
+    if (!o || o.headingOnly || !String(o.name||'').trim()) return;
+    var hits=guestAllergyHits(o.allergens);
+    var temps=prixFixeTempOptions(o.askTemp, o);
+    var checked=selectedName ? String(o.name)===String(selectedName) : false;
+    html+='<label class="pf-opt-label"><input type="radio" name="pf-course-'+ci+'" value="'+oi+'"'+(checked?' checked':'')+' onchange="togglePfScoops('+ci+','+oi+')">'+
+      esc(o.name)+(o.upcharge>0?' <span class="pf-upcharge">+$'+Number(o.upcharge).toFixed(0)+'</span>':'')+
+      (o.cookNote?' <span class="pf-upcharge">'+esc(o.cookNote)+'</span>':'')+
+      (hits.length?' <span class="allergy-flag">⚠ '+esc(hits.join(', '))+'</span>':'')+
+      '</label>'+(o.desc?'<span class="pf-opt-desc">'+esc(o.desc)+'</span>':'');
+    if (o.chooseCount){
+      html+='<div id="pf-scoops-'+ci+'-'+oi+'" class="pf-options" style="margin:0.4rem 0 0.8rem 1.2rem;'+(checked?'':'display:none;')+'">';
+      for (var n=1;n<=o.chooseCount;n++){
+        html+='<label>Scoop '+n+' <select id="pf-scoop-'+ci+'-'+oi+'-'+n+'">';
+        (o.scoops||[]).forEach(function(sc){
+          html+='<option value="'+esc(sc.name)+'">'+esc(sc.name)+'</option>';
+        });
+        html+='</select></label>';
+      }
+      html+='</div>';
+    }
+    if (temps.length){
+      html+='<div class="pf-temp-row">';
+      temps.forEach(function(t,ti){
+        html+='<label class="chip"><input type="radio" name="pf-temp-'+ci+'-'+oi+'" value="'+esc(t)+'"'+(ti===0?' checked':'')+'> '+esc(t)+'</label>';
+      });
+      html+='</div>';
+    }
+  });
+  return html;
+}
 function selFromOption(course, opt, flags){
   flags=flags||{};
   opt=opt||{};
@@ -5255,17 +5466,23 @@ function buildPrixFixeSelections(pf, pickedByIndex){
       return;
     }
     if (mode==='later'){
-      selections.push({
-        course:c.label,
-        choice:'Take after main',
-        desc:'Dessert is included. Order after the main course.',
-        upcharge:0,
-        station:(opts[0]&&opts[0].station)||'Pastry',
-        pending:true,
-        later:true,
-        dessertOptions:opts,
-        fired:false
-      });
+      var opt=opts[pickedByIndex[ci]];
+      if (opt) {
+        var laterSel=selFromOption(c,opt,{later:true,pending:false});
+        selections.push(laterSel);
+      } else {
+        selections.push({
+          course:c.label,
+          choice:'Take after main',
+          desc:'Dessert is included. Order after the main course.',
+          upcharge:0,
+          station:(opts[0]&&opts[0].station)||'Pastry',
+          pending:true,
+          later:true,
+          dessertOptions:opts,
+          fired:false
+        });
+      }
       return;
     }
     var opt=opts[pickedByIndex[ci]||0] || opts[0];
@@ -5469,13 +5686,19 @@ function prixFixeTempOptions(kind, opt){
 }
 
 function openPrixFixeSelector(pfId) {
+  if (seatHasPrixFixe(STATE.activeSeat)) {
+    toast('This seat already has the $89 prix fixe. Extra dishes go through Add items.');
+    return;
+  }
   var pf=findPrixFixeMenu(pfId);
   if (!pf) { toast('Prix fixe menu is not loaded'); return; }
   var ov=document.getElementById('pf-overlay');
   if (!ov) { toast('Cannot open the prix fixe menu'); return; }
   var courses=pf.courses||[];
-  var html='<div class="pf-selector"><h3>'+esc(pf.name)+' — '+posLineMoney(Number(pf.price)||0)+'</h3>';
-  html+='<p class="pf-sel-sub">Choose primo and main. Welcome bites, entremet, and dolce each have their own FIRE key on the check. Pork medallions are fully cooked — no temperature.</p>';
+  var html='<div class="pf-selector">';
+  html+='<button type="button" class="pf-back" onclick="backToOrderScreen()">← Order</button>';
+  html+='<h3>'+esc(pf.name)+' — '+posLineMoney(Number(pf.price)||0)+'</h3>';
+  html+='<p class="pf-sel-sub">One appetizer, one main, and one dessert per seat — all included in '+posLineMoney(Number(pf.price)||0)+'. Extra dishes go through Add items. Welcome bites and entremet fire from the check.</p>';
   if (!courses.length) html+='<p class="pf-sel-sub">No courses on this menu yet.</p>';
   courses.forEach(function(c,ci){
     var mode=pfCourseMode(c);
@@ -5488,38 +5711,18 @@ function openPrixFixeSelector(pfId) {
       return;
     }
     if (mode==='entremets'){
-      html+='<div class="pf-course-select"><label>'+esc(c.label)+' — after dessert is chosen</label>';
-      html+='<p class="pf-sel-sub">The complimentary palate cleanser stays off the check until dolce is taken.</p></div>';
+      html+='<div class="pf-course-select"><label>'+esc(c.label)+' — automatic palate cleanser</label>';
+      html+='<p class="pf-sel-sub">Fires from the check before dessert. Not a guest choice.</p></div>';
       return;
     }
-    if (mode==='later'){
-      html+='<div class="pf-course-select"><label>'+esc(c.label)+' — fire from the check</label>';
-      html+='<p class="pf-sel-sub">Choose the dessert on the check, then FIRE. Gelato is three scoops.</p></div>';
-      return;
-    }
-    html+='<div class="pf-course-select"><label>'+esc(c.label)+'</label><div class="pf-options">';
-    (c.options||[]).forEach(function(o,oi){
-      var hits=guestAllergyHits(o.allergens);
-      var temps=prixFixeTempOptions(o.askTemp, o);
-      html+='<label class="pf-opt-label"><input type="radio" name="pf-course-'+ci+'" value="'+oi+'"'+(oi===0?' checked':'')+'>'+
-        esc(o.name)+(o.upcharge>0?' <span class="pf-upcharge">+$'+Number(o.upcharge).toFixed(0)+'</span>':'')+
-        (o.cookNote?' <span class="pf-upcharge">'+esc(o.cookNote)+'</span>':'')+
-        (hits.length?' <span class="allergy-flag">⚠ '+esc(hits.join(', '))+'</span>':'')+
-        '</label>'+(o.desc?'<span class="pf-opt-desc">'+esc(o.desc)+'</span>':'');
-      if (temps.length){
-        html+='<div class="pf-temp-row">';
-        temps.forEach(function(t,ti){
-          html+='<label class="chip"><input type="radio" name="pf-temp-'+ci+'-'+oi+'" value="'+esc(t)+'"'+(ti===0?' checked':'')+'> '+esc(t)+'</label>';
-        });
-        html+='</div>';
-      }
-    });
+    html+='<div class="pf-course-select"><label>'+esc(c.label)+' — choose one</label><div class="pf-options">';
+    html+=pfOptionRadiosHtml(c, ci, '');
     html+='</div></div>';
   });
   html+='<div class="pf-course-select"><label>Modifier / kitchen note</label>';
   html+='<input class="search-box" id="pf-mod-note" placeholder="No onion, extra sauce, allergy confirmed…"></div>';
   html+='<div class="pf-sel-actions"><button class="send-btn" onclick=\'confirmPrixFixe('+JSON.stringify(String(pf.id))+')\'>Add to Order</button>'+
-    '<button class="cancel-pay-btn" onclick="closePfSelector()">Cancel</button></div></div>';
+    '<button class="cancel-pay-btn" onclick="backToOrderScreen()">Back to order</button></div></div>';
   ov.innerHTML=html;
   ov.classList.add('show');
 }
@@ -5530,39 +5733,58 @@ function closePfSelector() {
 }
 
 function confirmPrixFixe(pfId) {
+  if (seatHasPrixFixe(STATE.activeSeat)) {
+    toast('This seat already has the $89 prix fixe. Extra dishes go through Add items.');
+    return;
+  }
   var pf=findPrixFixeMenu(pfId);
   if (!pf) return;
   var picked={};
   var temps={};
+  var scoops={};
   var missingTemp='';
+  var missingScoops='';
   (pf.courses||[]).forEach(function(c,ci){
-    var mode=pfCourseMode(c);
-    if (mode!=='choose') return;
+    if (!pfGuestChoiceMode(c)) return;
     var radios=document.querySelectorAll('input[name="pf-course-'+ci+'"]');
-    radios.forEach(function(r){ if(r.checked) picked[ci]=parseInt(r.value,10)||0; });
-    var opt=(c.options||[])[picked[ci]||0];
+    var got=false;
+    radios.forEach(function(r){ if(r.checked){ picked[ci]=parseInt(r.value,10); got=true; } });
+    if (!got) return;
+    var opt=(c.options||[])[picked[ci]];
     if (opt && prixFixeTempOptions(opt.askTemp, opt).length){
-      var tEl=document.querySelector('input[name="pf-temp-'+ci+'-'+(picked[ci]||0)+'"]:checked');
+      var tEl=document.querySelector('input[name="pf-temp-'+ci+'-'+picked[ci]+'"]:checked');
       if (tEl) temps[ci]=tEl.value;
       else missingTemp=opt.name;
     }
+    if (opt && opt.chooseCount){
+      var names=[];
+      for (var n=1;n<=opt.chooseCount;n++){
+        var el=document.getElementById('pf-scoop-'+ci+'-'+picked[ci]+'-'+n);
+        if (el && el.value) names.push(el.value);
+      }
+      if (names.length!==opt.chooseCount) missingScoops=opt.name;
+      else scoops[ci]=names.join(', ');
+    }
   });
   if (missingTemp) { toast('Choose temperature for '+missingTemp); return; }
-  if (Object.keys(picked).length < (pf.courses||[]).filter(function(c){ return pfCourseMode(c)==='choose'; }).length) {
-    toast('Choose primo and main');
+  if (missingScoops) { toast('Choose scoops for '+missingScoops); return; }
+  var need=(pf.courses||[]).filter(function(c){ return pfGuestChoiceMode(c) && (c.options||[]).filter(function(o){ return o && !o.headingOnly && String(o.name||'').trim(); }).length; });
+  if (Object.keys(picked).length < need.length) {
+    toast('Choose one appetizer, one main, and one dessert');
     return;
   }
   var selections=buildPrixFixeSelections(pf, picked);
   selections.forEach(function(s,si){
     var ci=-1;
     (pf.courses||[]).forEach(function(c,i){
-      if (pfCourseMode(c)==='choose' && (c.label===s.course || c.name===s.course)) ci=i;
+      if (pfGuestChoiceMode(c) && (c.label===s.course || c.name===s.course)) ci=i;
     });
     if (ci>=0 && temps[ci]) {
       s.selectedTemp=temps[ci];
       s.cookNote=(s.cookNote?s.cookNote+'; ':'')+'Temp: '+temps[ci];
       s.choice=s.choice+' · '+temps[ci];
     }
+    if (ci>=0 && scoops[ci]) s.scoopChoice=scoops[ci];
   });
   var kitchenNote='';
   var noteEl=document.getElementById('pf-mod-note');
@@ -5835,6 +6057,7 @@ function renderModifierSheet(){
   html+='<p class="sheet-sub">Tap a modifier to add this dish. Stay here and pick more dishes; SEND when the order is ready.</p>';
   html+=(ready?'<button class="primary-btn" onclick="maybeAllergyThenAdd()">Add & keep ordering</button>':'');
   html+='<button class="ghost-btn" onclick="closeSheet()">Cancel</button>';
+  html+='<button class="ghost-btn" onclick="backToOrderScreen()">Back to order</button>';
   openSheet(html);
 }
 function setPendingCourse(cn){
@@ -5888,9 +6111,22 @@ function maybeAllergyThenAdd(){
 function commitPendingItem(){
   var p=STATE.pendingItem; if(!p) return;
   if (!modifiersReady(p)) { toast('Choose required modifiers'); return; }
-  STATE.currentOrder.push(p);
+  if (STATE._editingLineId) {
+    var replaced=false;
+    STATE.currentOrder=STATE.currentOrder.map(function(i){
+      if (i.lineId!==STATE._editingLineId) return i;
+      replaced=true;
+      p.lineId=STATE._editingLineId;
+      return p;
+    });
+    if (!replaced) STATE.currentOrder.push(p);
+    STATE._editingLineId=null;
+    toast('Updated '+p.name);
+  } else {
+    STATE.currentOrder.push(p);
+    toast('+ '+p.name+' · '+seatName(p.seat));
+  }
   persistCheck(ensureOpenCheck(STATE.selectedTable));
-  toast('+ '+p.name+' · '+seatName(p.seat));
   closeSheet();
   renderOrder();
 }
@@ -5909,7 +6145,7 @@ function removeItem(idx) {
 }
 
 function holdUnsent(){
-  var selectedIds=STATE.selectedLineIds||{};
+  var selectedIds=selectedOrderLineIds();
   var hasSelected=Object.keys(selectedIds).length>0;
   var pool=unsentFor().filter(function(i){ return lineBelongsToCheck(i); });
   var targets=hasSelected
@@ -5989,7 +6225,7 @@ function assignLineToCheck(lineId, checkId){
   });
 }
 function moveSelectedToCheck(checkId){
-  var ids=STATE.selectedLineIds||{};
+  var ids=selectedOrderLineIds();
   var n=0;
   Object.keys(ids).forEach(function(lid){ assignLineToCheck(lid, checkId); n++; });
   if (!n) { toast('Select items on the check first'); return; }
@@ -6025,7 +6261,7 @@ function openSplitOverlay(){
   html+='<button type="button" onclick="splitEvenPrompt()">EVEN</button>';
   html+='</div>';
   html+='<p class="sheet-sub" style="color:#94a3b8;">Tap items on the live check, then tap a check tile to move them. Sent and held lines keep their status.</p>';
-  html+='<button class="split-close" onclick="closeSplitOverlay()">Done</button>';
+  html+='<button class="split-close" onclick="backToOrderScreen()">Back to order</button>';
   var el=document.getElementById('split-overlay');
   el.innerHTML=html;
   el.classList.add('show');
@@ -6512,6 +6748,7 @@ function startDiningFromCheckLine(ti){
       sentAt:Date.now(),
       _boundLine:ti.lineId
     };
+    if (dessertHasBeenChosen(dining)) dining.dessertChosen=true;
   }
   if (!STATE.activeTastingOrders) STATE.activeTastingOrders=[];
   STATE.activeTastingOrders.push(dining);
@@ -6523,7 +6760,7 @@ function startDiningFromCheckLine(ti){
 function sendOrder(opts) {
   opts = opts || {};
   var pool = unsentFor().filter(function(i){ return lineBelongsToCheck(i); });
-  var selectedIds=STATE.selectedLineIds||{};
+  var selectedIds=selectedOrderLineIds();
   var hasSelected=Object.keys(selectedIds).length>0;
   var bundle = opts.fireCourse != null
     ? pool.filter(function(i){
@@ -6602,6 +6839,12 @@ function fireDiningCourse(to, quiet, idx){
   if (i<0 || !courses[i]) { if (!quiet) toast('All courses fired'); return false; }
   var nextCourse=courses[i];
   if (nextCourse.fired || nextCourse.skipped) { if (!quiet) toast('Already fired'); return false; }
+  var guestChoice=!(nextCourse.auto || nextCourse.fireEach || nextCourse.entremets || nextCourse.mode==='entremets');
+  if (guestChoice && (!nextCourse.choice || /take after/i.test(String(nextCourse.choice)))) {
+    if (!quiet) toast('Choose this course first');
+    openDiningCourseEditor(to.id, i);
+    return false;
+  }
   if (courseNeedsDessertPick(nextCourse)) {
     if (!quiet) toast('Choose dolce, then FIRE');
     openDessertSelector(to.id);
@@ -6762,7 +7005,9 @@ function renderDiningProgress(){
       if (c.upcharge) mods.push('+$'+Number(c.upcharge).toFixed(0));
       var hits=guestAllergyHits(c.allergens);
       if (hits.length) mods.push('⚠ '+hits.join(', '));
-      html+='<div class="ts-line lc-line dining-line '+(c.fired?'sent':c.skipped?'held':'unsent')+'">'+
+      var dKey=diningLineKey(to.id, i);
+      var picked=!!(STATE.selectedLineIds && STATE.selectedLineIds[dKey]);
+      html+='<div class="ts-line lc-line dining-line '+(c.fired?'sent':c.skipped?'held':'unsent')+(picked?' picked':'')+'" onclick=\'toggleLineSelect('+JSON.stringify(dKey)+')\'>'+
         '<div><div class="ts-name">'+esc(title)+'</div>'+
         (mods.length?'<div class="ts-mod">'+esc(mods.join(' · '))+'</div>':'')+
         '<div class="ts-meta lc-meta">'+st.toUpperCase()+'</div></div>'+
@@ -6773,23 +7018,168 @@ function renderDiningProgress(){
   return html;
 }
 
+function diningCourseOptions(to, c){
+  if (!c) return [];
+  if (c.dessertOptions && c.dessertOptions.length) return c.dessertOptions;
+  var pf=findPrixFixeMenu((to && (to.prixFixeId||to.dessertMenuId)) || '');
+  if (!pf) return dessertOptionsFor(to);
+  var match=(pf.courses||[]).filter(function(x){
+    return x.label===c.course || x.label===c.name || x.label===c.choice;
+  })[0];
+  if (match && (match.options||[]).length) return match.options;
+  if (c.later || c.mode==='later' || /dolce|dessert/i.test(c.course||c.name||'')) return dessertOptionsFor(to);
+  var kind=pfCourseKind(c.course||c.name||'');
+  var byKind=(pf.courses||[]).filter(function(x){ return pfCourseKind(x.label)===kind && (x.options||[]).length; })[0];
+  return (byKind && byKind.options) || [];
+}
+function applyOptionToDiningCourse(c, opt, extras){
+  extras=extras||{};
+  if (!c || !opt) return;
+  c.pending=false;
+  c.choice=opt.name;
+  c.name=opt.name;
+  c.desc=opt.desc||'';
+  c.upcharge=Number(opt.upcharge)||0;
+  c.station=opt.station||c.station||'Expo';
+  c.allergens=opt.allergens||[];
+  c.cookNote=opt.cookNote||'';
+  c.cookTime=opt.cookTime||0;
+  c.optionId=opt.id||'';
+  if (extras.temp) {
+    c.selectedTemp=extras.temp;
+    c.cookNote=(c.cookNote?c.cookNote+'; ':'')+'Temp: '+extras.temp;
+    c.choice=c.choice+' · '+extras.temp;
+  } else {
+    c.selectedTemp='';
+  }
+  c.scoopChoice=extras.scoops||'';
+}
+function openDiningCourseEditor(toId, idx){
+  var to=(STATE.activeTastingOrders||[]).find(function(o){ return o.id===toId; });
+  if (!to) return;
+  var c=diningCourses(to)[idx];
+  if (!c) return;
+  if (c.fired || c.skipped) { toast('Already fired'); return; }
+  if (c.auto || c.fireEach || c.entremets || c.mode==='entremets') {
+    openCourseNoteSheet(toId, idx);
+    return;
+  }
+  if (c.later || c.mode==='later' || /dolce|dessert/i.test(c.course||'')) {
+    openDessertSelector(toId);
+    return;
+  }
+  var options=diningCourseOptions(to, c).filter(function(o){ return o && !o.headingOnly && String(o.name||'').trim(); });
+  if (!options.length) { toast('No other choices for this course'); return; }
+  var current=String(c.choice||'').split(' · ')[0];
+  var html='<div class="pf-selector">';
+  html+='<button type="button" class="pf-back" onclick="backToOrderScreen()">← Order</button>';
+  html+='<h3>Modify '+esc(c.course||'course')+'</h3>';
+  html+='<p class="pf-sel-sub">One choice for this seat. Extra dishes go through Add items.</p>';
+  html+='<div class="pf-course-select"><label>Choose one</label><div class="pf-options">';
+  options.forEach(function(o,oi){
+    var hits=guestAllergyHits(o.allergens);
+    var temps=prixFixeTempOptions(o.askTemp, o);
+    var checked=current && String(o.name)===current;
+    html+='<label class="pf-opt-label"><input type="radio" name="pf-edit-opt" value="'+oi+'"'+(checked?' checked':'')+'>'+
+      esc(o.name)+(o.upcharge>0?' <span class="pf-upcharge">+$'+Number(o.upcharge).toFixed(0)+'</span>':'')+
+      (hits.length?' <span class="allergy-flag">⚠ '+esc(hits.join(', '))+'</span>':'')+
+      '</label>'+(o.desc?'<span class="pf-opt-desc">'+esc(o.desc)+'</span>':'');
+    if (temps.length){
+      html+='<div class="pf-temp-row">';
+      temps.forEach(function(t,ti){
+        var tOn=c.selectedTemp===t || (!c.selectedTemp && ti===0);
+        html+='<label class="chip"><input type="radio" name="pf-edit-temp-'+oi+'" value="'+esc(t)+'"'+(tOn?' checked':'')+'> '+esc(t)+'</label>';
+      });
+      html+='</div>';
+    }
+  });
+  html+='</div></div>';
+  html+='<div class="pf-sel-actions"><button class="send-btn" onclick=\'confirmDiningCourseEdit('+JSON.stringify(String(toId))+','+idx+')\'>Save</button>'+
+    '<button class="cancel-pay-btn" onclick="backToOrderScreen()">Back to order</button></div></div>';
+  var ov=document.getElementById('pf-overlay');
+  ov.innerHTML=html;
+  ov.classList.add('show');
+}
+function confirmDiningCourseEdit(toId, idx){
+  var to=(STATE.activeTastingOrders||[]).find(function(o){ return o.id===toId; });
+  if (!to) return;
+  var c=diningCourses(to)[idx];
+  var options=diningCourseOptions(to, c);
+  var radios=document.querySelectorAll('input[name="pf-edit-opt"]');
+  var sel=-1;
+  radios.forEach(function(r){ if(r.checked) sel=parseInt(r.value,10); });
+  if (sel<0) { toast('Choose one dish'); return; }
+  var opt=options[sel];
+  if (!opt) return;
+  var extras={};
+  if (prixFixeTempOptions(opt.askTemp, opt).length){
+    var tEl=document.querySelector('input[name="pf-edit-temp-'+sel+'"]:checked');
+    if (!tEl) { toast('Choose temperature'); return; }
+    extras.temp=tEl.value;
+  }
+  applyOptionToDiningCourse(c, opt, extras);
+  var line=(STATE.currentOrder||[]).filter(function(i){ return i.diningOrderId===to.id || i.lineId===to._boundLine; })[0];
+  if (line && line.selections && line.selections[idx]) line.selections[idx]=Object.assign({}, c);
+  closePfSelector();
+  renderOrder();
+  toast('Updated '+opt.name);
+}
+function eraseDiningCourse(toId, idx, quiet){
+  var to=(STATE.activeTastingOrders||[]).find(function(o){ return o.id===toId; });
+  if (!to) return;
+  var c=diningCourses(to)[idx];
+  if (!c) return;
+  if (c.fired || c.skipped) { toast('Already fired'); return; }
+  if (c.auto || c.fireEach || c.entremets || c.mode==='entremets') {
+    toast('Complimentary course — add a kitchen note instead');
+    return;
+  }
+  if (c.later || c.mode==='later' || /dolce|dessert/i.test(c.course||'')) {
+    c.choice='Take after main';
+    c.name='';
+    c.pending=true;
+    c.later=true;
+    c.scoopChoice='';
+    c.selectedTemp='';
+    to.dessertChosen=false;
+  } else {
+    c.choice='';
+    c.name='';
+    c.pending=true;
+    c.selectedTemp='';
+    c.scoopChoice='';
+  }
+  var dKey=diningLineKey(toId, idx);
+  if (STATE.selectedLineIds) delete STATE.selectedLineIds[dKey];
+  if (!quiet) {
+    renderOrder();
+    toast('Choice cleared — pick a new dish');
+  }
+}
+
 function openDessertSelector(orderId){
   var to=STATE.activeTastingOrders.find(function(o){ return o.id===orderId; });
   if (!to) return;
   var options=dessertOptionsFor(to);
   if (!options.length) { toast('No dessert options on the menu'); return; }
-  var html='<div class="pf-selector"><h3>Dolce</h3>';
-  html+='<p class="pf-sel-sub">Choose dolce, then FIRE it from the check. Entremet has its own FIRE key. Gelato is three scoops.</p>';
-  html+='<div class="pf-course-select"><label>Dessert</label><div class="pf-options">';
+  var later=diningCourses(to).filter(function(c){ return c.later || c.mode==='later'; })[0];
+  var current=later ? String(later.choice||later.name||'').split(' · ')[0] : '';
+  if (/take after/i.test(current)) current='';
+  var html='<div class="pf-selector">';
+  html+='<button type="button" class="pf-back" onclick="backToOrderScreen()">← Order</button>';
+  html+='<h3>Dolce</h3>';
+  html+='<p class="pf-sel-sub">One dessert per seat, included in the prix fixe. Extra desserts go through Add items. Gelato is three scoops.</p>';
+  html+='<div class="pf-course-select"><label>Dessert — choose one</label><div class="pf-options">';
   options.forEach(function(o,oi){
     var hits=guestAllergyHits(o.allergens);
-    html+='<label class="pf-opt-label"><input type="radio" name="dessert-opt" value="'+oi+'"'+(oi===0?' checked':'')+' onchange="toggleDessertScoops('+oi+')">'+
+    var checked=current ? String(o.name)===current : false;
+    html+='<label class="pf-opt-label"><input type="radio" name="dessert-opt" value="'+oi+'"'+(checked?' checked':'')+' onchange="toggleDessertScoops('+oi+')">'+
       esc(o.name)+(o.upcharge>0?' <span class="pf-upcharge">+$'+Number(o.upcharge).toFixed(0)+'</span>':'')+
       (o.cookNote?' <span class="pf-upcharge">'+esc(o.cookNote)+'</span>':'')+
       (hits.length?' <span class="allergy-flag">⚠ '+esc(hits.join(', '))+'</span>':'')+
       '</label>'+(o.desc?'<span class="pf-opt-desc">'+esc(o.desc)+'</span>':'');
     if (o.chooseCount){
-      html+='<div id="dessert-scoops-'+oi+'" class="pf-options" style="margin:0.4rem 0 0.8rem 1.2rem;'+(oi===0?'':'display:none;')+'">';
+      html+='<div id="dessert-scoops-'+oi+'" class="pf-options" style="margin:0.4rem 0 0.8rem 1.2rem;'+(checked?'':'display:none;')+'">';
       for (var n=1;n<=o.chooseCount;n++){
         html+='<label>Scoop '+n+' <select id="scoop-'+oi+'-'+n+'">';
         (o.scoops||[]).forEach(function(sc){
@@ -6802,7 +7192,7 @@ function openDessertSelector(orderId){
   });
   html+='</div></div>';
   html+='<div class="pf-sel-actions"><button class="send-btn" onclick="confirmDessert(\''+orderId+'\')">Save dessert</button>'+
-    '<button class="cancel-pay-btn" onclick="closePfSelector()">Cancel</button></div></div>';
+    '<button class="cancel-pay-btn" onclick="backToOrderScreen()">Back to order</button></div></div>';
   document.getElementById('pf-overlay').innerHTML=html;
   document.getElementById('pf-overlay').classList.add('show');
 }
@@ -6816,8 +7206,9 @@ function confirmDessert(orderId){
   if (!to) return;
   var options=dessertOptionsFor(to);
   var radios=document.querySelectorAll('input[name="dessert-opt"]');
-  var sel=0;
-  radios.forEach(function(r){ if(r.checked) sel=parseInt(r.value,10)||0; });
+  var sel=-1;
+  radios.forEach(function(r){ if(r.checked) sel=parseInt(r.value,10); });
+  if (sel<0) { toast('Choose one dessert'); return; }
   var opt=options[sel];
   if (!opt) return;
   var scoopNames=[];
@@ -6910,7 +7301,7 @@ function openPayment(subtotal) {
 
   // Charge button
   html += '<button class="charge-btn" id="charge-btn" onclick="processPayment('+subtotal+')">Charge $'+total.toFixed(2)+'</button>';
-  html += '<button class="cancel-pay-btn" onclick="closePayment()">Cancel</button>';
+  html += '<button class="cancel-pay-btn" onclick="backToOrderScreen()">Back to order</button>';
 
   document.getElementById('payment-card').innerHTML = html;
   document.getElementById('payment-overlay').classList.add('show');
