@@ -18,7 +18,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <title>Epicurean POS</title>
-<!-- pos-build: scalini-print-v42 -->
+<!-- pos-build: scalini-print-v43 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
@@ -709,9 +709,11 @@ body.hh-on.floor-drawing .floor-stage { outline:2px dashed var(--primary); }
 .ts-console.toast-go.has-dining .ts-check {
   max-height:42vh; flex:0 1 42vh; min-height:0;
 }
-.ts-console.toast-go.has-dining .ts-grid-wrap { flex:1 1 32vh; min-height:140px; overflow:auto; }
+.ts-console.toast-go.has-dining .ts-grid-wrap { flex:1 1 42vh; min-height:220px; overflow:auto; }
+.ts-console.toast-go.has-dining.searching .ts-check { max-height:26vh; flex:0 1 26vh; }
+.ts-console.toast-go.has-dining.searching .ts-grid-wrap { flex:1 1 56vh; min-height:280px; overflow:auto; }
 .ts-console.toast-go .ts-check-head, .ts-console.toast-go .ts-line {
-  grid-template-columns:minmax(0,1fr) 36px 58px 62px 28px;
+  grid-template-columns:minmax(0,1fr) 28px 40px 44px 28px;
 }
 .ts-check-meta {
   display:flex; justify-content:space-between; gap:8px; align-items:baseline;
@@ -1046,11 +1048,14 @@ body.hh-on .ts-console.toast-go .ts-check {
   background:#fff; border:1px solid #c5ced8; border-radius:0; max-height:42vh;
   padding:0.35rem 0.45rem 0.2rem; color:#000; overflow-y:auto; -webkit-overflow-scrolling:touch;
 }
-body.hh-on .ts-console.toast-go.has-dining .ts-check { max-height:42vh; flex:0 1 42vh; }
+body.hh-on .ts-console.toast-go.has-dining .ts-check { max-height:36vh; flex:0 1 36vh; }
+body.hh-on .ts-console.toast-go.has-dining.searching .ts-check { max-height:24vh; flex:0 1 24vh; }
 body.hh-on .ts-grid-wrap {
-  flex:1 1 auto; min-height:28vh; overflow-x:auto; overflow-y:auto;
+  flex:1 1 auto; min-height:32vh; overflow-x:auto; overflow-y:auto;
   -webkit-overflow-scrolling:touch;
 }
+body.hh-on .ts-console.toast-go.has-dining .ts-grid-wrap { min-height:38vh; }
+body.hh-on .ts-console.toast-go.has-dining.searching .ts-grid-wrap { min-height:48vh; flex:1 1 52vh; }
 body.hh-on .ts-console.toast-go .ts-grid {
   grid-template-columns:repeat(4, minmax(72px,1fr));
   grid-auto-rows:minmax(58px, auto);
@@ -1190,7 +1195,7 @@ body.hh-on .floor-retry { background:#fff; color:#000; border-color:#c5ced8; }
 <div id="login-screen" class="screen active">
   <h1>Epicurean POS</h1>
   <p class="subtitle">Enter your 4-digit code</p>
-  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 42</p>
+  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 43</p>
   <div class="pin-display" id="pin-display">
     <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
   </div>
@@ -1552,7 +1557,7 @@ function foodCategories(cats){
 }
 function drinkCatRank(c){
   var id=String((c&&c.id)||'').toLowerCase();
-  var order=['cocktails','mocktails','wine-glass','wine-bottle','wine','beer','spirits','after-dinner','soft-drinks','coffees','retail'];
+  var order=['wine-glass','wine-bottle','cocktails','mocktails','wine','beer','spirits','after-dinner','soft-drinks','coffees','retail'];
   var i=order.indexOf(id);
   return i<0 ? 80 : i;
 }
@@ -1573,11 +1578,25 @@ function familyCategories(){
 function setMenuFamily(fam){
   STATE.menuFamily=fam==='drinks'?'drinks':'food';
   STATE.menuSearch='';
-  STATE.menuNav={ level:'cats', family:STATE.menuFamily };
-  STATE.orderCat=null;
   STATE.hhMode='service';
   STATE.checkFocus=false;
   STATE.tilePage=0;
+  if (STATE.menuFamily==='drinks') {
+    var glass=(familyCategories()||[]).filter(function(c){
+      if (!c) return false;
+      var id=String(c.id||'').toLowerCase();
+      var n=String(c.name||'').toLowerCase();
+      return id==='wine-glass' || ((n.indexOf('wine')>=0 || n.indexOf('wines')>=0) && n.indexOf('glass')>=0);
+    })[0];
+    if (glass) {
+      STATE.menuNav={ level:'items', family:'drinks', cat:glass.id };
+      STATE.orderCat=glass.id;
+      renderOrder();
+      return;
+    }
+  }
+  STATE.menuNav={ level:'cats', family:STATE.menuFamily };
+  STATE.orderCat=null;
   renderOrder();
 }
 function parseClockTime(str){
@@ -1783,18 +1802,7 @@ function extraPlateSurchargeForDish(dish, kind){
   return listed;
 }
 function parseExtraDishSearch(q){
-  var raw=String(q||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
-  var parts=raw.split(' ').filter(Boolean);
-  var courseKind='';
-  var words=[];
-  parts.forEach(function(p){
-    if (p==='app' || p==='apps' || p==='appetizer' || p==='appetizers' || p==='primo' || p==='primi' || p==='starter' || p==='starters') courseKind='app';
-    else if (p==='main' || p==='mains' || p==='entree' || p==='entrees' || p==='principale') courseKind='main';
-    else if (p==='des' || p==='dessert' || p==='desserts' || p==='dolce' || p==='dolci') courseKind='des';
-    else if (p==='and' || p==='the' || p==='of' || p==='a' || p==='an' || p==='with' || p==='in' || p==='on' || p==='for') return;
-    else words.push(p);
-  });
-  return { courseKind:courseKind, words:words, needle:words.join(' ') };
+  return { words:posQueryWords(q), needle:posQueryWords(q).join(' ') };
 }
 function listPrixFixeExtraDishes(){
   var out=[];
@@ -1839,23 +1847,12 @@ function listPrixFixeExtraDishes(){
   return out;
 }
 function pfExtraHaystack(d){
-  return [
-    d.name, d.desc, d.ingredients, d.id, d.courseLabel, d.pfName,
-    /shrimp|lobster/.test([d.name,d.desc,d.ingredients,d.id].join(' ').toLowerCase()) ? 'shrimp' : '',
-    /pork chop|san domenico/.test(String(d.name||'').toLowerCase()) ? 'pork' : '',
-    /medallion/.test(String(d.name||'').toLowerCase()) ? 'medallions medallion' : '',
-    /mignon|giambotta/.test(String(d.name||'').toLowerCase()) ? 'mignon filet' : '',
-    /\braviolo\b/.test(String(d.name||'').toLowerCase()) ? 'raviolo' : '',
-    /\blamb\b|osso bucco|osso buco/.test(String(d.name||'').toLowerCase()) ? 'lamb' : ''
-  ].join(' ').toLowerCase();
+  return posSearchHay(d);
 }
 function matchPrixFixeExtraDishes(q){
   var parsed=parseExtraDishSearch(q);
-  if (!parsed.courseKind && !parsed.needle) return [];
+  if (!parsed.needle) return [];
   return listPrixFixeExtraDishes().filter(function(d){
-    if (parsed.courseKind && d.kind!==parsed.courseKind) return false;
-    if (!parsed.needle) return true;
-    var hay=pfExtraHaystack(d);
     var name=String(d.name||'').toLowerCase();
     if (parsed.needle==='pork' || (parsed.words.length===1 && parsed.words[0]==='pork')) {
       return /pork chop|san domenico/.test(name) && !/medallion/.test(name);
@@ -1865,7 +1862,12 @@ function matchPrixFixeExtraDishes(q){
     }
     if (parsed.needle==='medallions' || parsed.needle==='medallion') return /medallion/.test(name);
     if (parsed.needle==='mignon' || parsed.needle==='filet') return /mignon|giambotta/.test(name);
-    if (parsed.needle==='raviolo') return /\braviolo\b/.test(name);
+    if (parsed.needle==='raviolo' || parsed.needle==='ravioli') return /raviolo|ravioli/.test(name);
+    if (parsed.needle==='porcini') return /porcini/.test(name) && /raviolo|ravioli/.test(name);
+    if (parsed.needle==='bolognese' || parsed.needle==='tagliatelle') {
+      return /bolognese|tagliatelle/.test(name);
+    }
+    var hay=pfExtraHaystack(d);
     return parsed.words.every(function(w){ return hay.indexOf(w)>-1; });
   });
 }
@@ -1888,7 +1890,7 @@ function beginAddPrixFixeExtra(key){
     checkId:activeCheckId(),
     qty:1,
     notes:'',
-    selectedMod:'Extra plate $'+extraFee+(surcharge?(' + $'+surcharge):''),
+    selectedMod:'Extra plate',
     mods:{},
     extraPlate:true,
     extraFee:extraFee,
@@ -1915,12 +1917,8 @@ function beginAddPrixFixeExtra(key){
   renderModifierSheet();
 }
 function prixFixeExtraTileHtml(d){
-  var fee=extraPlateFeeByKind(d.kind);
-  var surcharge=extraPlateSurchargeForDish(d, d.kind);
-  var total=fee+surcharge;
-  var tag=(d.courseLabel||d.kind)+' · extra $'+fee+(surcharge?(' + $'+surcharge):'');
   return '<button type="button" class="ts-tile prix extra-pf" onclick=\'beginAddPrixFixeExtra('+JSON.stringify(String(d.key))+')\'>'+
-    esc(d.name)+'<span class="course-tag">'+esc(tag)+'</span><span class="price">$'+total.toFixed(2)+'</span></button>';
+    esc(d.name)+'</button>';
 }
 function tableHasDining(){
   return tableDiningOrders().length>0;
@@ -2067,6 +2065,52 @@ function moneyOpt(n){
   n=Number(n)||0;
   return n%1 ? n.toFixed(2) : String(n);
 }
+function posLineMoney(n){
+  n=Math.round(Number(n)||0);
+  if (n>=1000) {
+    var k=n/1000;
+    var s=k.toFixed(1);
+    if (s.slice(-2)==='.0') s=String(Math.round(k));
+    return s+'K';
+  }
+  return String(n);
+}
+function posTotalMoney(n){
+  return String(Math.round(Number(n)||0));
+}
+function posStopWord(w){
+  return !w || w.length<2 || /^(the|and|di|del|della|dei|al|alla|con|with|of|a|an|in|on|for|by|de|du|le|la|il|los|aux|et|or|to|from|our|is|el)$/.test(w);
+}
+function posNameTokens(text){
+  return String(text||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').split(' ').filter(function(w){ return !posStopWord(w); });
+}
+function posKeywordExtras(text){
+  var s=String(text||'').toLowerCase();
+  var extra=[];
+  if (/raviolo|ravioli/.test(s)) extra.push('raviolo','ravioli');
+  if (/porcini/.test(s) && /raviolo|ravioli/.test(s)) extra.push('porcini');
+  if (/bolognese|tagliatelle/.test(s)) extra.push('bolognese','tagliatelle');
+  if (/mignon|giambotta|tenderloin|\bfilet\b/.test(s)) extra.push('mignon','filet','giambotta');
+  if (/medallion/.test(s)) extra.push('medallions','medallion');
+  if (/pork chop|san domenico/.test(s)) extra.push('pork');
+  if (/\blamb\b|osso bucco|osso buco/.test(s)) extra.push('lamb');
+  if (/shrimp|gamberi/.test(s)) extra.push('shrimp');
+  return extra;
+}
+function posSearchHay(obj){
+  var blob=[
+    obj && obj.name, obj && obj.desc, obj && obj.description, obj && obj.ingredients,
+    obj && obj.producer, obj && obj.region, obj && obj.varietal, obj && obj.grape,
+    obj && obj.vintage, obj && obj.code, obj && obj.category, obj && obj.subtitle,
+    obj && obj.id, asList(obj && obj.allergens).join(' '), asList(obj && obj.dietaryFlags).join(' ')
+  ].join(' ');
+  return (blob+' '+posNameTokens(blob).join(' ')+' '+posKeywordExtras(blob).join(' ')).toLowerCase();
+}
+function posQueryWords(q){
+  return String(q||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').split(' ').filter(function(w){
+    return w && w.length>1 && !posStopWord(w);
+  });
+}
 function barKindCat(kindOrItem){
   var it=(kindOrItem && typeof kindOrItem==='object') ? kindOrItem : {kind:kindOrItem};
   var kind=String(it.kind||it.category||'');
@@ -2156,17 +2200,18 @@ function isWineListCat(catId){
   return /wine/.test(n);
 }
 function winePourMods(w){
+  var btg=!!(w && (w.byTheGlass || w.scaliniOnly || Number(w && w.glassPrice || 0)>0));
+  if (!btg) return [];
   var opts=[];
   var glass=Number(w && w.glassPrice || 0);
   var bottle=Number(w && w.bottlePrice || 0);
-  var btg=!!(w && (w.byTheGlass || w.scaliniOnly || glass>0));
-  if (!btg && !bottle) bottle=Number(w && w.price || 0);
   if (btg && glass>0) {
-    opts.push('Glass 6 oz $'+moneyOpt(glass));
-    opts.push('Taste 2 oz $'+moneyOpt(Math.round(glass/3*100)/100));
+    opts.push('Glass 6 oz '+posLineMoney(glass));
+    opts.push('Taste 2 oz '+posLineMoney(Math.round(glass/3)));
   }
-  if (bottle>0) opts.push('Bottle $'+moneyOpt(bottle));
-  return opts.length ? [{group:'Pour', options:opts}] : [];
+  if (bottle>0) opts.push('Bottle '+posLineMoney(bottle));
+  if (opts.length<=1) return [];
+  return [{group:'Pour', options:opts}];
 }
 function bohPhoto(id, fallback){
   var u = (STATE.menuPhotos && id && STATE.menuPhotos[id]) || '';
@@ -2419,23 +2464,10 @@ function rebuildPosCatalog(){
   STATE.menuItems = items;
 }
 function itemMatchesSearch(item, q){
-  if (!q) return true;
-  var hay = [
-    item && item.name,
-    item && item.description,
-    item && item.desc,
-    item && item.subtitle,
-    item && item.station,
-    item && item.code,
-    item && item.category,
-    item && item.retailCategory,
-    item && item.producer,
-    item && item.region,
-    item && item.varietal,
-    asList(item && item.allergens).join(' '),
-    asList(item && item.dietaryFlags).join(' ')
-  ].join(' ').toLowerCase();
-  return hay.indexOf(q) > -1;
+  var words=posQueryWords(q);
+  if (!words.length) return !String(q||'').trim();
+  var hay=posSearchHay(item);
+  return words.every(function(w){ return hay.indexOf(w)>-1; });
 }
 function refreshOrderView(){
   if (STATE.activeTab==='order') renderOrder();
@@ -2486,8 +2518,8 @@ var SEED_ITEMS = [
   {id:'i8',code:'CK01',name:'Pisco Sour',price:14,category:'cocktails',station:'Bar',cookTime:3,modifiers:[],description:'Peruvian pisco, lime, egg white, Angostura bitters',allergens:['Egg'],dietaryFlags:['Vegetarian']},
   {id:'i9',code:'CK02',name:'Chocolate Old Fashioned',price:16,category:'cocktails',station:'Bar',cookTime:3,modifiers:[],description:'Bourbon, cacao nib-infused syrup, orange peel, chocolate bitters',allergens:[],dietaryFlags:['Vegan']},
   {id:'i10',code:'BE01',name:'Local Lager',price:8,category:'beer',station:'Bar',cookTime:1,modifiers:[],description:'Crisp craft lager from local brewery',allergens:['Gluten'],dietaryFlags:['Vegan']},
-  {id:'i11',code:'WN01',name:'Malbec Reserva',price:52,category:'wine-bottle',station:'Bar',cookTime:1,modifiers:[{group:'Pour',options:['Glass $14','Bottle $52']}],description:'Mendoza, Argentina. Full-bodied, dark fruit, spice, velvety tannins',allergens:['Sulfites'],dietaryFlags:['Vegan']},
-  {id:'i12',code:'WN02',name:'Chardonnay',price:44,category:'wine-bottle',station:'Bar',cookTime:1,modifiers:[{group:'Pour',options:['Glass $12','Bottle $44']}],description:'Sonoma Coast. Crisp citrus, green apple, light oak',allergens:['Sulfites'],dietaryFlags:['Vegan']},
+  {id:'i11',code:'WN01',name:'Malbec Reserva',price:52,category:'wine-bottle',station:'Bar',cookTime:1,modifiers:[],description:'Mendoza, Argentina. Full-bodied, dark fruit, spice, velvety tannins',allergens:['Sulfites'],dietaryFlags:['Vegan']},
+  {id:'i12',code:'WN02',name:'Chardonnay',price:44,category:'wine-bottle',station:'Bar',cookTime:1,modifiers:[],description:'Sonoma Coast. Crisp citrus, green apple, light oak',allergens:['Sulfites'],dietaryFlags:['Vegan']},
   {id:'i13',code:'SS01',name:'Soup of the Day',price:10,category:'soups-salads',station:'Sauté',cookTime:5,modifiers:[],description:'Chef\'s daily creation, ask your server for today\'s selection',allergens:['Dairy'],dietaryFlags:['Vegetarian']},
   {id:'i14',code:'SD01',name:'Truffle Fries',price:12,category:'sides',station:'Fry',cookTime:6,modifiers:[],description:'Hand-cut fries, truffle oil, parmesan, fresh herbs',allergens:['Dairy'],dietaryFlags:['Vegetarian']}
 ];
@@ -4619,7 +4651,7 @@ function orderBannerHtml(){
   html+='<div><div class="ob-table">Table '+esc(String(STATE.selectedTable))+'</div>';
   html+='<div class="ob-meta">'+sess.guestCount+' guests · '+(STATE.currentServer?esc(STATE.currentServer.name):'Food Master')+'</div>';
   html+='<div class="ob-seated" id="order-seated">'+seatedLabelFor(STATE.selectedTable)+'</div></div>';
-  html+='<div class="ob-total">$'+tot.grand.toFixed(2)+'<span>OPEN CHECK</span></div>';
+  html+='<div class="ob-total">'+posTotalMoney(tot.grand)+'<span>OPEN CHECK</span></div>';
   if (warn.text) html+='<div class="res-warn lvl'+warn.level+'">'+esc(warn.text)+'</div>';
   html+='</div>';
   return html;
@@ -4651,7 +4683,7 @@ function renderMenuRows(filtered, q){
       '<div class="item-meta">'+esc(meta.join(' · '))+'</div>'+
       (hasDesc ? '<div class="item-desc-toggle" onclick="event.stopPropagation();toggleItemDesc('+JSON.stringify(String(item.id))+')">details</div>' : '')+
       '</div>'+
-      '<div class="item-price">$'+(Number(item.price)||0).toFixed(2)+'</div>'+
+      '<div class="item-price">'+posLineMoney(Number(item.price)||0)+'</div>'+
     '</div>';
     if (hasDesc && STATE._expandedItems && STATE._expandedItems[item.id]) {
       html+='<div class="item-desc-expanded">';
@@ -4670,14 +4702,14 @@ function renderPrixFixeRows(q){
     html+='<div class="menu-item-row tasting-row" onclick=\'openPrixFixeSelector('+JSON.stringify(String(pf.id))+')\'>'+
       '<div class="item-info"><div class="item-name">◈ '+esc(pf.name)+'</div>'+
       '<div class="item-meta">'+(pf.courses?pf.courses.length:0)+' courses · Welcome fires one by one</div></div>'+
-      '<div class="item-price">$'+(Number(pf.price)||0).toFixed(2)+'</div></div>';
+      '<div class="item-price">'+posLineMoney(Number(pf.price)||0)+'</div></div>';
   });
   (STATE.tastingMenus||[]).forEach(function(tm){
     if (q && !itemMatchesSearch(tm, q)) return;
     html+='<div class="menu-item-row tasting-row" onclick="addTastingMenu('+JSON.stringify(String(tm.id))+')">'+
       '<div class="item-info"><div class="item-name">✦ '+esc(tm.name)+'</div>'+
       '<div class="item-meta">'+(tm.courses?tm.courses.length:0)+' courses · Fire one by one</div></div>'+
-      '<div class="item-price">$'+(Number(tm.price)||0).toFixed(2)+'</div></div>';
+      '<div class="item-price">'+posLineMoney(Number(tm.price)||0)+'</div></div>';
   });
   return html;
 }
@@ -4830,8 +4862,8 @@ function liveCheckHtml(){
       mods.map(function(m){ return '<div class="ts-mod">'+esc(m)+'</div>'; }).join('')+
       '<div class="ts-meta lc-meta">'+seatName(row.seat)+' · '+row.status.toUpperCase()+'</div></div>'+
       '<div class="ts-qty">'+qty+'</div>'+
-      '<div class="ts-money">$'+(each?each.toFixed(2):'')+'</div>'+
-      '<div class="ts-money">$'+(each? (each*qty).toFixed(2):'')+'</div>'+
+      '<div class="ts-money">'+(each?posLineMoney(each):'')+'</div>'+
+      '<div class="ts-money">'+(each? posLineMoney(each*qty):'')+'</div>'+
       lineKebabBtn({ lineId:row.lineId })+'</div>';
   });
   html+=renderDiningProgress();
@@ -4847,12 +4879,12 @@ function liveCheckHtml(){
   html+='<button type="button" class="stay" onclick="stayOrder()"'+(canFire?'':' disabled')+'>Stay</button>';
   html+='<button type="button" class="send" onclick="sendOrder({})"'+(canFire?'':' disabled')+'>Send</button>';
   html+='</div>';
-  html+='<div class="toast-totals"><span class="due">Balance Due: $'+tot.grand.toFixed(2)+'</span><span class="tot">TOTAL: $'+tot.grand.toFixed(2)+'</span></div>';
+  html+='<div class="toast-totals"><span class="due">Balance Due: '+posTotalMoney(tot.grand)+'</span><span class="tot">TOTAL: '+posTotalMoney(tot.grand)+'</span></div>';
   html+='<div class="toast-check-ops">';
   html+='<button type="button" onclick="openSeatPicker()">'+esc(String(sessionOf(STATE.selectedTable).guestCount||2))+' Guests</button>';
   html+='<button type="button" onclick="STATE.menuOpen=true;setMenuFamily(\'food\')">Dining</button>';
   html+='<button type="button" onclick="printCheck()">Print</button>';
-  html+='<button type="button" class="pay" onclick="openPayment(checkTotals().grand)">Pay $'+tot.grand.toFixed(2)+'</button>';
+  html+='<button type="button" class="pay" onclick="openPayment(checkTotals().grand)">Pay '+posTotalMoney(tot.grand)+'</button>';
   html+='</div></div>';
   return html;
 }
@@ -4885,7 +4917,7 @@ function renderOrder() {
   var c=document.getElementById('app-content');
   var warn=reservationWarning(STATE.selectedTable);
   var tot=checkTotals();
-  var html='<div class="ts-console toast-go'+(STATE.checkFocus?' focus':'')+(tableDiningOrders().length?' has-dining':'')+'">';
+  var html='<div class="ts-console toast-go'+(STATE.checkFocus?' focus':'')+(tableDiningOrders().length?' has-dining':'')+(String(STATE.menuSearch||'').trim()?' searching':'')+'">';
   if (warn.text) html+='<div class="res-warn lvl'+warn.level+'">'+esc(warn.text)+'</div>';
   html+=liveCheckHtml();
   html+=renderGuestAllergyStrip();
@@ -4899,8 +4931,8 @@ function renderOrder() {
 }
 function addItemsHeaderHtml(){
   var dining=tableHasDining();
-  var extra=dining?'<div class="extra-plate-hint">Extra plate $38 app · $48 main · $22 dessert · shrimp · pork · medallions · mignon</div>':'';
-  var ph=dining?'shrimp · pork · mignon · app / main / des':'Search';
+  var extra=dining?'<div class="extra-plate-hint">Extra dish — raviolo · porcini · bolognese · shrimp · pork · mignon</div>':'';
+  var ph=dining?'raviolo · porcini · bolognese · shrimp · pork':'Search';
   return '<div class="add-items-row"><div class="add-items-label">Add items</div>'+extra+
     '<input class="search-box add-search" id="pos-item-find" value="'+esc(STATE.menuSearch||'')+'" placeholder="'+esc(ph)+'" oninput="STATE.menuSearch=this.value;var s=this.selectionStart;renderOrder();var el=document.getElementById(\'pos-item-find\');if(el){el.focus();try{el.setSelectionRange(s,s);}catch(e){}}"></div>';
 }
@@ -4964,7 +4996,8 @@ function tickerTouchEnd(e){
   renderOrder();
 }
 function paginateTiles(tiles, mode){
-  var per=mode==='list'?10:12;
+  var searching=!!String(STATE.menuSearch||'').trim();
+  var per=mode==='list'?(searching?20:14):(searching?16:12);
   var pages=Math.max(1, Math.ceil((tiles.length||1)/per));
   var page=STATE.tilePage||0;
   if (page<0) page=0;
@@ -4995,12 +5028,11 @@ function renderMenuGrid(){
       if (!itemMatchesSearch(item, q)) return;
       var click=item.eightySixed ? 'toast("86 — not available")' : 'beginAddItem('+JSON.stringify(String(item.id))+')';
       var wine=isPosWineItem(item);
-      var t='<button type="button" class="ts-tile'+(item.eightySixed?' sold':'')+(wine?' wine':'')+'" onclick=\''+click+'\'>'+esc(item.name)+'<span class="price">$'+(Number(item.price)||0).toFixed(2)+'</span>';
-      if (wine && !item.eightySixed) t+='<span class="wine-notes-btn" onclick=\'event.preventDefault();event.stopPropagation();explainPosWine('+JSON.stringify(String(item.id))+')\'>Notes · pair</span>';
-      tiles.push(t+'</button>');
+      var t='<button type="button" class="ts-tile'+(item.eightySixed?' sold':'')+(wine?' wine':'')+'" onclick=\''+click+'\'>'+esc(item.name)+'<span class="price">'+posLineMoney(Number(item.price)||0)+'</span></button>';
+      tiles.push(t);
     });
     if (!tiles.length) {
-      return '<p style="color:var(--text-muted);font-size:0.85rem;padding:0.8rem 0.2rem;">No matches. Try shrimp, shrimp main, pork, medallions, mignon, or add app / main / des.</p>';
+      return '<p style="color:var(--text-muted);font-size:0.85rem;padding:0.8rem 0.2rem;">No matches. Try raviolo, porcini, bolognese, shrimp, pork, or mignon.</p>';
     }
     return paginateTiles(tiles, 'list');
   }
@@ -5025,11 +5057,11 @@ function renderMenuGrid(){
     });
   } else if (STATE.orderCat==='__prixfixe__') {
     (STATE.prixFixeMenus||[]).forEach(function(pf){
-      tiles.push('<button type="button" class="ts-tile prix" onclick=\'openPrixFixeSelector('+JSON.stringify(String(pf.id))+')\'>'+esc(pf.name)+'<span class="price">$'+(Number(pf.price)||0).toFixed(2)+'</span></button>');
+      tiles.push('<button type="button" class="ts-tile prix" onclick=\'openPrixFixeSelector('+JSON.stringify(String(pf.id))+')\'>'+esc(pf.name)+'<span class="price">'+posLineMoney(Number(pf.price)||0)+'</span></button>');
     });
   } else if (STATE.orderCat==='__tasting__') {
     (STATE.tastingMenus||[]).forEach(function(tm){
-      tiles.push('<button type="button" class="ts-tile prix" onclick="addTastingMenu('+JSON.stringify(String(tm.id))+')">'+esc(tm.name)+'<span class="price">$'+(Number(tm.price)||0).toFixed(2)+'</span></button>');
+      tiles.push('<button type="button" class="ts-tile prix" onclick="addTastingMenu('+JSON.stringify(String(tm.id))+')">'+esc(tm.name)+'<span class="price">'+posLineMoney(Number(tm.price)||0)+'</span></button>');
     });
   } else {
     var catItems=items.filter(function(i){
@@ -5037,7 +5069,7 @@ function renderMenuGrid(){
       return i.category===STATE.orderCat;
     });
     var wineCat=isWineListCat(STATE.orderCat);
-    if (wineCat && catItems.length>20) {
+    if (wineCat) {
       var q=String(STATE._posWineFind||'').trim().toLowerCase();
       extra='<div><input class="search-box" id="pos-wine-find" value="'+esc(STATE._posWineFind||'')+'" placeholder="Find a wine ('+catItems.length+')" oninput="STATE._posWineFind=this.value;var s=this.selectionStart;renderOrder();var el=document.getElementById(\'pos-wine-find\');if(el){el.focus();try{el.setSelectionRange(s,s);}catch(e){}}"></div>';
       if (q) catItems=catItems.filter(function(i){ return itemMatchesSearch(i,q); });
@@ -5048,9 +5080,8 @@ function renderMenuGrid(){
     catItems.forEach(function(item){
       var click=item.eightySixed ? 'toast("86 — not available")' : 'beginAddItem('+JSON.stringify(String(item.id))+')';
       var wine=isPosWineItem(item);
-      var t='<button type="button" class="ts-tile'+(item.eightySixed?' sold':'')+(wine?' wine':'')+'" onclick=\''+click+'\'>'+esc(item.name)+'<span class="price">$'+(Number(item.price)||0).toFixed(2)+'</span>';
-      if (wine && !item.eightySixed) t+='<span class="wine-notes-btn" onclick=\'event.preventDefault();event.stopPropagation();explainPosWine('+JSON.stringify(String(item.id))+')\'>Notes · pair</span>';
-      tiles.push(t+'</button>');
+      var t='<button type="button" class="ts-tile'+(item.eightySixed?' sold':'')+(wine?' wine':'')+'" onclick=\''+click+'\'>'+esc(item.name)+'<span class="price">'+posLineMoney(Number(item.price)||0)+'</span></button>';
+      tiles.push(t);
     });
   }
   var tileMode='';
@@ -5443,7 +5474,7 @@ function openPrixFixeSelector(pfId) {
   var ov=document.getElementById('pf-overlay');
   if (!ov) { toast('Cannot open the prix fixe menu'); return; }
   var courses=pf.courses||[];
-  var html='<div class="pf-selector"><h3>'+esc(pf.name)+' — $'+(Number(pf.price)||0).toFixed(2)+'</h3>';
+  var html='<div class="pf-selector"><h3>'+esc(pf.name)+' — '+posLineMoney(Number(pf.price)||0)+'</h3>';
   html+='<p class="pf-sel-sub">Choose primo and main. Welcome bites, entremet, and dolce each have their own FIRE key on the check. Pork medallions are fully cooked — no temperature.</p>';
   if (!courses.length) html+='<p class="pf-sel-sub">No courses on this menu yet.</p>';
   courses.forEach(function(c,ci){
@@ -5692,13 +5723,13 @@ function explainPosWine(itemId){
   var item=findPosMenuItem(itemId);
   if (!item) { toast('Wine not on the list'); return; }
   var html='<h2>'+esc(item.name)+'</h2>';
-  html+='<p class="sheet-sub">$'+(Number(item.price)||0).toFixed(2);
+  html+='<p class="sheet-sub">'+posLineMoney(Number(item.price)||0);
   if (item.producer || item.region || item.varietal) {
     html+=' · '+esc([item.producer, item.vintage, item.region, item.varietal].filter(Boolean).join(' · '));
   }
   html+='</p>';
   html+=wineGuideHtml(item);
-  html+='<button class="primary-btn" onclick=\'closeSheet();beginAddItem('+JSON.stringify(String(item.id))+')\'>Add this pour</button>';
+  html+='<button class="primary-btn" onclick=\'closeSheet();beginAddItem('+JSON.stringify(String(item.id))+')\'>Add</button>';
   html+='<button class="ghost-btn" onclick="closeSheet()">Close</button>';
   openSheet(html);
 }
@@ -5722,7 +5753,7 @@ function beginAddItem(itemId) {
     checkId:activeCheckId(),
     qty:1,
     notes:'',
-    selectedMod:dining?('Extra plate $'+extraFee+(surcharge?(' + $'+surcharge):'')):null,
+    selectedMod:dining?'Extra plate':null,
     mods:{},
     extraPlate:dining,
     extraFee:extraFee,
@@ -5734,7 +5765,13 @@ function beginAddItem(itemId) {
     catIds:item.catIds,
     station:item.station,
     cookTime:item.cookTime||item.cookMin||0,
-    modifiers:item.modifiers||[],
+    modifiers:(function(){
+      var mods=item.modifiers||[];
+      if (isPosWineItem(item) && !item.byTheGlass && !item.scaliniOnly) {
+        mods=mods.filter(function(m){ return m && String(m.group||'')!=='Pour'; });
+      }
+      return mods;
+    })(),
     allergens:item.allergens||[],
     dietaryFlags:item.dietaryFlags||item.dietary||[],
     description:item.description||item.desc||'',
@@ -5749,7 +5786,7 @@ function beginAddItem(itemId) {
     byTheGlass:!!item.byTheGlass,
     scaliniOnly:!!item.scaliniOnly
   };
-  if (dining || (item.modifiers&&item.modifiers.length)) {
+  if (dining || isPosWineItem(item) || (STATE.pendingItem.modifiers&&STATE.pendingItem.modifiers.length)) {
     renderModifierSheet();
     return;
   }
@@ -5760,9 +5797,9 @@ function renderModifierSheet(){
   var p=STATE.pendingItem; if(!p) return;
   var html='<h2>'+p.name+'</h2>';
   if (p.extraPlate) {
-    html+='<p class="sheet-sub">Extra plate $'+Number(p.extraFee||0).toFixed(0)+(p.itemSurcharge?(' + $'+Number(p.itemSurcharge).toFixed(0)+' on the item'):'')+' = $'+Number(p.price).toFixed(2)+'</p>';
+    html+='<p class="sheet-sub">'+esc(seatName(p.seat))+'</p>';
   } else {
-    html+='<p class="sheet-sub">$'+Number(p.price).toFixed(2)+' · '+seatName(p.seat)+'</p>';
+    html+='<p class="sheet-sub">'+posLineMoney(p.price)+' · '+seatName(p.seat)+'</p>';
   }
   if (isPosWineItem(p)) html+=wineGuideHtml(p);
   html+='<div class="tasting-section-label">Seat</div><div class="seat-pick-list">';
@@ -5774,11 +5811,13 @@ function renderModifierSheet(){
   html+='<button type="button" onclick="STATE.pendingItem.qty=Math.max(1,(STATE.pendingItem.qty||1)-1);renderModifierSheet()">−</button>';
   html+='<div style="font-size:1.3rem;font-weight:800;">'+(p.qty||1)+'</div>';
   html+='<button type="button" onclick="STATE.pendingItem.qty=(STATE.pendingItem.qty||1)+1;renderModifierSheet()">+</button></div>';
-  html+='<div class="tasting-section-label">Course</div><div class="chip-row">';
-  [1,2,3,4].forEach(function(cn){
-    html+='<button type="button" class="chip'+(Number(p.course)===cn?' active':'')+'" onclick="setPendingCourse('+cn+')">'+cn+' '+courseName(cn)+'</button>';
-  });
-  html+='</div>';
+  if (!p.extraPlate) {
+    html+='<div class="tasting-section-label">Course</div><div class="chip-row">';
+    [1,2,3,4].forEach(function(cn){
+      html+='<button type="button" class="chip'+(Number(p.course)===cn?' active':'')+'" onclick="setPendingCourse('+cn+')">'+cn+' '+courseName(cn)+'</button>';
+    });
+    html+='</div>';
+  }
   (p.modifiers||[]).forEach(function(mod,mi){
     var chosen=p.mods[mod.group];
     html+='<div class="tasting-section-label">'+mod.group+' <span style="color:var(--danger)">*</span></div><div class="chip-row">';
@@ -5805,7 +5844,7 @@ function setPendingCourse(cn){
     p.extraFee = cn===4 ? 22 : (cn===2 ? 38 : 48);
     if (p.pfExtra) p.pfCourseKind = cn===4 ? 'des' : (cn===2 ? 'app' : 'main');
     p.price=(Number(p.extraFee)||0)+(Number(p.itemSurcharge)||0);
-    p.selectedMod='Extra plate $'+p.extraFee+(p.itemSurcharge?(' + $'+p.itemSurcharge):'');
+    p.selectedMod='Extra plate';
   }
   renderModifierSheet();
 }
@@ -5973,9 +6012,9 @@ function openSplitOverlay(){
     html+='<div class="split-tile'+(active?' active':'')+'" onclick="selectSplitCheck(\''+id+'\')">';
     html+='<h3>Check '+(idx+1)+(active?' · open':'')+'</h3>';
     if (!rows.length) html+='<div class="st-line">Empty</div>';
-    rows.slice(0,6).forEach(function(r){ html+='<div class="st-line">'+esc(r.name)+' · $'+((Number(r.price)||0)*r.qty).toFixed(2)+'</div>'; });
+    rows.slice(0,6).forEach(function(r){ html+='<div class="st-line">'+esc(r.name)+' · '+posLineMoney((Number(r.price)||0)*r.qty)+'</div>'; });
     if (rows.length>6) html+='<div class="st-line">+'+(rows.length-6)+' more</div>';
-    html+='<div class="st-total">$'+tot.toFixed(2)+'</div></div>';
+    html+='<div class="st-total">'+posTotalMoney(tot)+'</div></div>';
   });
   html+='<div class="split-tile new" onclick="addSplitCheck()">+ New Check</div>';
   html+='<div class="split-tile new" onclick="openLookupCheck()">Lookup Check</div>';
