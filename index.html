@@ -18,7 +18,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <title>Epicurean POS</title>
-<!-- pos-build: scalini-print-v41 -->
+<!-- pos-build: scalini-print-v42 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
@@ -320,8 +320,8 @@ body { font-family:var(--font); color:var(--text); background:var(--bg); -webkit
 .f-star { position:absolute; top:2px; right:5px; color:#C9A84C; font-size:0.95rem; font-weight:800; line-height:1; z-index:3; text-shadow:0 1px 2px rgba(0,0,0,0.6); }
 .f-dwell { position:absolute; bottom:3px; left:0; right:0; font-size:0.58rem; font-weight:800; color:#fff; letter-spacing:0.02em; text-shadow:0 1px 2px rgba(0,0,0,0.7); }
 .f-table.open-tbl, .f-stool.open-tbl, .f-outdoor.open-tbl {
-  background:transparent !important; border:2.5px dashed rgba(243,236,220,0.88) !important;
-  color:#F3ECDC !important; box-shadow:none;
+  background:transparent !important; border:2.5px solid rgba(243,236,220,0.95) !important;
+  color:#F3ECDC !important; box-shadow:none; overflow:visible;
 }
 .f-table.open-tbl .f-tnum, .f-stool.open-tbl .f-tnum, .f-outdoor.open-tbl .f-tnum,
 .f-table.open-tbl .f-tsub, .f-stool.open-tbl .f-tsub, .f-outdoor.open-tbl .f-tsub { color:#F3ECDC; }
@@ -1190,7 +1190,7 @@ body.hh-on .floor-retry { background:#fff; color:#000; border-color:#c5ced8; }
 <div id="login-screen" class="screen active">
   <h1>Epicurean POS</h1>
   <p class="subtitle">Enter your 4-digit code</p>
-  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 41</p>
+  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 42</p>
   <div class="pin-display" id="pin-display">
     <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
   </div>
@@ -1410,16 +1410,9 @@ function createNamedFirestoreAdapter(){
   return {collection:collection};
 }
 
-if (typeof fbReady !== 'undefined' && fbReady) {
-  try { fbDb = firebase.firestore(); }
-  catch (e) { fbDb = createNamedFirestoreAdapter(); }
-}
+if (typeof fbReady !== 'undefined' && fbReady) fbDb = createNamedFirestoreAdapter();
 var POS_LAYOUT_KEY = 'eh_pos_layout_v41';
 var POS_COMBINE_KEY = 'eh_pos_table_combines';
-try {
-  localStorage.removeItem('eh_pos_layout_live');
-  localStorage.removeItem('eh_pos_layout');
-} catch (e) {}
 function asObjArray(v){
   if (Array.isArray(v)) return v;
   if (v && typeof v==='object') {
@@ -1447,6 +1440,11 @@ function loadPosLayout(){
     if (raw) {
       var d = JSON.parse(raw);
       if (d && d.fromBoh && layoutHasFloor(d.rooms, d.roomObjs)) return d;
+    }
+    raw = localStorage.getItem('eh_pos_layout_live');
+    if (raw) {
+      var live = JSON.parse(raw);
+      if (live && live.fromBoh && layoutHasFloor(live.rooms, live.roomObjs)) return live;
     }
   } catch (e) {}
   return { rooms: [], roomObjs: [], stations: [] };
@@ -2682,9 +2680,18 @@ function mergeScaliniList(list, seed, dummyIds){
 function applyBohTables(d){
   if (!d) return;
   var incomingRooms = asObjArray(d.rooms);
-  if (incomingRooms.length) STATE.rooms = incomingRooms;
-  if (d.roomObjs) STATE.roomObjs = normalizePosRoomObjs(d.roomObjs);
+  var incomingObjs = d.roomObjs ? normalizePosRoomObjs(d.roomObjs) : null;
   var incomingStations = asObjArray(d.stations);
+  var haveFloor = layoutHasFloor(STATE.rooms, STATE.roomObjs);
+  var roomsForCheck = incomingRooms.length ? incomingRooms : (incomingObjs ? Object.keys(incomingObjs).map(function(id){ return {id:id, name:id}; }) : []);
+  var incomingHasFloor = !!(incomingObjs && layoutHasFloor(roomsForCheck, incomingObjs));
+  if (incomingObjs && !incomingHasFloor && haveFloor) {
+    incomingObjs = null;
+    incomingRooms = [];
+    incomingStations = [];
+  }
+  if (incomingRooms.length) STATE.rooms = incomingRooms;
+  if (incomingObjs) STATE.roomObjs = incomingObjs;
   if (incomingStations.length) STATE.stations = incomingStations;
   STATE.stations = mergeStationsFromFloor(STATE.stations, STATE.roomObjs);
   if ((!STATE.rooms || !STATE.rooms.length) && STATE.roomObjs && typeof STATE.roomObjs==='object' && !Array.isArray(STATE.roomObjs)) {
@@ -2742,7 +2749,7 @@ function loadData() {
     refreshOrderView();
   }, function(){});
 
-  // Live BOH dining room. Native Firestore listen only — do not poll.
+  // Live BOH dining room from named database default (same adapter as BOH).
   fbDb.collection('boh_shared').doc('tables').onSnapshot(function(doc){
     if (doc.exists && doc.data()) applyBohTables(doc.data());
   }, function(){});
@@ -2921,11 +2928,17 @@ function findStaffForPin(code){
 }
 function defaultFloorFilter(){
   var rooms=STATE.rooms||[];
-  if (rooms.length) return 'room:'+rooms[0].id;
+  var withObjs=rooms.filter(function(rm){
+    return roomObjectList(rm.id).some(function(o){ return !!o; });
+  });
+  if (withObjs.length) return 'room:'+withObjs[0].id;
   if (STATE.roomObjs && !Array.isArray(STATE.roomObjs)) {
-    var ids=Object.keys(STATE.roomObjs);
+    var ids=Object.keys(STATE.roomObjs).filter(function(id){
+      return asObjArray(STATE.roomObjs[id]).length>0;
+    });
     if (ids.length) return 'room:'+ids[0];
   }
+  if (rooms.length) return 'room:'+rooms[0].id;
   return 'all';
 }
 function failLogin(){
