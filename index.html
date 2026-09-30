@@ -11,14 +11,14 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<link rel="manifest" href="manifest.json?b=48">
-<link rel="apple-touch-icon" href="icon-192.png?b=48">
-<link rel="apple-touch-icon" sizes="180x180" href="icon-192.png?b=48">
-<link rel="apple-touch-icon" sizes="192x192" href="icon-192.png?b=48">
-<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?b=48">
-<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?b=48">
+<link rel="manifest" href="manifest.json?b=49">
+<link rel="apple-touch-icon" href="icon-192.png?b=49">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-192.png?b=49">
+<link rel="apple-touch-icon" sizes="192x192" href="icon-192.png?b=49">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?b=49">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?b=49">
 <title>Epicurean POS</title>
-<!-- pos-build: scalini-print-v48 -->
+<!-- pos-build: scalini-print-v49 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
@@ -526,7 +526,7 @@ body.hh-on.floor-drawing .floor-stage { outline:2px dashed var(--primary); }
   background:rgba(248,113,113,0.12); border:1px solid var(--danger); color:#fecaca;
   border-radius:12px; padding:0.75rem; font-size:0.85rem; font-weight:600; margin:0.6rem 0 1rem;
 }
-.seat-bar { display:flex; gap:6px; overflow-x:auto; padding:0.15rem 0 0.65rem; -webkit-overflow-scrolling:touch; }
+.seat-bar { display:flex; gap:6px; overflow-x:auto; padding:0.15rem 0 0.65rem; -webkit-overflow-scrolling:touch; flex-shrink:0; }
 .seat-chip {
   flex:0 0 auto; min-width:52px; min-height:44px; padding:0.45rem 0.7rem; border-radius:12px;
   border:1px solid var(--border); background:var(--surface); color:var(--text-secondary);
@@ -725,9 +725,7 @@ body.hh-on.floor-drawing .floor-stage { outline:2px dashed var(--primary); }
 .ts-console.toast-go.has-dining .ts-check {
   max-height:42vh; flex:0 1 42vh; min-height:0;
 }
-.ts-console.toast-go.has-dining .ts-grid-wrap { flex:1 1 46vh; min-height:240px; overflow:auto; }
-.ts-console.toast-go.has-dining.searching .ts-check { max-height:22vh; flex:0 1 22vh; }
-.ts-console.toast-go.has-dining.searching .ts-grid-wrap { flex:1 1 62vh; min-height:320px; overflow:auto; }
+.ts-console.toast-go.has-dining .ts-grid-wrap { flex:1 1 32vh; min-height:140px; overflow:auto; }
 .ts-console.toast-go .ts-check-head, .ts-console.toast-go .ts-line {
   grid-template-columns:minmax(0,1fr) 28px 40px 44px 28px;
 }
@@ -801,8 +799,8 @@ body.hh-on.floor-drawing .floor-stage { outline:2px dashed var(--primary); }
 .ts-console.toast-go .ts-line.dining-line .ts-name { font-size:0.78rem; }
 .ts-console.toast-go .ts-line.dining-line .ts-mod { font-size:0.64rem; padding:0; }
 .ts-console.toast-go .ts-line.dining-line .ts-meta { display:none; }
-.ts-console.toast-go.has-dining .seat-bar { padding:0.1rem 0; }
-.ts-console.toast-go.has-dining .seat-chip { min-height:32px; }
+.ts-console.toast-go.has-dining .seat-bar { padding:0.1rem 0; flex-shrink:0; }
+.ts-console.toast-go.has-dining .seat-chip { min-height:44px; }
 .ts-course-actions .fire-now {
   background:linear-gradient(135deg,#dc2626,#ea580c); color:#fff; border:none;
 }
@@ -1075,14 +1073,11 @@ body.hh-on .ts-console.toast-go .ts-check {
   background:#fff; border:1px solid #c5ced8; border-radius:0; max-height:42vh;
   padding:0.35rem 0.45rem 0.2rem; color:#000; overflow-y:auto; -webkit-overflow-scrolling:touch;
 }
-body.hh-on .ts-console.toast-go.has-dining .ts-check { max-height:28vh; flex:0 1 28vh; }
-body.hh-on .ts-console.toast-go.has-dining.searching .ts-check { max-height:16vh; flex:0 1 16vh; }
+body.hh-on .ts-console.toast-go.has-dining .ts-check { max-height:42vh; flex:0 1 42vh; }
 body.hh-on .ts-grid-wrap {
-  flex:1 1 auto; min-height:40vh; overflow-x:auto; overflow-y:auto;
+  flex:1 1 auto; min-height:28vh; overflow-x:auto; overflow-y:auto;
   -webkit-overflow-scrolling:touch;
 }
-body.hh-on .ts-console.toast-go.has-dining .ts-grid-wrap { min-height:50vh; }
-body.hh-on .ts-console.toast-go.has-dining.searching .ts-grid-wrap { min-height:64vh; flex:1 1 70vh; }
 body.hh-on .add-items-row .add-search { min-height:64px; font-size:1.08rem; width:100%; }
 body.hh-on .ts-line.picked, body.hh-on .lc-line.picked { background:#e8f0ff; outline:3px solid #2f6fdb; }
 .ts-line.extra-line { touch-action:none; user-select:none; -webkit-user-select:none; cursor:grab; }
@@ -1236,7 +1231,7 @@ body.hh-on .floor-retry { background:#fff; color:#000; border-color:#c5ced8; }
 <div id="login-screen" class="screen active">
   <h1>Epicurean POS</h1>
   <p class="subtitle">Enter your 4-digit code</p>
-  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 48</p>
+  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 49</p>
   <div class="pin-display" id="pin-display">
     <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
   </div>
@@ -1480,17 +1475,73 @@ function layoutHasFloor(rooms, roomObjs){
   var hasObjs = Object.keys(src).some(function(k){ return (src[k]||[]).length>0; });
   return hasRooms && hasObjs;
 }
+function bohGeomOf(o){
+  if (!o) return null;
+  return o._bohGeom || o._origGeom || null;
+}
+function stripPosOverlayForPersist(o){
+  if (!o || typeof o!=='object') return o;
+  var copy={};
+  Object.keys(o).forEach(function(k){
+    if (k.charAt(0)==='_' || k==='hidden' || k==='combinedInto') return;
+    copy[k]=o[k];
+  });
+  var g=bohGeomOf(o);
+  if (g) {
+    copy.x=g.x; copy.y=g.y; copy.w=g.w; copy.h=g.h; copy.seats=g.seats;
+  }
+  return copy;
+}
+function cloneFloorForPersist(roomObjs){
+  if (Array.isArray(roomObjs)) return roomObjs.map(stripPosOverlayForPersist);
+  if (!roomObjs || typeof roomObjs!=='object') return roomObjs;
+  var out={};
+  Object.keys(roomObjs).forEach(function(k){
+    out[k]=asObjArray(roomObjs[k]).map(stripPosOverlayForPersist);
+  });
+  return out;
+}
+function sanitizeLoadedRoomObj(o){
+  if (!o || typeof o!=='object') return o;
+  var g=o._bohGeom||o._origGeom;
+  if (g) {
+    o.x=g.x; o.y=g.y; o.w=g.w; o.h=g.h;
+    if (g.seats!=null) o.seats=g.seats;
+    o._bohGeom={ x:g.x||0, y:g.y||0, w:g.w||70, h:g.h||70, seats:g.seats||2 };
+    o.hidden=false;
+    delete o.combinedInto;
+  } else if (!o.hidden && !o.combinedInto) {
+    o._bohGeom={ x:o.x||0, y:o.y||0, w:o.w||70, h:o.h||70, seats:o.seats||2 };
+  }
+  delete o._origGeom;
+  return o;
+}
+function sanitizeLoadedRoomObjs(roomObjs){
+  if (Array.isArray(roomObjs)) return roomObjs.map(sanitizeLoadedRoomObj);
+  if (!roomObjs || typeof roomObjs!=='object') return roomObjs;
+  var out={};
+  Object.keys(roomObjs).forEach(function(k){
+    out[k]=asObjArray(roomObjs[k]).map(sanitizeLoadedRoomObj);
+  });
+  return out;
+}
 function loadPosLayout(){
   try {
     var raw = localStorage.getItem(POS_LAYOUT_KEY);
     if (raw) {
       var d = JSON.parse(raw);
-      if (d && d.fromBoh && layoutHasFloor(d.rooms, d.roomObjs)) return d;
+      if (d && d.fromBoh && layoutHasFloor(d.rooms, d.roomObjs)) {
+        d.roomObjs = sanitizeLoadedRoomObjs(d.roomObjs);
+        return d;
+      }
     }
     raw = localStorage.getItem('eh_pos_layout_live');
     if (raw) {
       var live = JSON.parse(raw);
-      if (live && live.fromBoh && layoutHasFloor(live.rooms, live.roomObjs)) return live;
+      if (live && live.fromBoh && layoutHasFloor(live.rooms, live.roomObjs)) {
+        live.roomObjs = sanitizeLoadedRoomObjs(live.roomObjs);
+        return live;
+      }
     }
   } catch (e) {}
   return { rooms: [], roomObjs: [], stations: [] };
@@ -1499,7 +1550,7 @@ function persistPosLayout(){
   if (!layoutHasFloor(STATE.rooms, STATE.roomObjs)) return;
   try {
     localStorage.setItem(POS_LAYOUT_KEY, JSON.stringify({
-      rooms: STATE.rooms, roomObjs: STATE.roomObjs, stations: STATE.stations, fromBoh: true, savedAt: Date.now()
+      rooms: STATE.rooms, roomObjs: cloneFloorForPersist(STATE.roomObjs), stations: STATE.stations, fromBoh: true, savedAt: Date.now()
     }));
   } catch (e) {}
 }
@@ -2880,7 +2931,16 @@ function applyBohTables(d){
     incomingStations = [];
   }
   if (incomingRooms.length) STATE.rooms = incomingRooms;
-  if (incomingObjs) STATE.roomObjs = incomingObjs;
+  if (incomingObjs) {
+    STATE.roomObjs = incomingObjs;
+    eachLiveFloorObject(function(o){
+      if (!o) return;
+      o._bohGeom={ x:o.x||0, y:o.y||0, w:o.w||70, h:o.h||70, seats:o.seats||2 };
+      o.hidden=false;
+      delete o.combinedInto;
+      delete o._origGeom;
+    });
+  }
   if (incomingStations.length) STATE.stations = incomingStations;
   STATE.stations = mergeStationsFromFloor(STATE.stations, STATE.roomObjs);
   if ((!STATE.rooms || !STATE.rooms.length) && STATE.roomObjs && typeof STATE.roomObjs==='object' && !Array.isArray(STATE.roomObjs)) {
@@ -4245,6 +4305,8 @@ function bindFloorGestures(){
     if (hit && String(hit)!==String(startTable)) {
       combineTables(startTable, hit);
     } else {
+      var live=liveFloorTable(resolveTableNumber(startTable));
+      if (live) restoreOrigGeom(live);
       cancelTableDrag();
       renderTables();
     }
@@ -6736,18 +6798,19 @@ function geomSnap(o){
 }
 function ensureOrigGeom(o){
   if (!o || o._origGeom) return;
-  o._origGeom=geomSnap(o);
+  o._origGeom=o._bohGeom ? geomSnap(o._bohGeom) : geomSnap(o);
 }
 function restoreOrigGeom(o){
   if (!o) return;
-  if (o._origGeom) {
-    o.x=o._origGeom.x;
-    o.y=o._origGeom.y;
-    o.w=o._origGeom.w;
-    o.h=o._origGeom.h;
-    o.seats=o._origGeom.seats;
-    delete o._origGeom;
+  var g=o._bohGeom || o._origGeom;
+  if (g) {
+    o.x=g.x;
+    o.y=g.y;
+    o.w=g.w;
+    o.h=g.h;
+    o.seats=g.seats;
   }
+  delete o._origGeom;
   o.hidden=false;
   delete o.combinedInto;
 }
@@ -6777,6 +6840,17 @@ function applyCombineToObject(keep, drop){
   drop.combinedInto=tableKey(keep);
 }
 function reapplyCombines(){
+  eachLiveFloorObject(function(o){
+    if (!o || !o._bohGeom) return;
+    o.x=o._bohGeom.x;
+    o.y=o._bohGeom.y;
+    o.w=o._bohGeom.w;
+    o.h=o._bohGeom.h;
+    o.seats=o._bohGeom.seats;
+    o.hidden=false;
+    delete o.combinedInto;
+    delete o._origGeom;
+  });
   (STATE.tableCombines||[]).forEach(function(c){
     if (!c || c.keep==null || c.drop==null) return;
     applyCombineToObject(liveFloorTable(c.keep), liveFloorTable(c.drop));
