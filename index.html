@@ -11,14 +11,14 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<link rel="manifest" href="manifest.json?b=47">
-<link rel="apple-touch-icon" href="icon-192.png?b=47">
-<link rel="apple-touch-icon" sizes="180x180" href="icon-192.png?b=47">
-<link rel="apple-touch-icon" sizes="192x192" href="icon-192.png?b=47">
-<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?b=47">
-<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?b=47">
+<link rel="manifest" href="manifest.json?b=48">
+<link rel="apple-touch-icon" href="icon-192.png?b=48">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-192.png?b=48">
+<link rel="apple-touch-icon" sizes="192x192" href="icon-192.png?b=48">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?b=48">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?b=48">
 <title>Epicurean POS</title>
-<!-- pos-build: scalini-print-v47 -->
+<!-- pos-build: scalini-print-v48 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
@@ -750,13 +750,16 @@ body.hh-on.floor-drawing .floor-stage { outline:2px dashed var(--primary); }
   color:#fff; font-weight:700; font-size:0.82rem; padding:0.7rem 0.9rem; cursor:pointer;
 }
 .line-menu-pop button:active { background:#2a3544; }
-.line-edit-bar { display:flex; gap:6px; padding:0.25rem 0 0.45rem; }
+.line-edit-bar { display:flex; flex-wrap:wrap; gap:6px; padding:0.25rem 0 0.45rem; }
 .line-edit-bar button {
-  flex:1; min-height:38px; font-weight:800; font-size:0.78rem;
+  flex:1 1 30%; min-height:40px; font-weight:800; font-size:0.74rem;
   border:1px solid var(--border); background:var(--surface-2); color:var(--text);
   border-radius:8px; cursor:pointer;
 }
 .line-edit-bar button.erase { background:#3b1212; color:#fecaca; border-color:#7f1d1d; }
+.line-edit-bar .course-set { flex:1 1 100%; display:flex; gap:4px; }
+.line-edit-bar .course-set button { flex:1; min-height:36px; }
+.line-edit-bar .course-set button.active { outline:2px solid #2f6fdb; outline-offset:-2px; }
 .seat-pick-list { display:flex; flex-direction:column; gap:0; margin:0.4rem 0 0.8rem; }
 .seat-pick-list button {
   width:100%; min-height:48px; text-align:left; padding:0 0.9rem;
@@ -1233,7 +1236,7 @@ body.hh-on .floor-retry { background:#fff; color:#000; border-color:#c5ced8; }
 <div id="login-screen" class="screen active">
   <h1>Epicurean POS</h1>
   <p class="subtitle">Enter your 4-digit code</p>
-  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 47</p>
+  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 48</p>
   <div class="pin-display" id="pin-display">
     <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
   </div>
@@ -1692,7 +1695,8 @@ function guestCheckItems(checkId){
       seat:i.seat||'table', course:i.course||null, notes:i.notes||'', mods:i.selectedMod||'',
       status:i.held?'held':'unsent', checkId:i.checkId||cid,
       extraPlate:!!i.extraPlate, pfExtra:!!i.pfExtra, pfCourseKind:i.pfCourseKind||null,
-      ticketPos:i.ticketPos!=null?Number(i.ticketPos):null
+      ticketPos:i.ticketPos!=null?Number(i.ticketPos):null,
+      serviceCourse:i.serviceCourse!=null?Number(i.serviceCourse):(i.course||null)
     });
   });
   var sentMap={};
@@ -1709,7 +1713,8 @@ function guestCheckItems(checkId){
           seat:i.seat||'table', course:i.course||null, notes:i.notes||'', mods:i.selectedMod||'',
           status:'sent', checkId:itemCid,
           extraPlate:!!i.extraPlate, pfExtra:!!i.pfExtra, pfCourseKind:i.pfCourseKind||null,
-          ticketPos:i.ticketPos!=null?Number(i.ticketPos):null
+          ticketPos:i.ticketPos!=null?Number(i.ticketPos):null,
+          serviceCourse:i.serviceCourse!=null?Number(i.serviceCourse):(i.course||null)
         };
       }
       sentMap[lid].qty += Math.max(1, parseInt(i.qty,10)||1);
@@ -1829,6 +1834,11 @@ function extraPlateFeeByKind(kind){
 }
 function extraKindOf(line){
   if (!line) return 'main';
+  var sc=Number(line.serviceCourse);
+  if (sc===1) return 'drink';
+  if (sc===2) return 'app';
+  if (sc===3) return 'main';
+  if (sc===4) return 'des';
   var kind=line.pfCourseKind;
   if (kind==='app' || kind==='main' || kind==='des' || kind==='drink') return kind;
   var n=Number(line.course);
@@ -1847,11 +1857,19 @@ function extraTicketPos(line){
 }
 function diningCourseKind(c){
   if (!c) return 'main';
+  if (c.serviceCourse) {
+    var n=Number(c.serviceCourse);
+    if (n===4) return 'des';
+    if (n===2) return 'app';
+    if (n===1) return 'drink';
+    if (n===3) return 'main';
+  }
   if (isWelcomeTrioCourse(c)) return 'welcome';
   if (c.entremets || c.mode==='entremets') return 'entremet';
   return pfCourseKind(c.course||c.name||c.choice||'');
 }
 function diningCourseTicketPos(c, idx){
+  if (c && c.ticketPos!=null && isFinite(Number(c.ticketPos))) return Number(c.ticketPos);
   return defaultTicketPosForKind(diningCourseKind(c))+(Number(idx)||0)*0.01;
 }
 function pfCourseKind(label){
@@ -1966,6 +1984,7 @@ function beginAddPrixFixeExtra(key){
     itemSurcharge:surcharge,
     pfExtra:true,
     pfCourseKind:kind,
+    serviceCourse:kind==='des'?4:(kind==='app'?2:3),
     ticketPos:defaultTicketPosForKind(kind)+1,
     pfId:dish.pfId||'',
     pfOptionId:dish.id||'',
@@ -4915,23 +4934,29 @@ function saveLineNote(lineId){
 function normFireTitle(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim(); }
 function diningFireGroupKey(to, c, idx){
   if (!c) return 'x'+idx;
-  if (c.later || c.mode==='later') return 'dolce';
-  if (c.entremets || c.mode==='entremets') return 'entremet';
+  if (c.noneChoice) return 'none:'+idx;
+  var kind=diningCourseKind(c);
+  if (kind==='des' || c.later || c.mode==='later') return 'dolce';
+  if (kind==='entremet' || c.entremets || c.mode==='entremets') return 'entremet';
   if (c.auto || c.fireEach) return 'auto:'+normFireTitle(diningCourseTitle(to,c));
+  if (kind==='app') return 'slot:app';
+  if (kind==='main') return 'slot:main';
   return 'slot:'+normFireTitle(c.course||c.name||('i'+idx));
 }
 function collectDiningFireGroups(){
   var groups=[], map={};
   tableDiningOrders().forEach(function(to){
     diningCourses(to).forEach(function(c,i){
-      if (c.fired || c.skipped) return;
+      if (c.fired || c.skipped || c.noneChoice) return;
       if (hideEntremetUntilDessert(c, to)) return;
       var key=diningFireGroupKey(to,c,i);
       if (!map[key]) {
         var label=diningCourseTitle(to,c);
         if (key==='dolce') label='Dolce';
         if (key==='entremet') label='Entremet';
-        if (key.indexOf('slot:')===0) label=c.course||label;
+        if (key==='slot:app') label='Appetizer';
+        if (key==='slot:main') label='Main';
+        if (key.indexOf('slot:')===0 && key!=='slot:app' && key!=='slot:main') label=c.course||label;
         map[key]={ key:key, label:label, count:0, needDessert:false, members:[] };
         groups.push(map[key]);
       }
@@ -4946,7 +4971,7 @@ function collectALaCarteFireGroups(){
   var map={};
   unsentFor().filter(function(i){ return lineBelongsToCheck(i); }).forEach(function(i){
     if (i.isPrixFixe || i.isTasting || i.isPairing) return;
-    var n=Number(i.course)||defaultCourse(i);
+    var n=Number(i.serviceCourse||i.course)||defaultCourse(i);
     if (!map[n]) map[n]={ course:n, name:courseName(n), count:0 };
     map[n].count += parseInt(i.qty,10)||1;
   });
@@ -5051,12 +5076,133 @@ function parseSelKey(key){
   return { type:'line', lineId:s };
 }
 function lineEditBarHtml(){
-  var n=Object.keys(STATE.selectedLineIds||{}).length;
-  if (!n) return '';
-  return '<div class="line-edit-bar">'+
-    '<button type="button" onclick="modifySelectedLine()">Modify</button>'+
-    '<button type="button" class="erase" onclick="eraseSelectedLines()">Erase</button>'+
-    '</div>';
+  var keys=selectedLineKeys();
+  if (!keys.length) return '';
+  var spec=keys.length===1 ? parseSelKey(keys[0]) : null;
+  var locked=spec ? entryIsLocked(spec) : true;
+  var sc=spec ? entryServiceCourse(spec) : 0;
+  var html='<div class="line-edit-bar">';
+  html+='<button type="button" onclick="modifySelectedLine()">Modify</button>';
+  html+='<button type="button" onclick="noteSelectedLine()">Note</button>';
+  if (!locked) {
+    html+='<button type="button" onclick="moveSelectedLine(-1)">Up</button>';
+    html+='<button type="button" onclick="moveSelectedLine(1)">Down</button>';
+    html+='<div class="course-set">';
+    html+='<button type="button" class="'+(sc===2?'active':'')+'" onclick="setSelectedServiceCourse(2)">Appetizer</button>';
+    html+='<button type="button" class="'+(sc===3?'active':'')+'" onclick="setSelectedServiceCourse(3)">Main</button>';
+    html+='<button type="button" class="'+(sc===4?'active':'')+'" onclick="setSelectedServiceCourse(4)">Dessert</button>';
+    html+='</div>';
+  }
+  html+='<button type="button" class="erase" onclick="eraseSelectedLines()">Erase</button>';
+  html+='</div>';
+  return html;
+}
+function selectedSingleSpec(){
+  var keys=selectedLineKeys();
+  if (keys.length!==1) { toast('Highlight one item'); return null; }
+  return parseSelKey(keys[0]);
+}
+function findDiningCourse(spec){
+  if (!spec || spec.type!=='dining') return null;
+  var to=(STATE.activeTastingOrders||[]).filter(function(o){ return o.id===spec.toId; })[0];
+  if (!to) return null;
+  var c=diningCourses(to)[spec.idx];
+  return c ? { to:to, c:c } : null;
+}
+function findOrderLine(lineId){
+  return (STATE.currentOrder||[]).filter(function(i){ return i.lineId===lineId; })[0] || null;
+}
+function entryIsLocked(spec){
+  if (!spec) return true;
+  if (spec.type==='dining') {
+    var found=findDiningCourse(spec);
+    if (!found) return true;
+    if (found.c.auto || found.c.fireEach || found.c.entremets || found.c.mode==='entremets') return true;
+    return !!(found.c.fired || (found.c.skipped && !found.c.noneChoice));
+  }
+  return !findOrderLine(spec.lineId);
+}
+function entryServiceCourse(spec){
+  if (!spec) return 0;
+  if (spec.type==='dining') {
+    var found=findDiningCourse(spec);
+    return found ? (Number(found.c.serviceCourse)||({app:2,main:3,des:4,drink:1}[diningCourseKind(found.c)]||3)) : 0;
+  }
+  var line=findOrderLine(spec.lineId);
+  if (!line) return 0;
+  return Number(line.serviceCourse)||Number(line.course)||({app:2,main:3,des:4,drink:1}[extraKindOf(line)]||3);
+}
+function noteSelectedLine(){
+  var spec=selectedSingleSpec(); if (!spec) return;
+  if (spec.type==='dining') { openCourseNoteSheet(spec.toId, spec.idx); return; }
+  if (!findOrderLine(spec.lineId)) { toast('Sent items keep their original note'); return; }
+  openLineNoteSheet(spec.lineId);
+}
+function sequenceEntries(){
+  var rows=[];
+  (STATE.currentOrder||[]).forEach(function(i){
+    if (!lineBelongsToCheck(i)) return;
+    if (i.isPrixFixe || i.isTasting || i.isPairing || i.noneChoice) return;
+    rows.push({ type:'line', line:i, ticketPos:extraTicketPos(i) });
+  });
+  tableDiningOrders().forEach(function(to){
+    diningCourses(to).forEach(function(c,i){
+      if (isWelcomeTrioCourse(c) || hideEntremetUntilDessert(c,to)) return;
+      if (c.auto || c.fireEach || c.entremets || c.mode==='entremets') return;
+      rows.push({ type:'dining', to:to, c:c, idx:i, ticketPos:diningCourseTicketPos(c,i) });
+    });
+  });
+  rows.sort(function(a,b){
+    if (a.ticketPos!==b.ticketPos) return a.ticketPos-b.ticketPos;
+    return 0;
+  });
+  return rows;
+}
+function moveSelectedLine(dir){
+  var spec=selectedSingleSpec(); if (!spec) return;
+  if (entryIsLocked(spec)) { toast('Already sent — cannot move'); return; }
+  var rows=sequenceEntries();
+  var idx=-1;
+  rows.forEach(function(r,i){
+    if (spec.type==='line' && r.type==='line' && r.line.lineId===spec.lineId) idx=i;
+    if (spec.type==='dining' && r.type==='dining' && r.to.id===spec.toId && r.idx===spec.idx) idx=i;
+  });
+  var swap=idx+dir;
+  if (idx<0 || swap<0 || swap>=rows.length) return;
+  var a=rows[idx], b=rows[swap];
+  var pa=a.ticketPos, pb=b.ticketPos;
+  if (pa===pb) { pb=pa+dir; }
+  if (a.type==='line') a.line.ticketPos=pb;
+  else { a.c.ticketPos=pb; }
+  if (b.type==='line') b.line.ticketPos=pa;
+  else { b.c.ticketPos=pa; }
+  persistCheck(ensureOpenCheck(STATE.selectedTable));
+  renderOrder();
+}
+function setSelectedServiceCourse(n){
+  var spec=selectedSingleSpec(); if (!spec) return;
+  if (entryIsLocked(spec)) { toast('Already sent — cannot reassign'); return; }
+  n=Number(n);
+  var kind=n===4?'des':(n===2?'app':(n===1?'drink':'main'));
+  var pos=defaultTicketPosForKind(kind)+1;
+  if (spec.type==='dining') {
+    var found=findDiningCourse(spec);
+    if (!found) return;
+    found.c.serviceCourse=n;
+    found.c.ticketPos=pos;
+  } else {
+    var line=findOrderLine(spec.lineId);
+    if (!line) return;
+    var cat=line.category;
+    line.serviceCourse=n;
+    line.course=n;
+    line.ticketPos=pos;
+    if (line.pfCourseKind) line.pfCourseKind=kind;
+    line.category=cat;
+  }
+  persistCheck(ensureOpenCheck(STATE.selectedTable));
+  renderOrder();
+  toast(n===2?'Serve with appetizer':(n===4?'Serve with dessert':'Serve with main'));
 }
 function selectedLineKeys(){
   return Object.keys(STATE.selectedLineIds||{});
@@ -5445,8 +5591,22 @@ function addPairing(tmId, pairingId) {
   renderOrder();
 }
 
+function isPfDessertCourse(c){
+  if (!c) return false;
+  if (c.mode==='entremets' || c.entremets) return false;
+  if (c.mode==='later' || c.later) return true;
+  return /dolce|dessert/i.test([c.label,c.name,c.course,c.id,c.group].join(' '));
+}
+function pfServiceCourseOf(course){
+  if (!course) return 3;
+  if (course.serviceCourse!=null && isFinite(Number(course.serviceCourse))) return Number(course.serviceCourse);
+  if (isPfDessertCourse(course)) return 4;
+  var kind=pfCourseKind(course.label||course.name||course.course||'');
+  return kind==='des'?4:(kind==='app'?2:(kind==='drink'?1:3));
+}
 function pfCourseMode(c){
   if (!c) return 'choose';
+  if (isPfDessertCourse(c) && c.mode!=='auto' && c.mode!=='entremets') return 'later';
   if (c.mode) return c.mode;
   return c.fireEach ? 'auto' : 'choose';
 }
@@ -5465,16 +5625,17 @@ function nonePrixFixeSelection(course, flags){
   flags=flags||{};
   return {
     course: course.label || course.name || '',
-    choice: 'None',
-    name: 'None',
-    desc: 'No prix-fixe dish — order through Add items if needed.',
+    choice: '',
+    name: '',
+    desc: '',
     upcharge: 0,
     station: 'Expo',
     allergens: [],
     skipped: true,
     noneChoice: true,
-    pending: false,
+    pending: !!flags.later,
     later: !!flags.later,
+    serviceCourse: pfServiceCourseOf(course),
     fired: false,
     firedAt: null
   };
@@ -5482,17 +5643,18 @@ function nonePrixFixeSelection(course, flags){
 function applyNoneToDiningCourse(c, flags){
   flags=flags||{};
   if (!c) return;
-  c.choice='None';
-  c.name='None';
-  c.desc='No prix-fixe dish — order through Add items if needed.';
+  c.choice='';
+  c.name='';
+  c.desc='';
   c.upcharge=0;
-  c.pending=false;
+  c.pending=!!flags.later;
   c.skipped=true;
   c.noneChoice=true;
   c.selectedTemp='';
   c.scoopChoice='';
   c.allergens=[];
   if (flags.later) c.later=true;
+  if (c.serviceCourse==null) c.serviceCourse=pfServiceCourseOf(c);
 }
 function togglePfScoops(ci, active){
   document.querySelectorAll('[id^="pf-scoops-'+ci+'-"]').forEach(function(el){
@@ -5551,6 +5713,7 @@ function selFromOption(course, opt, flags){
     pending: !!flags.pending,
     later: !!flags.later,
     entremets: !!flags.entremets,
+    serviceCourse: pfServiceCourseOf(course),
     fired: false,
     firedAt: null
   };
@@ -5587,12 +5750,13 @@ function buildPrixFixeSelections(pf, pickedByIndex){
           pending:true,
           later:true,
           dessertOptions:opts,
+          serviceCourse:4,
           fired:false
         });
       }
       return;
     }
-    if (isPfNonePick(pickedByIndex[ci])) {
+    if (pickedByIndex[ci]==null || isPfNonePick(pickedByIndex[ci])) {
       selections.push(nonePrixFixeSelection(c,{}));
       return;
     }
@@ -5607,7 +5771,7 @@ function diningCourses(to){
 function nextDiningFire(to){
   var courses=diningCourses(to);
   for (var i=0;i<courses.length;i++){
-    if (courses[i].fired || courses[i].skipped) continue;
+    if (courses[i].fired || courses[i].skipped || courses[i].noneChoice) continue;
     var needDessert=courseNeedsDessertPick(courses[i]);
     return { idx:i, needDessert:needDessert, course:courses[i] };
   }
@@ -5622,8 +5786,10 @@ function courseNeedsDessertPick(c){
 }
 function diningCourseTitle(to, c){
   if (!c) return 'Course';
+  if (c.noneChoice) return (c.course||c.name||'Course')+' — not selected';
   if (to && to.type==='tasting') return c.name || c.choice || 'Course';
   if (c.choice && !/take after/i.test(c.choice)) return c.choice;
+  if (c.later || c.mode==='later' || /take after/i.test(c.choice||'')) return (c.course||'Dolce')+' — choose later';
   return c.course || c.name || 'Course';
 }
 function tableDiningOrders(){
@@ -5773,9 +5939,13 @@ function hydratePrixFixeMenu(pf){
     if (seed.courseGroups) pf.courseGroups=seed.courseGroups;
     if (!pf.name) pf.name=seed.name;
     if (!pf.price) pf.price=seed.price;
+    (pf.courses||[]).forEach(function(c){
+      if (isPfDessertCourse(c)) { c.mode='later'; c.later=true; }
+    });
     return pf;
   }
   (pf.courses||[]).forEach(function(c){
+    if (isPfDessertCourse(c)) { c.mode='later'; c.later=true; }
     if ((c.options||[]).length) return;
     var sc=(seed.courses||[]).filter(function(x){ return x.label===c.label || x.id===c.id; })[0];
     if (sc && sc.options) c.options=JSON.parse(JSON.stringify(sc.options));
@@ -5893,14 +6063,6 @@ function confirmPrixFixe(pfId) {
   });
   if (missingTemp) { toast('Choose temperature for '+missingTemp); return; }
   if (missingScoops) { toast('Choose scoops for '+missingScoops); return; }
-  var need=(pf.courses||[]).filter(function(c){
-    if (pfCourseMode(c)!=='choose') return false;
-    return (c.options||[]).filter(function(o){ return o && !o.headingOnly && String(o.name||'').trim(); }).length;
-  });
-  if (Object.keys(picked).length < need.length) {
-    toast('Choose an appetizer and a main, or None');
-    return;
-  }
   var selections=buildPrixFixeSelections(pf, picked);
   selections.forEach(function(s,si){
     var ci=-1;
@@ -5923,7 +6085,9 @@ function confirmPrixFixe(pfId) {
     if (auto && String(s.modNote||'').indexOf(auto)<0) s.modNote=s.modNote ? (s.modNote+' · '+auto) : auto;
   });
   var totalUpcharge=selections.reduce(function(s,x){ return s+(x.pending?0:(Number(x.upcharge)||0)); },0);
-  var choiceStr=selections.filter(function(s){ return !s.pending; }).map(function(s){ return s.choice; }).join(', ');
+  var choiceStr=selections.filter(function(s){
+    return !s.pending && !s.noneChoice && String(s.choice||'').trim() && !/take after/i.test(s.choice);
+  }).map(function(s){ return s.choice; }).join(', ');
   STATE.currentOrder.push({
     lineId:genId(),
     table:STATE.selectedTable,
@@ -6136,9 +6300,11 @@ function beginAddItem(itemId) {
     byTheGlass:!!item.byTheGlass,
     scaliniOnly:!!item.scaliniOnly
   };
+  STATE.pendingItem.serviceCourse=STATE.pendingItem.course;
   if (dining) {
     STATE.pendingItem.pfCourseKind=extraKindOf(STATE.pendingItem);
     STATE.pendingItem.ticketPos=defaultTicketPosForKind(STATE.pendingItem.pfCourseKind)+1;
+    STATE.pendingItem.serviceCourse=({app:2,main:3,des:4,drink:1}[STATE.pendingItem.pfCourseKind]||STATE.pendingItem.course);
   }
   if (dining || isPosWineItem(item) || (STATE.pendingItem.modifiers&&STATE.pendingItem.modifiers.length)) {
     renderModifierSheet();
@@ -6236,6 +6402,7 @@ function maybeAllergyThenAdd(){
 function commitPendingItem(){
   var p=STATE.pendingItem; if(!p) return;
   if (!modifiersReady(p)) { toast('Choose required modifiers'); return; }
+  if (p.serviceCourse==null) p.serviceCourse=p.course||defaultCourse(p);
   if (p.extraPlate && (p.ticketPos==null || !isFinite(Number(p.ticketPos)))) {
     p.ticketPos=defaultTicketPosForKind(extraKindOf(p))+1;
   }
@@ -6809,18 +6976,28 @@ function kitchenItemsFrom(lines){
   var cid=activeCheckId();
   lines.forEach(function(i){
     if (i.isTasting||i.isPrixFixe||i.isPairing) return;
+    if (i.noneChoice || (i.skipped && !i.fired && !String(i.name||i.choice||'').trim())) return;
+    if (!String(i.name||'').trim()) return;
     var qty=Math.max(1, parseInt(i.qty,10)||1);
+    var course=i.serviceCourse!=null?Number(i.serviceCourse):(i.course||null);
     for (var n=0;n<qty;n++){
       out.push({
         id:i.id, name:i.name, station:i.station, cookTime:i.cookTime||0,
         modifiers:i.modifiers||[], selectedMod:i.selectedMod||null,
-        seat:i.seat||'table', course:i.course||null, notes:i.notes||'',
+        seat:i.seat||'table', course:course, notes:i.notes||'',
         qty:1, allergens:i.allergens||[], price:Number(i.price)||0,
         lineId:i.lineId, checkId:i.checkId||cid,
         extraPlate:!!i.extraPlate, pfExtra:!!i.pfExtra, pfCourseKind:i.pfCourseKind||null,
-        ticketPos:i.ticketPos!=null?Number(i.ticketPos):null
+        ticketPos:i.ticketPos!=null?Number(i.ticketPos):null,
+        serviceCourse:course
       });
     }
+  });
+  out.sort(function(a,b){
+    var pa=a.ticketPos!=null?Number(a.ticketPos):((Number(a.serviceCourse||a.course)||3)*100);
+    var pb=b.ticketPos!=null?Number(b.ticketPos):((Number(b.serviceCourse||b.course)||3)*100);
+    if (pa!==pb) return pa-pb;
+    return 0;
   });
   return out;
 }
@@ -6871,7 +7048,11 @@ function startDiningFromCheckLine(ti){
       totalPrice:ti.price,
       dessertAfter:ti.dessertAfter||'main',
       dessertMenuId:ti.prixFixeId,
-      selections:(ti.selections||[]).map(function(s){ return Object.assign({}, s, {fired:false, firedAt:null, modNote:s.modNote||ti.notes||''}); }),
+      selections:(ti.selections||[]).map(function(s){
+        var copy=Object.assign({}, s, {fired:false, firedAt:null, modNote:s.modNote||ti.notes||''});
+        if (copy.serviceCourse==null) copy.serviceCourse=pfServiceCourseOf(copy);
+        return copy;
+      }),
       currentCourse:-1,
       status:'active',
       seat:ti.seat||STATE.activeSeat||'table',
@@ -6895,7 +7076,7 @@ function sendOrder(opts) {
   var bundle = opts.fireCourse != null
     ? pool.filter(function(i){
         if (i.isPrixFixe||i.isTasting||i.isPairing) return false;
-        return Number(i.course||defaultCourse(i))===Number(opts.fireCourse);
+        return Number(i.serviceCourse||i.course||defaultCourse(i))===Number(opts.fireCourse);
       })
     : hasSelected
       ? pool.filter(function(i){ return selectedIds[i.lineId]; })
@@ -6968,6 +7149,10 @@ function fireDiningCourse(to, quiet, idx){
   var i=(idx==null || idx<0) ? (nextDiningFire(to).idx) : idx;
   if (i<0 || !courses[i]) { if (!quiet) toast('All courses fired'); return false; }
   var nextCourse=courses[i];
+  if (nextCourse.noneChoice || (nextCourse.skipped && !nextCourse.fired && !String(nextCourse.choice||nextCourse.name||'').trim())) {
+    if (!quiet) toast('No dish selected for this course');
+    return false;
+  }
   if (nextCourse.fired || nextCourse.skipped) { if (!quiet) toast('Already fired'); return false; }
   var guestChoice=!(nextCourse.auto || nextCourse.fireEach || nextCourse.entremets || nextCourse.mode==='entremets');
   if (guestChoice && (!nextCourse.choice || /take after/i.test(String(nextCourse.choice)))) {
@@ -7028,7 +7213,9 @@ function fireDiningCourse(to, quiet, idx){
       choices:isPf ? courses.filter(function(s){return !s.pending;}).map(function(s){return s.course+': '+s.choice;}).join(' · ') : ''
     },
     status:'new', sentAt:Date.now(), clearedAt:null,
-    isTastingCourse:true, courseNum:i+1, tastingName:menuName
+    isTastingCourse:true, courseNum:i+1, tastingName:menuName,
+    serviceCourse: nextCourse.serviceCourse!=null?Number(nextCourse.serviceCourse):null,
+    ticketPos: diningCourseTicketPos(nextCourse, i)
   };
   if (fbReady) fbDb.collection('orders').add(courseOrder).then(function(ref){ publishActiveOrder(courseOrder, ref.id); });
   if (!quiet) toast('Fired: '+firedName);
@@ -7239,11 +7426,13 @@ function applyExtraDrop(lineId, row, clientY){
   if (kind==='app' || kind==='main' || kind==='des') {
     extra.pfCourseKind=kind;
     extra.course=kind==='des'?4:(kind==='app'?2:3);
+    extra.serviceCourse=extra.course;
   } else if (otherId) {
     var other=findMutableExtra(otherId);
     if (other) {
       extra.pfCourseKind=extraKindOf(other);
       extra.course=extra.pfCourseKind==='des'?4:(extra.pfCourseKind==='app'?2:(extra.pfCourseKind==='drink'?1:3));
+      extra.serviceCourse=extra.course;
     }
   }
   persistCheck(ensureOpenCheck(STATE.selectedTable));
