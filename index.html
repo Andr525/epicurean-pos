@@ -4338,6 +4338,14 @@ function bindFloorGestures(){
     if (splitMode) endSplit(false);
     delete pointers[e.pointerId];
     if (count()<2) lastDist=0;
+    if (moved && startTable) {
+      var live=liveFloorTable(resolveTableNumber(startTable));
+      if (live) restoreOrigGeom(live);
+      cancelTableDrag();
+      suppressClick=true;
+      renderTables();
+      return;
+    }
     cancelTableDrag();
     if (moved) suppressClick=true;
   });
@@ -4431,6 +4439,14 @@ function bindFloorGestures(){
     if (splitMode) endSplit(false);
     syncTouches(e);
     if (count()<2) lastDist=0;
+    if (moved && startTable) {
+      var live=liveFloorTable(resolveTableNumber(startTable));
+      if (live) restoreOrigGeom(live);
+      cancelTableDrag();
+      suppressClick=true;
+      renderTables();
+      return;
+    }
     cancelTableDrag();
     if (moved) suppressClick=true;
   });
@@ -6797,8 +6813,9 @@ function geomSnap(o){
   return { x:o.x||0, y:o.y||0, w:o.w||70, h:o.h||70, seats:o.seats||2 };
 }
 function ensureOrigGeom(o){
-  if (!o || o._origGeom) return;
-  o._origGeom=o._bohGeom ? geomSnap(o._bohGeom) : geomSnap(o);
+  if (!o) return;
+  if (!o._bohGeom) o._bohGeom=geomSnap(o);
+  if (!o._origGeom) o._origGeom=geomSnap(o._bohGeom);
 }
 function restoreOrigGeom(o){
   if (!o) return;
@@ -6809,6 +6826,7 @@ function restoreOrigGeom(o){
     o.w=g.w;
     o.h=g.h;
     o.seats=g.seats;
+    if (!o._bohGeom) o._bohGeom=geomSnap(g);
   }
   delete o._origGeom;
   o.hidden=false;
@@ -6841,7 +6859,10 @@ function applyCombineToObject(keep, drop){
 }
 function reapplyCombines(){
   eachLiveFloorObject(function(o){
-    if (!o || !o._bohGeom) return;
+    if (!o) return;
+    var g=o._bohGeom || o._origGeom;
+    if (!g) return;
+    if (!o._bohGeom) o._bohGeom=geomSnap(g);
     o.x=o._bohGeom.x;
     o.y=o._bohGeom.y;
     o.w=o._bohGeom.w;
