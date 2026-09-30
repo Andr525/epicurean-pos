@@ -11,14 +11,14 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon-192.png">
-<link rel="apple-touch-icon" sizes="180x180" href="icon-192.png">
-<link rel="apple-touch-icon" sizes="192x192" href="icon-192.png">
-<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+<link rel="manifest" href="manifest.json?b=47">
+<link rel="apple-touch-icon" href="icon-192.png?b=47">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-192.png?b=47">
+<link rel="apple-touch-icon" sizes="192x192" href="icon-192.png?b=47">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?b=47">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?b=47">
 <title>Epicurean POS</title>
-<!-- pos-build: scalini-print-v46 -->
+<!-- pos-build: scalini-print-v47 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
@@ -118,9 +118,16 @@ body { font-family:var(--font); color:var(--text); background:var(--bg); -webkit
 .pf-sel-actions { display:flex; gap:0.5rem; margin-top:1.2rem; }
 .pf-temp-row { display:flex; flex-wrap:wrap; gap:6px; margin:0.35rem 0 0.55rem 1.4rem; }
 .pf-temp-row .chip { min-height:36px; padding:0.35rem 0.7rem; font-size:0.78rem; }
-.pf-none-row { margin:0 0 0.45rem; }
-.pf-none-tab { min-height:40px; padding:0 1.05rem; font-weight:800; letter-spacing:0.04em; text-transform:uppercase; }
-.pf-none-tab:has(input:checked) { outline:2px solid #2f6fdb; outline-offset:-2px; }
+.pf-none-row { margin:0 0 0.55rem; }
+.pf-none-tab {
+  display:flex; align-items:center; gap:10px; width:100%;
+  min-height:48px; padding:0 1rem; border:2px solid #2f6fdb; border-radius:10px;
+  background:#eef3ff; color:#102033; font-weight:800; font-size:0.95rem;
+  letter-spacing:0.05em; text-transform:uppercase; cursor:pointer;
+}
+.pf-none-tab input { accent-color:#2f6fdb; width:18px; height:18px; }
+.pf-none-tab:has(input:checked), .pf-none-tab.active { background:#2f6fdb; color:#fff; }
+.pf-none-hint { display:block; font-size:0.72rem; color:var(--text-muted); font-weight:600; margin:0.2rem 0 0.15rem; text-transform:none; letter-spacing:0; }
 .wine-notes-btn {
   margin-top:0.35rem; font-size:0.68rem; font-weight:700; letter-spacing:0.04em;
   color:#E8D5A3; text-transform:uppercase; border:1px solid rgba(201,168,76,0.45);
@@ -1157,6 +1164,9 @@ body.hh-on .guest-display {
   text-align:center; margin:0.4rem 0 0.8rem; color:#000;
 }
 body.hh-on .pf-selector, body.hh-on .payment-card { background:#fff; color:#000; }
+body.hh-on .pf-none-tab { background:#eef3ff; color:#102033; border-color:#2f6fdb; }
+body.hh-on .pf-none-tab:has(input:checked), body.hh-on .pf-none-tab.active { background:#2f6fdb; color:#fff; }
+body.hh-on .pf-none-hint { color:#333; }
 body.hh-on .wine-notes-btn { color:#000; background:#fff; border-color:#c5ced8; }
 body.hh-on .ts-course-actions .fire-now { color:#fff; }
 body.hh-on .add-items-label, body.hh-on .as-label { color:#000; }
@@ -1223,7 +1233,7 @@ body.hh-on .floor-retry { background:#fff; color:#000; border-color:#c5ced8; }
 <div id="login-screen" class="screen active">
   <h1>Epicurean POS</h1>
   <p class="subtitle">Enter your 4-digit code</p>
-  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 46</p>
+  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 47</p>
   <div class="pin-display" id="pin-display">
     <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
   </div>
@@ -5445,7 +5455,8 @@ function pfGuestChoiceMode(c){
   return m==='choose' || m==='later';
 }
 function pfNoneRadioHtml(name, checked, onchange){
-  return '<div class="pf-none-row"><label class="chip pf-none-tab'+(checked?' active':'')+'"><input type="radio" name="'+name+'" value="none"'+(checked?' checked':'')+(onchange?' onchange="'+onchange+'"':'')+'> None</label></div>';
+  return '<div class="pf-none-row"><label class="pf-none-tab'+(checked?' active':'')+'"><input type="radio" name="'+name+'" value="none"'+(checked?' checked':'')+(onchange?' onchange="'+onchange+'"':'')+'> NONE</label>'+
+    '<span class="pf-none-hint">Skip this prix-fixe course. Add a dish through Add items if needed.</span></div>';
 }
 function isPfNonePick(v){
   return v==='none' || v==='-1';
