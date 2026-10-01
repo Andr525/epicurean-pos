@@ -11,14 +11,14 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<link rel="manifest" href="manifest.json?b=49">
-<link rel="apple-touch-icon" href="icon-192.png?b=49">
-<link rel="apple-touch-icon" sizes="180x180" href="icon-192.png?b=49">
-<link rel="apple-touch-icon" sizes="192x192" href="icon-192.png?b=49">
-<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?b=49">
-<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?b=49">
+<link rel="manifest" href="manifest.json?b=50">
+<link rel="apple-touch-icon" href="icon-192.png?b=50">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-192.png?b=50">
+<link rel="apple-touch-icon" sizes="192x192" href="icon-192.png?b=50">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?b=50">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?b=50">
 <title>Epicurean POS</title>
-<!-- pos-build: scalini-print-v49 -->
+<!-- pos-build: scalini-print-v50 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
@@ -357,7 +357,7 @@ body { font-family:var(--font); color:var(--text); background:var(--bg); -webkit
     linear-gradient(90deg,rgba(201,168,76,0.05) 1px,transparent 1px) 0 0/40px 40px;
 }
 .floor-obj { position:absolute; box-sizing:border-box; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:0; overflow:visible; }
-.floor-obj.seatable { cursor:pointer; box-shadow:none; z-index:6; padding:0; overflow:visible; -webkit-tap-highlight-color:rgba(184,115,51,0.35); touch-action:manipulation; pointer-events:auto; }
+.floor-obj.seatable { cursor:pointer; box-shadow:none; z-index:6; padding:0; overflow:visible; -webkit-tap-highlight-color:rgba(184,115,51,0.35); touch-action:none; pointer-events:auto; }
 .floor-obj.seatable .busy-tbl { box-shadow:0 4px 12px rgba(0,0,0,0.35); }
 .floor-zoom-fab {
   position:absolute; right:10px; bottom:10px; z-index:6; display:flex; flex-direction:column; gap:8px;
@@ -821,6 +821,11 @@ body.hh-on.floor-drawing .floor-stage { outline:2px dashed var(--primary); }
   background:var(--surface-2); color:var(--text); font-size:0.68rem; font-weight:800; cursor:pointer;
 }
 .toast-ops .pay-now { background:#d6e4ff; color:#102033; border-color:#d6e4ff; }
+.add-items-pane {
+  flex:1 1 auto; min-height:0; overflow:auto; -webkit-overflow-scrolling:touch;
+  display:flex; flex-direction:column;
+}
+.ts-console.toast-go.has-dining .add-items-pane { flex:1 1 auto; min-height:0; }
 .add-items-row {
   display:flex; flex-direction:column; align-items:stretch; gap:6px;
   flex-shrink:0; padding:0.15rem 0 0.45rem;
@@ -1231,7 +1236,7 @@ body.hh-on .floor-retry { background:#fff; color:#000; border-color:#c5ced8; }
 <div id="login-screen" class="screen active">
   <h1>Epicurean POS</h1>
   <p class="subtitle">Enter your 4-digit code</p>
-  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 49</p>
+  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 50</p>
   <div class="pin-display" id="pin-display">
     <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
   </div>
@@ -1623,7 +1628,12 @@ var STATE = {
   viewCheckId: null,
   checkFocus: false,
   payEven: 1,
-  _seatTick: null
+  _seatTick: null,
+  floorSuppressOpen: false,
+  _floorHoldTimer: null,
+  _floorHoldTable: '',
+  _floorDragActive: false,
+  _floorSuppressTimer: null
 };
 var COMMON_ALLERGENS = ['Fish','Shellfish','Dairy','Egg','Gluten','Soy','Sesame','Nuts','Tree Nut','Sulfites'];
 
@@ -4066,7 +4076,62 @@ function restoreFloorView(){
   }
   floorResetView();
 }
+var FLOOR_HOLD_MS = 1000;
+var FLOOR_HOLD_JITTER = 14;
+var FLOOR_DRAG_PX = 20;
+function floorDisplacement(x0, y0, x1, y1){
+  return Math.abs((x1||0)-(x0||0))+Math.abs((y1||0)-(y0||0));
+}
+function floorHoldJitterOk(total){ return (total||0) <= FLOOR_HOLD_JITTER; }
+function floorDragStarted(total){ return (total||0) > FLOOR_DRAG_PX; }
+function markFloorOpenSuppressed(){
+  STATE.floorSuppressOpen=true;
+  if (STATE._floorSuppressTimer) clearTimeout(STATE._floorSuppressTimer);
+  STATE._floorSuppressTimer=setTimeout(function(){ STATE.floorSuppressOpen=false; }, 480);
+}
+function floorOpenBlocked(){ return !!STATE.floorSuppressOpen; }
+function restoreTableEl(el, left, top){
+  if (!el) return;
+  el.style.left=(left||0)+'px';
+  el.style.top=(top||0)+'px';
+  el.style.zIndex='';
+  el.style.pointerEvents='';
+}
+function clearFloorHold(){
+  if (STATE._floorHoldTimer) {
+    clearTimeout(STATE._floorHoldTimer);
+    STATE._floorHoldTimer=null;
+  }
+  STATE._floorHoldTable='';
+}
+function armFloorHold(tNum){
+  clearFloorHold();
+  tNum=String(tNum||'');
+  if (!tNum) return;
+  STATE._floorHoldTable=tNum;
+  STATE._floorHoldTimer=setTimeout(function(){
+    STATE._floorHoldTimer=null;
+    if (STATE._floorDragActive || floorOpenBlocked()) return;
+    var n=STATE._floorHoldTable;
+    STATE._floorHoldTable='';
+    if (n) tapTable(n);
+  }, FLOOR_HOLD_MS);
+}
+if (!window._floorClickGuard) {
+  window._floorClickGuard=true;
+  document.addEventListener('click', function(e){
+    if (!floorOpenBlocked()) return;
+    var t=e.target && e.target.closest ? e.target.closest('.floor-obj.seatable, #floor-stage') : null;
+    if (!t) return;
+    e.preventDefault();
+    e.stopPropagation();
+  }, true);
+}
 function tapTable(tNum, ev){
+  if (floorOpenBlocked()) {
+    if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+    return;
+  }
   if (ev) { ev.preventDefault(); ev.stopPropagation(); }
   tNum=String(tNum||'');
   if (!tNum) return;
@@ -4135,7 +4200,6 @@ function bindFloorGestures(){
   var pointers={};
   var lastDist=0;
   var moved=false;
-  var suppressClick=false;
   var tapX=0, tapY=0;
   var startTable='';
   var dragEl=null;
@@ -4237,6 +4301,7 @@ function bindFloorGestures(){
     return doSplit;
   }
   function handleTwoFingers(){
+    clearFloorHold();
     cancelTableDrag();
     if (maybeBeginSplit() || splitMode) {
       applySplitStretch();
@@ -4246,18 +4311,52 @@ function bindFloorGestures(){
     applyPinchZoom();
     return false;
   }
-  stage.addEventListener('pointerdown', function(e){
-    if (e.pointerType==='touch') return;
-    try { stage.setPointerCapture(e.pointerId); } catch (err) {}
-    pointers[e.pointerId]={x:e.clientX,y:e.clientY};
+  function beginTableGesture(x, y){
     moved=false;
-    tapX=e.clientX; tapY=e.clientY;
-    startTable=tableAtClientPoint(e.clientX, e.clientY);
+    STATE._floorDragActive=false;
+    tapX=x; tapY=y;
+    startTable=tableAtClientPoint(x, y);
     dragEl=startTable ? document.querySelector('[data-table="'+startTable+'"]') : null;
     if (dragEl) {
       origLeft=parseFloat(dragEl.style.left)||0;
       origTop=parseFloat(dragEl.style.top)||0;
+      armFloorHold(startTable);
+    } else {
+      clearFloorHold();
     }
+  }
+  function dragTotal(x, y){ return floorDisplacement(tapX, tapY, x, y); }
+  function applyTableDragCss(x, y){
+    if (!dragEl) return;
+    var z=STATE.floorZoom||1;
+    dragEl.style.left=(origLeft+(x-tapX)/z)+'px';
+    dragEl.style.top=(origTop+(y-tapY)/z)+'px';
+    dragEl.style.zIndex='40';
+  }
+  function noteMove(x, y, stepDx, stepDy){
+    var total=dragTotal(x, y);
+    if (startTable && floorDragStarted(total)) {
+      if (!moved) {
+        clearFloorHold();
+        STATE._floorDragActive=true;
+        markFloorOpenSuppressed();
+      }
+      moved=true;
+      applyTableDragCss(x, y);
+      return 'drag';
+    }
+    if (!startTable && total>FLOOR_HOLD_JITTER) {
+      moved=true;
+      return 'pan';
+    }
+    if (stepDx!=null && stepDy!=null && !startTable) return 'pan-step';
+    return '';
+  }
+  stage.addEventListener('pointerdown', function(e){
+    if (e.pointerType==='touch') return;
+    try { stage.setPointerCapture(e.pointerId); } catch (err) {}
+    pointers[e.pointerId]={x:e.clientX,y:e.clientY};
+    beginTableGesture(e.clientX, e.clientY);
     if (count()===2) {
       lastDist=dist();
       if (maybeBeginSplit()) cancelTableDrag();
@@ -4269,49 +4368,50 @@ function bindFloorGestures(){
     var prev=pointers[e.pointerId];
     var dx=e.clientX-prev.x, dy=e.clientY-prev.y;
     pointers[e.pointerId]={x:e.clientX,y:e.clientY};
-    if (floorViewLocked()) {
-      pointers[e.pointerId]={x:e.clientX,y:e.clientY};
-      return;
-    }
-    if (Math.abs(dx)+Math.abs(dy)>8) moved=true;
+    if (floorViewLocked()) return;
     if (count()>=2) {
       handleTwoFingers();
-    } else if (startTable && dragEl && count()===1) {
-      var z=STATE.floorZoom||1;
-      dragEl.style.left=(origLeft+(e.clientX-tapX)/z)+'px';
-      dragEl.style.top=(origTop+(e.clientY-tapY)/z)+'px';
-      dragEl.style.zIndex='40';
-      applyFloorTransform();
     } else if (count()===1) {
-      STATE.floorPanX += dx;
-      STATE.floorPanY += dy;
-      applyFloorTransform();
+      var kind=noteMove(e.clientX, e.clientY, dx, dy);
+      if (kind==='pan' || (kind==='pan-step' && moved)) {
+        STATE.floorPanX += dx;
+        STATE.floorPanY += dy;
+        applyFloorTransform();
+      } else if (kind==='drag') {
+        applyFloorTransform();
+      }
     }
     if (moved && e.cancelable) e.preventDefault();
   }, {passive:false});
   function cancelTableDrag(){
-    if (dragEl) {
-      dragEl.style.left=origLeft+'px';
-      dragEl.style.top=origTop+'px';
-      dragEl.style.zIndex='';
-      dragEl.style.pointerEvents='';
-    }
+    restoreTableEl(dragEl, origLeft, origTop);
     startTable='';
     dragEl=null;
+    STATE._floorDragActive=false;
   }
   function finishTableDrag(x, y){
-    if (!moved || !startTable) { startTable=''; dragEl=null; return false; }
-    var hit=combineTargetFromDrag(dragEl, x, y, startTable);
-    if (hit && String(hit)!==String(startTable)) {
-      combineTables(startTable, hit);
-    } else {
-      var live=liveFloorTable(resolveTableNumber(startTable));
-      if (live) restoreOrigGeom(live);
-      cancelTableDrag();
-      renderTables();
+    markFloorOpenSuppressed();
+    var table=startTable;
+    var el=dragEl;
+    if (!moved || !table) {
+      restoreTableEl(el, origLeft, origTop);
+      startTable='';
+      dragEl=null;
+      STATE._floorDragActive=false;
+      return false;
     }
+    var hit=combineTargetFromDrag(el, x, y, table);
+    restoreTableEl(el, origLeft, origTop);
     startTable='';
     dragEl=null;
+    STATE._floorDragActive=false;
+    if (hit && String(hit)!==String(table)) {
+      combineTables(table, hit);
+    } else {
+      var live=liveFloorTable(resolveTableNumber(table));
+      if (live) restoreOrigGeom(live);
+      renderTables();
+    }
     return true;
   }
   function endPtr(e){
@@ -4320,17 +4420,19 @@ function bindFloorGestures(){
       endSplit(true);
       delete pointers[e.pointerId];
       lastDist=0;
-      suppressClick=true;
+      markFloorOpenSuppressed();
+      clearFloorHold();
       startTable='';
       return;
     }
     delete pointers[e.pointerId];
     if (count()<2) lastDist=0;
-    if (moved) {
-      suppressClick=true;
-      finishTableDrag(e.clientX, e.clientY);
-    }
+    clearFloorHold();
+    if (moved) finishTableDrag(e.clientX, e.clientY);
+    else restoreTableEl(dragEl, origLeft, origTop);
     startTable='';
+    dragEl=null;
+    STATE._floorDragActive=false;
   }
   stage.addEventListener('pointerup', endPtr);
   stage.addEventListener('pointercancel', function(e){
@@ -4338,16 +4440,12 @@ function bindFloorGestures(){
     if (splitMode) endSplit(false);
     delete pointers[e.pointerId];
     if (count()<2) lastDist=0;
-    if (moved && startTable) {
-      var live=liveFloorTable(resolveTableNumber(startTable));
-      if (live) restoreOrigGeom(live);
-      cancelTableDrag();
-      suppressClick=true;
-      renderTables();
-      return;
-    }
+    clearFloorHold();
+    markFloorOpenSuppressed();
+    var live=startTable ? liveFloorTable(resolveTableNumber(startTable)) : null;
+    if (live) restoreOrigGeom(live);
     cancelTableDrag();
-    if (moved) suppressClick=true;
+    renderTables();
   });
   function syncTouches(e){
     pointers={};
@@ -4358,18 +4456,11 @@ function bindFloorGestures(){
   }
   stage.addEventListener('touchstart', function(e){
     syncTouches(e);
-    moved=false;
     if (e.touches.length===1) {
-      tapX=e.touches[0].clientX;
-      tapY=e.touches[0].clientY;
-      startTable=tableAtClientPoint(tapX, tapY);
-      dragEl=startTable ? document.querySelector('[data-table="'+startTable+'"]') : null;
-      if (dragEl) {
-        origLeft=parseFloat(dragEl.style.left)||0;
-        origTop=parseFloat(dragEl.style.top)||0;
-      }
+      beginTableGesture(e.touches[0].clientX, e.touches[0].clientY);
     }
     if (e.touches.length>=2) {
+      clearFloorHold();
       cancelTableDrag();
       lastDist=dist();
       maybeBeginSplit();
@@ -4382,21 +4473,18 @@ function bindFloorGestures(){
     var id='t'+t.identifier;
     var prev=pointers[id];
     if (floorViewLocked()) { syncTouches(e); return; }
-    if (count()===1 && prev) {
-      var dx=t.clientX-prev.x, dy=t.clientY-prev.y;
-      if (Math.abs(dx)+Math.abs(dy)>8) moved=true;
-      if (moved && startTable && dragEl) {
-        var z=STATE.floorZoom||1;
-        dragEl.style.left=(origLeft+(t.clientX-tapX)/z)+'px';
-        dragEl.style.top=(origTop+(t.clientY-tapY)/z)+'px';
-        dragEl.style.zIndex='40';
-      } else if (moved) {
-        STATE.floorPanX += dx;
-        STATE.floorPanY += dy;
+    if (e.touches.length===1) {
+      var stepDx=prev ? (t.clientX-prev.x) : 0;
+      var stepDy=prev ? (t.clientY-prev.y) : 0;
+      var kind=noteMove(t.clientX, t.clientY, stepDx, stepDy);
+      if (kind==='pan' || (kind==='pan-step' && moved)) {
+        STATE.floorPanX += stepDx;
+        STATE.floorPanY += stepDy;
         applyFloorTransform();
       }
     } else if (e.touches.length>=2) {
       moved=true;
+      markFloorOpenSuppressed();
       syncTouches(e);
       handleTwoFingers();
     }
@@ -4408,9 +4496,11 @@ function bindFloorGestures(){
       endSplit(true);
       syncTouches(e);
       lastDist=0;
-      suppressClick=true;
+      markFloorOpenSuppressed();
+      clearFloorHold();
       startTable='';
       moved=false;
+      STATE._floorDragActive=false;
       return;
     }
     var wasMoved=moved;
@@ -4421,40 +4511,35 @@ function bindFloorGestures(){
     }
     syncTouches(e);
     if (count()<2) lastDist=0;
+    clearFloorHold();
     if (wasMoved) {
-      suppressClick=true;
+      if (e.cancelable) e.preventDefault();
       finishTableDrag(x, y);
       return;
     }
+    restoreTableEl(dragEl, origLeft, origTop);
+    startTable='';
+    dragEl=null;
+    STATE._floorDragActive=false;
     if (e.touches && e.touches.length) return;
-    var tNum=tableAtClientPoint(x, y);
-    if (tNum) {
-      if (e.cancelable) e.preventDefault();
-      suppressClick=true;
-      tapTable(tNum);
-    }
+    if (e.cancelable) e.preventDefault();
   }
-  stage.addEventListener('touchend', endTouch);
+  stage.addEventListener('touchend', endTouch, {passive:false});
   stage.addEventListener('touchcancel', function(e){
     if (splitMode) endSplit(false);
     syncTouches(e);
     if (count()<2) lastDist=0;
-    if (moved && startTable) {
-      var live=liveFloorTable(resolveTableNumber(startTable));
-      if (live) restoreOrigGeom(live);
-      cancelTableDrag();
-      suppressClick=true;
-      renderTables();
-      return;
-    }
+    clearFloorHold();
+    markFloorOpenSuppressed();
+    var live=startTable ? liveFloorTable(resolveTableNumber(startTable)) : null;
+    if (live) restoreOrigGeom(live);
     cancelTableDrag();
-    if (moved) suppressClick=true;
-  });
+    renderTables();
+  }, {passive:false});
   stage.addEventListener('click', function(e){
-    if (!suppressClick) return;
+    if (!floorOpenBlocked()) return;
     e.preventDefault();
     e.stopPropagation();
-    suppressClick=false;
   }, true);
 }
 function stationsAreBohOnly(){
@@ -4543,7 +4628,7 @@ function renderTables() {
       var tNum=tableKey(o);
       if (SEATABLE[o.type]) {
         if (o.type==='couch') {
-          html+='<div class="floor-obj seatable" data-table="'+esc(String(tNum))+'" onclick=\'tapTable('+JSON.stringify(String(tNum))+')\' style="'+style+'"><div class="f-couch"></div></div>';
+          html+='<div class="floor-obj seatable" data-table="'+esc(String(tNum))+'" style="'+style+'"><div class="f-couch"></div></div>';
         } else {
         var hasCall=tableHasCall(tNum);
         var busy=tableIsBusy(tNum, o);
@@ -4551,7 +4636,7 @@ function renderTables() {
         var extra=inFocus?'':('opacity:0.28;');
         var shape=o.shape||(o.type==='stool'?'round':(o.type==='outdoor'?'rect':'square'));
         var innerCls=(o.type==='stool'?'f-stool':(o.type==='outdoor'?'f-outdoor':('f-table '+shape)))+(busy?' busy-tbl':' open-tbl');
-        html+='<div class="floor-obj seatable" data-table="'+esc(String(tNum))+'" data-combined="'+(isCombinedTable(tNum)?'1':'0')+'" onclick=\'tapTable('+JSON.stringify(String(tNum))+')\' style="'+style+extra+'">'+
+        html+='<div class="floor-obj seatable" data-table="'+esc(String(tNum))+'" data-combined="'+(isCombinedTable(tNum)?'1':'0')+'" style="'+style+extra+'">'+
           '<div class="'+innerCls+'" style="'+(hasCall?'box-shadow:0 0 0 3px #E65050;':'')+'">'+
             '<span class="f-tnum">'+esc(String(tNum))+'</span>'+
           '</div></div>';
@@ -4783,7 +4868,6 @@ function paintGuestCountSheet(t){
       '<button type="button" onclick="guestKey(\'0\')">0</button>'+
       '<button type="button" class="done" onclick="confirmGuests()">Done</button>'+
     '</div>'+
-    '<button class="ghost-btn" onclick="openCombineSheet()">Combine with another table</button>'+
     '<button class="ghost-btn" onclick="closeSheet()">Cancel</button>'
   );
 }
@@ -5373,12 +5457,30 @@ function renderOrder() {
   html+=liveCheckHtml();
   html+=renderGuestAllergyStrip();
   html+=renderSeatBar();
+  html+='<div class="add-items-pane" id="add-items-pane">';
   html+=addItemsHeaderHtml();
   html+=periodTabsHtml();
   html+=renderMenuGrid();
-  html+='</div>';
+  html+='</div></div>';
   c.innerHTML=html;
   paintChrome();
+  revealAddItemsContent();
+}
+function revealAddItemsContent(){
+  var pane=document.getElementById('add-items-pane');
+  var grid=document.getElementById('menu-items-list');
+  if (!pane || !grid) return;
+  function go(){
+    var first=grid.querySelector('.ts-tile:not(.back)') || grid.querySelector('.ts-tile') || grid;
+    if (!first) return;
+    var p=pane.getBoundingClientRect();
+    var t=first.getBoundingClientRect();
+    if (t.top < p.top || t.bottom > p.bottom) {
+      pane.scrollTop += (t.top - p.top);
+    }
+  }
+  if (typeof requestAnimationFrame==='function') requestAnimationFrame(function(){ requestAnimationFrame(go); });
+  else go();
 }
 function addItemsHeaderHtml(){
   return '<div class="add-items-row"><div class="add-items-label">Add items</div>'+
@@ -6814,8 +6916,8 @@ function geomSnap(o){
 }
 function ensureOrigGeom(o){
   if (!o) return;
-  if (!o._bohGeom) o._bohGeom=geomSnap(o);
-  if (!o._origGeom) o._origGeom=geomSnap(o._bohGeom);
+  if (!o._bohGeom && !o.hidden && !o.combinedInto) o._bohGeom=geomSnap(o);
+  if (!o._origGeom && o._bohGeom) o._origGeom=geomSnap(o._bohGeom);
 }
 function restoreOrigGeom(o){
   if (!o) return;
@@ -6840,20 +6942,27 @@ function isCombinedTable(n){
   n=resolveTableNumber(n);
   return !!(n && combinedDropsFor(n).length);
 }
+function combineAxisGrow(keep, drop){
+  var kg=(keep && keep._bohGeom) || geomSnap(keep||{});
+  var dg=(drop && drop._bohGeom) || geomSnap(drop||{});
+  var kcx=(kg.x||0)+(kg.w||70)/2;
+  var kcy=(kg.y||0)+(kg.h||70)/2;
+  var dcx=(dg.x||0)+(dg.w||70)/2;
+  var dcy=(dg.y||0)+(dg.h||70)/2;
+  return (Math.abs(dcx-kcx) >= Math.abs(dcy-kcy)) ? 'w' : 'h';
+}
 function applyCombineToObject(keep, drop){
   if (!keep || !drop) return;
   if (drop.hidden && String(drop.combinedInto)===String(tableKey(keep))) return;
   ensureOrigGeom(keep);
   ensureOrigGeom(drop);
+  var kg=keep._bohGeom || geomSnap(keep);
+  var dg=drop._bohGeom || geomSnap(drop);
   keep.seats=(keep.seats||2)+(drop.seats||2);
-  var kx=keep.x||0, ky=keep.y||0, kw=keep.w||70, kh=keep.h||70;
-  var dx=drop.x||0, dy=drop.y||0, dw=drop.w||70, dh=drop.h||70;
-  var minX=Math.min(kx, dx), minY=Math.min(ky, dy);
-  var maxX=Math.max(kx+kw, dx+dw), maxY=Math.max(ky+kh, dy+dh);
-  keep.x=minX;
-  keep.y=minY;
-  keep.w=Math.max(kw, maxX-minX);
-  keep.h=Math.max(kh, maxY-minY);
+  keep.x=kg.x||0;
+  keep.y=kg.y||0;
+  if (combineAxisGrow(keep, drop)==='w') keep.w=(keep.w||kg.w||70)+(dg.w||70);
+  else keep.h=(keep.h||kg.h||70)+(dg.h||70);
   drop.hidden=true;
   drop.combinedInto=tableKey(keep);
 }
