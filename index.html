@@ -358,6 +358,8 @@ body { font-family:var(--font); color:var(--text); background:var(--bg); -webkit
 }
 .floor-obj { position:absolute; box-sizing:border-box; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:0; overflow:visible; }
 .floor-obj.seatable { cursor:pointer; box-shadow:none; z-index:6; padding:0; overflow:visible; -webkit-tap-highlight-color:rgba(184,115,51,0.35); touch-action:none; pointer-events:auto; }
+.floor-obj.seatable.floor-drag-home { opacity:0.45; }
+.floor-obj.floor-drag-clone { pointer-events:none !important; z-index:50 !important; opacity:0.92; touch-action:none; }
 .floor-obj.seatable .busy-tbl { box-shadow:0 4px 12px rgba(0,0,0,0.35); }
 .floor-zoom-fab {
   position:absolute; right:10px; bottom:10px; z-index:6; display:flex; flex-direction:column; gap:8px;
@@ -1482,18 +1484,20 @@ function layoutHasFloor(rooms, roomObjs){
 }
 function bohGeomOf(o){
   if (!o) return null;
-  return o._bohGeom || o._origGeom || null;
+  return o._bohGeom || null;
 }
 function stripPosOverlayForPersist(o){
   if (!o || typeof o!=='object') return o;
   var copy={};
   Object.keys(o).forEach(function(k){
-    if (k.charAt(0)==='_' || k==='hidden' || k==='combinedInto') return;
+    if (k.charAt(0)==='_' || k==='hidden' || k==='combinedInto' || k==='bohGeom') return;
+    if (k==='x' || k==='y' || k==='w' || k==='h' || k==='seats') return;
     copy[k]=o[k];
   });
-  var g=bohGeomOf(o);
+  var g=o._bohGeom;
   if (g) {
     copy.x=g.x; copy.y=g.y; copy.w=g.w; copy.h=g.h; copy.seats=g.seats;
+    copy.bohGeom={ x:g.x||0, y:g.y||0, w:g.w||70, h:g.h||70, seats:g.seats||2 };
   }
   return copy;
 }
@@ -1508,17 +1512,21 @@ function cloneFloorForPersist(roomObjs){
 }
 function sanitizeLoadedRoomObj(o){
   if (!o || typeof o!=='object') return o;
-  var g=o._bohGeom||o._origGeom;
+  var g=o.bohGeom||o._bohGeom;
+  delete o._origGeom;
   if (g) {
-    o.x=g.x; o.y=g.y; o.w=g.w; o.h=g.h;
-    if (g.seats!=null) o.seats=g.seats;
     o._bohGeom={ x:g.x||0, y:g.y||0, w:g.w||70, h:g.h||70, seats:g.seats||2 };
+    o.x=o._bohGeom.x;
+    o.y=o._bohGeom.y;
+    o.w=o._bohGeom.w;
+    o.h=o._bohGeom.h;
+    o.seats=o._bohGeom.seats;
     o.hidden=false;
     delete o.combinedInto;
-  } else if (!o.hidden && !o.combinedInto) {
-    o._bohGeom={ x:o.x||0, y:o.y||0, w:o.w||70, h:o.h||70, seats:o.seats||2 };
+  } else {
+    delete o._bohGeom;
   }
-  delete o._origGeom;
+  delete o.bohGeom;
   return o;
 }
 function sanitizeLoadedRoomObjs(roomObjs){
@@ -4091,7 +4099,7 @@ function markFloorOpenSuppressed(){
 }
 function floorOpenBlocked(){ return !!STATE.floorSuppressOpen; }
 function restoreTableEl(el, left, top){
-  if (!el) return;
+  if (!el || el.getAttribute('data-table')) return;
   el.style.left=(left||0)+'px';
   el.style.top=(top||0)+'px';
   el.style.zIndex='';
@@ -4193,187 +4201,366 @@ function combineTargetFromDrag(dragEl, clientX, clientY, skipNum){
 function commitTableMove(){
   return;
 }
+var FLOOR_GESTURE = {
+  pointers: {},
+  source: '',
+  lastDist: 0,
+  moved: false,
+  tapX: 0,
+  tapY: 0,
+  startTable: '',
+  restEl: null,
+  cloneEl: null,
+  origLeft: 0,
+  origTop: 0,
+  splitMode: '',
+  splitEl: null,
+  startSplitDist: 0,
+  origSplitL: 0,
+  origSplitT: 0,
+  origSplitW: 0,
+  origSplitH: 0
+};
+function floorGestureCount(){ return Object.keys(FLOOR_GESTURE.pointers).length; }
+function floorGestureDist(){
+  var ids=Object.keys(FLOOR_GESTURE.pointers);
+  if (ids.length<2) return 0;
+  var a=FLOOR_GESTURE.pointers[ids[0]], b=FLOOR_GESTURE.pointers[ids[1]];
+  var dx=a.x-b.x, dy=a.y-b.y;
+  return Math.sqrt(dx*dx+dy*dy);
+}
+function discardDragClone(){
+  var g=FLOOR_GESTURE;
+  if (g.cloneEl && g.cloneEl.parentNode) g.cloneEl.parentNode.removeChild(g.cloneEl);
+  g.cloneEl=null;
+  if (g.restEl) {
+    g.restEl.classList.remove('floor-drag-home');
+    g.restEl.style.opacity='';
+    g.restEl.style.zIndex='';
+  }
+}
+function floorAbortDrag(){
+  discardDragClone();
+  FLOOR_GESTURE.startTable='';
+  FLOOR_GESTURE.restEl=null;
+  FLOOR_GESTURE.moved=false;
+  STATE._floorDragActive=false;
+}
+function ensureDragClone(){
+  var g=FLOOR_GESTURE;
+  if (g.cloneEl || !g.restEl || !g.restEl.parentNode) return g.cloneEl;
+  var clone=g.restEl.cloneNode(true);
+  clone.classList.add('floor-drag-clone');
+  clone.classList.remove('floor-drag-home');
+  clone.removeAttribute('data-table');
+  clone.removeAttribute('data-combined');
+  clone.setAttribute('aria-hidden','true');
+  clone.style.pointerEvents='none';
+  clone.style.zIndex='50';
+  clone.style.left=g.origLeft+'px';
+  clone.style.top=g.origTop+'px';
+  g.restEl.classList.add('floor-drag-home');
+  g.restEl.parentNode.appendChild(clone);
+  g.cloneEl=clone;
+  return clone;
+}
+function applyCloneDrag(x, y){
+  var g=FLOOR_GESTURE;
+  var clone=ensureDragClone();
+  if (!clone) return;
+  var z=STATE.floorZoom||1;
+  clone.style.left=(g.origLeft+(x-g.tapX)/z)+'px';
+  clone.style.top=(g.origTop+(y-g.tapY)/z)+'px';
+}
+function beginFloorTableGesture(x, y){
+  var g=FLOOR_GESTURE;
+  discardDragClone();
+  g.moved=false;
+  STATE._floorDragActive=false;
+  g.tapX=x; g.tapY=y;
+  g.startTable=tableAtClientPoint(x, y);
+  g.restEl=g.startTable ? document.querySelector('[data-table="'+g.startTable+'"]') : null;
+  if (g.restEl) {
+    g.origLeft=parseFloat(g.restEl.style.left)||0;
+    g.origTop=parseFloat(g.restEl.style.top)||0;
+    armFloorHold(g.startTable);
+  } else {
+    clearFloorHold();
+  }
+}
+function floorNoteMove(x, y, stepDx, stepDy){
+  var g=FLOOR_GESTURE;
+  var total=floorDisplacement(g.tapX, g.tapY, x, y);
+  if (g.startTable && floorDragStarted(total)) {
+    if (!g.moved) {
+      clearFloorHold();
+      STATE._floorDragActive=true;
+      markFloorOpenSuppressed();
+    }
+    g.moved=true;
+    applyCloneDrag(x, y);
+    return 'drag';
+  }
+  if (!g.startTable && total>FLOOR_HOLD_JITTER) {
+    g.moved=true;
+    return 'pan';
+  }
+  if (stepDx!=null && stepDy!=null && !g.startTable) return 'pan-step';
+  return '';
+}
+function finishFloorTableDrag(x, y){
+  var g=FLOOR_GESTURE;
+  var table=g.startTable;
+  var clone=g.cloneEl;
+  var moved=g.moved;
+  var hit='';
+  if (moved && table && clone) {
+    hit=combineTargetFromDrag(clone, x, y, table);
+  }
+  discardDragClone();
+  g.startTable='';
+  g.restEl=null;
+  g.moved=false;
+  STATE._floorDragActive=false;
+  markFloorOpenSuppressed();
+  if (hit && String(hit)!==String(table)) {
+    combineTables(table, hit);
+    return true;
+  }
+  return !!moved;
+}
+function floorMaybeBeginSplit(){
+  var g=FLOOR_GESTURE;
+  if (g.splitMode) return true;
+  var ids=Object.keys(g.pointers);
+  if (ids.length<2) return false;
+  var a=g.pointers[ids[0]], b=g.pointers[ids[1]];
+  var ta=resolveTableNumber(tableAtClientPoint(a.x, a.y));
+  var tb=resolveTableNumber(tableAtClientPoint(b.x, b.y));
+  if (!ta || ta!==tb || !isCombinedTable(ta)) return false;
+  g.splitMode='pull';
+  g.splitEl=document.querySelector('[data-table="'+ta+'"]');
+  g.startSplitDist=floorGestureDist();
+  if (g.splitEl) {
+    g.origSplitL=parseFloat(g.splitEl.style.left)||0;
+    g.origSplitT=parseFloat(g.splitEl.style.top)||0;
+    g.origSplitW=parseFloat(g.splitEl.style.width)||0;
+    g.origSplitH=parseFloat(g.splitEl.style.height)||0;
+    g.splitEl.style.zIndex='42';
+  }
+  return true;
+}
+function floorApplySplitStretch(){
+  var g=FLOOR_GESTURE;
+  if (!g.splitEl || g.startSplitDist<=0) return;
+  var d=floorGestureDist();
+  var extra=Math.max(0, d-g.startSplitDist);
+  var ids=Object.keys(g.pointers);
+  if (ids.length<2) return;
+  var a=g.pointers[ids[0]], b=g.pointers[ids[1]];
+  var adx=Math.abs(a.x-b.x), ady=Math.abs(a.y-b.y);
+  var z=STATE.floorZoom||1;
+  extra=extra/z;
+  if (adx>=ady) {
+    g.splitEl.style.width=(g.origSplitW+extra)+'px';
+    g.splitEl.style.left=(g.origSplitL-extra/2)+'px';
+    g.splitEl.style.height=g.origSplitH+'px';
+    g.splitEl.style.top=g.origSplitT+'px';
+  } else {
+    g.splitEl.style.height=(g.origSplitH+extra)+'px';
+    g.splitEl.style.top=(g.origSplitT-extra/2)+'px';
+    g.splitEl.style.width=g.origSplitW+'px';
+    g.splitEl.style.left=g.origSplitL+'px';
+  }
+}
+function floorSplitPullEnough(){
+  var g=FLOOR_GESTURE;
+  var d=floorGestureDist();
+  if (!g.startSplitDist || d<=0) return false;
+  return (d-g.startSplitDist)>56 || d>g.startSplitDist*1.28;
+}
+function floorClearSplitVisual(){
+  var g=FLOOR_GESTURE;
+  if (!g.splitEl) return;
+  g.splitEl.style.left=g.origSplitL+'px';
+  g.splitEl.style.top=g.origSplitT+'px';
+  g.splitEl.style.width=g.origSplitW+'px';
+  g.splitEl.style.height=g.origSplitH+'px';
+  g.splitEl.style.zIndex='';
+}
+function floorEndSplit(commit){
+  var g=FLOOR_GESTURE;
+  var keep=g.splitEl ? g.splitEl.getAttribute('data-table') : '';
+  var doSplit=!!(commit && keep && floorSplitPullEnough());
+  if (!doSplit) floorClearSplitVisual();
+  g.splitMode='';
+  g.splitEl=null;
+  g.startSplitDist=0;
+  if (doSplit) splitCombinedTable(keep);
+  return doSplit;
+}
+function floorApplyPinchZoom(stage){
+  var g=FLOOR_GESTURE;
+  var d=floorGestureDist();
+  if (g.lastDist>0 && d>0) {
+    var factor=d/g.lastDist;
+    var rect=stage.getBoundingClientRect();
+    var ids=Object.keys(g.pointers);
+    var a=g.pointers[ids[0]], b=g.pointers[ids[1]];
+    var cx=((a.x+b.x)/2)-rect.left;
+    var cy=((a.y+b.y)/2)-rect.top;
+    var old=STATE.floorZoom||1;
+    var nz=Math.max(floorMinZoom(), Math.min(8, old*factor));
+    STATE.floorPanX = cx - (cx - STATE.floorPanX) * (nz/old);
+    STATE.floorPanY = cy - (cy - STATE.floorPanY) * (nz/old);
+    STATE.floorZoom=nz;
+    STATE.floorFitDone=true;
+    applyFloorTransform();
+  }
+  g.lastDist=d;
+}
+function floorHandleTwoFingers(stage){
+  clearFloorHold();
+  floorAbortDrag();
+  var g=FLOOR_GESTURE;
+  if (floorMaybeBeginSplit() || g.splitMode) {
+    floorApplySplitStretch();
+    g.lastDist=floorGestureDist();
+    return true;
+  }
+  floorApplyPinchZoom(stage);
+  return false;
+}
+function floorSyncTouches(e){
+  var g=FLOOR_GESTURE;
+  g.pointers={};
+  for (var i=0;i<(e.touches?e.touches.length:0);i++){
+    var t=e.touches[i];
+    g.pointers['t'+t.identifier]={x:t.clientX,y:t.clientY};
+  }
+}
+function floorEndPointer(e){
+  var g=FLOOR_GESTURE;
+  if (g.source==='touch' && e && e.pointerType==='touch') return;
+  if (g.splitMode && floorGestureCount()>=2) {
+    floorEndSplit(true);
+    if (e) delete g.pointers[e.pointerId];
+    g.lastDist=0;
+    markFloorOpenSuppressed();
+    clearFloorHold();
+    g.startTable='';
+    g.source=floorGestureCount() ? g.source : '';
+    return;
+  }
+  if (e) delete g.pointers[e.pointerId];
+  if (floorGestureCount()<2) g.lastDist=0;
+  clearFloorHold();
+  var x=e?e.clientX:g.tapX, y=e?e.clientY:g.tapY;
+  if (g.moved) finishFloorTableDrag(x, y);
+  else floorAbortDrag();
+  g.source=floorGestureCount() ? g.source : '';
+}
+function floorCancelPointer(e){
+  var g=FLOOR_GESTURE;
+  if (g.source==='touch' && e && e.pointerType==='touch') return;
+  if (g.splitMode) floorEndSplit(false);
+  if (e) delete g.pointers[e.pointerId];
+  if (floorGestureCount()<2) g.lastDist=0;
+  clearFloorHold();
+  markFloorOpenSuppressed();
+  floorAbortDrag();
+  g.source=floorGestureCount() ? g.source : '';
+}
+function floorEndTouch(e){
+  var g=FLOOR_GESTURE;
+  if (g.splitMode && (!e.touches || e.touches.length<2)) {
+    floorEndSplit(true);
+    floorSyncTouches(e);
+    g.lastDist=0;
+    markFloorOpenSuppressed();
+    clearFloorHold();
+    g.startTable='';
+    g.moved=false;
+    STATE._floorDragActive=false;
+    g.source=floorGestureCount() ? g.source : '';
+    return;
+  }
+  var wasMoved=g.moved;
+  var x=g.tapX, y=g.tapY;
+  if (e.changedTouches && e.changedTouches[0]) {
+    x=e.changedTouches[0].clientX;
+    y=e.changedTouches[0].clientY;
+  }
+  floorSyncTouches(e);
+  if (floorGestureCount()<2) g.lastDist=0;
+  clearFloorHold();
+  if (wasMoved) {
+    if (e.cancelable) e.preventDefault();
+    finishFloorTableDrag(x, y);
+    g.source=floorGestureCount() ? g.source : '';
+    return;
+  }
+  floorAbortDrag();
+  g.source=floorGestureCount() ? g.source : '';
+  if (e.touches && e.touches.length) return;
+  if (e.cancelable) e.preventDefault();
+}
+function floorCancelTouch(e){
+  var g=FLOOR_GESTURE;
+  if (g.splitMode) floorEndSplit(false);
+  floorSyncTouches(e);
+  if (floorGestureCount()<2) g.lastDist=0;
+  clearFloorHold();
+  markFloorOpenSuppressed();
+  floorAbortDrag();
+  g.source=floorGestureCount() ? g.source : '';
+}
+function bindFloorDocGestures(){
+  if (window._posFloorDocBound) return;
+  window._posFloorDocBound=true;
+  document.addEventListener('pointerup', floorEndPointer, true);
+  document.addEventListener('pointercancel', floorCancelPointer, true);
+  document.addEventListener('touchend', floorEndTouch, {passive:false, capture:true});
+  document.addEventListener('touchcancel', floorCancelTouch, {passive:false, capture:true});
+  document.addEventListener('visibilitychange', function(){
+    if (document.hidden) {
+      clearFloorHold();
+      markFloorOpenSuppressed();
+      floorAbortDrag();
+      FLOOR_GESTURE.source='';
+      FLOOR_GESTURE.pointers={};
+    }
+  });
+}
 function bindFloorGestures(){
   var stage=document.getElementById('floor-stage');
   if (!stage || stage._bound) return;
   stage._bound=true;
-  var pointers={};
-  var lastDist=0;
-  var moved=false;
-  var tapX=0, tapY=0;
-  var startTable='';
-  var dragEl=null;
-  var origLeft=0, origTop=0;
-  var splitMode='';
-  var splitEl=null;
-  var startSplitDist=0;
-  var origSplitL=0, origSplitT=0, origSplitW=0, origSplitH=0;
-  function count(){ return Object.keys(pointers).length; }
-  function dist(){
-    var ids=Object.keys(pointers);
-    if (ids.length<2) return 0;
-    var a=pointers[ids[0]], b=pointers[ids[1]];
-    var dx=a.x-b.x, dy=a.y-b.y;
-    return Math.sqrt(dx*dx+dy*dy);
-  }
-  function applyPinchZoom(){
-    var d=dist();
-    if (lastDist>0 && d>0) {
-      var factor=d/lastDist;
-      var rect=stage.getBoundingClientRect();
-      var ids=Object.keys(pointers);
-      var a=pointers[ids[0]], b=pointers[ids[1]];
-      var cx=((a.x+b.x)/2)-rect.left;
-      var cy=((a.y+b.y)/2)-rect.top;
-      var old=STATE.floorZoom||1;
-      var nz=Math.max(floorMinZoom(), Math.min(8, old*factor));
-      STATE.floorPanX = cx - (cx - STATE.floorPanX) * (nz/old);
-      STATE.floorPanY = cy - (cy - STATE.floorPanY) * (nz/old);
-      STATE.floorZoom=nz;
-      STATE.floorFitDone=true;
-      applyFloorTransform();
-    }
-    lastDist=d;
-  }
-  function maybeBeginSplit(){
-    if (splitMode) return true;
-    var ids=Object.keys(pointers);
-    if (ids.length<2) return false;
-    var a=pointers[ids[0]], b=pointers[ids[1]];
-    var ta=resolveTableNumber(tableAtClientPoint(a.x, a.y));
-    var tb=resolveTableNumber(tableAtClientPoint(b.x, b.y));
-    if (!ta || ta!==tb || !isCombinedTable(ta)) return false;
-    splitMode='pull';
-    splitEl=document.querySelector('[data-table="'+ta+'"]');
-    startSplitDist=dist();
-    if (splitEl) {
-      origSplitL=parseFloat(splitEl.style.left)||0;
-      origSplitT=parseFloat(splitEl.style.top)||0;
-      origSplitW=parseFloat(splitEl.style.width)||0;
-      origSplitH=parseFloat(splitEl.style.height)||0;
-      splitEl.style.zIndex='42';
-    }
-    return true;
-  }
-  function applySplitStretch(){
-    if (!splitEl || startSplitDist<=0) return;
-    var d=dist();
-    var extra=Math.max(0, d-startSplitDist);
-    var ids=Object.keys(pointers);
-    if (ids.length<2) return;
-    var a=pointers[ids[0]], b=pointers[ids[1]];
-    var adx=Math.abs(a.x-b.x), ady=Math.abs(a.y-b.y);
-    var z=STATE.floorZoom||1;
-    extra=extra/z;
-    if (adx>=ady) {
-      splitEl.style.width=(origSplitW+extra)+'px';
-      splitEl.style.left=(origSplitL-extra/2)+'px';
-      splitEl.style.height=origSplitH+'px';
-      splitEl.style.top=origSplitT+'px';
-    } else {
-      splitEl.style.height=(origSplitH+extra)+'px';
-      splitEl.style.top=(origSplitT-extra/2)+'px';
-      splitEl.style.width=origSplitW+'px';
-      splitEl.style.left=origSplitL+'px';
-    }
-  }
-  function splitPullEnough(){
-    var d=dist();
-    if (!startSplitDist || d<=0) return false;
-    return (d-startSplitDist)>56 || d>startSplitDist*1.28;
-  }
-  function clearSplitVisual(){
-    if (!splitEl) return;
-    splitEl.style.left=origSplitL+'px';
-    splitEl.style.top=origSplitT+'px';
-    splitEl.style.width=origSplitW+'px';
-    splitEl.style.height=origSplitH+'px';
-    splitEl.style.zIndex='';
-  }
-  function endSplit(commit){
-    var keep=splitEl ? splitEl.getAttribute('data-table') : '';
-    var doSplit=!!(commit && keep && splitPullEnough());
-    if (!doSplit) clearSplitVisual();
-    splitMode='';
-    splitEl=null;
-    startSplitDist=0;
-    if (doSplit) splitCombinedTable(keep);
-    return doSplit;
-  }
-  function handleTwoFingers(){
-    clearFloorHold();
-    cancelTableDrag();
-    if (maybeBeginSplit() || splitMode) {
-      applySplitStretch();
-      lastDist=dist();
-      return true;
-    }
-    applyPinchZoom();
-    return false;
-  }
-  function beginTableGesture(x, y){
-    moved=false;
-    STATE._floorDragActive=false;
-    tapX=x; tapY=y;
-    startTable=tableAtClientPoint(x, y);
-    dragEl=startTable ? document.querySelector('[data-table="'+startTable+'"]') : null;
-    if (dragEl) {
-      origLeft=parseFloat(dragEl.style.left)||0;
-      origTop=parseFloat(dragEl.style.top)||0;
-      armFloorHold(startTable);
-    } else {
-      clearFloorHold();
-    }
-  }
-  function dragTotal(x, y){ return floorDisplacement(tapX, tapY, x, y); }
-  function applyTableDragCss(x, y){
-    if (!dragEl) return;
-    var z=STATE.floorZoom||1;
-    dragEl.style.left=(origLeft+(x-tapX)/z)+'px';
-    dragEl.style.top=(origTop+(y-tapY)/z)+'px';
-    dragEl.style.zIndex='40';
-  }
-  function noteMove(x, y, stepDx, stepDy){
-    var total=dragTotal(x, y);
-    if (startTable && floorDragStarted(total)) {
-      if (!moved) {
-        clearFloorHold();
-        STATE._floorDragActive=true;
-        markFloorOpenSuppressed();
-      }
-      moved=true;
-      applyTableDragCss(x, y);
-      return 'drag';
-    }
-    if (!startTable && total>FLOOR_HOLD_JITTER) {
-      moved=true;
-      return 'pan';
-    }
-    if (stepDx!=null && stepDy!=null && !startTable) return 'pan-step';
-    return '';
-  }
+  bindFloorDocGestures();
   stage.addEventListener('pointerdown', function(e){
-    if (e.pointerType==='touch') return;
+    if (FLOOR_GESTURE.source==='touch') return;
+    FLOOR_GESTURE.source='pointer';
     try { stage.setPointerCapture(e.pointerId); } catch (err) {}
-    pointers[e.pointerId]={x:e.clientX,y:e.clientY};
-    beginTableGesture(e.clientX, e.clientY);
-    if (count()===2) {
-      lastDist=dist();
-      if (maybeBeginSplit()) cancelTableDrag();
+    FLOOR_GESTURE.pointers[e.pointerId]={x:e.clientX,y:e.clientY};
+    if (floorGestureCount()===1) beginFloorTableGesture(e.clientX, e.clientY);
+    if (floorGestureCount()===2) {
+      FLOOR_GESTURE.lastDist=floorGestureDist();
+      if (floorMaybeBeginSplit()) floorAbortDrag();
     }
   });
   stage.addEventListener('pointermove', function(e){
-    if (e.pointerType==='touch') return;
-    if (!pointers[e.pointerId]) return;
-    var prev=pointers[e.pointerId];
+    var g=FLOOR_GESTURE;
+    if (g.source==='touch') return;
+    if (!g.pointers[e.pointerId]) return;
+    var prev=g.pointers[e.pointerId];
     var dx=e.clientX-prev.x, dy=e.clientY-prev.y;
-    pointers[e.pointerId]={x:e.clientX,y:e.clientY};
+    g.pointers[e.pointerId]={x:e.clientX,y:e.clientY};
     if (floorViewLocked()) return;
-    if (count()>=2) {
-      handleTwoFingers();
-    } else if (count()===1) {
-      var kind=noteMove(e.clientX, e.clientY, dx, dy);
-      if (kind==='pan' || (kind==='pan-step' && moved)) {
+    if (floorGestureCount()>=2) {
+      floorHandleTwoFingers(stage);
+    } else if (floorGestureCount()===1) {
+      var kind=floorNoteMove(e.clientX, e.clientY, dx, dy);
+      if (kind==='pan' || (kind==='pan-step' && g.moved)) {
         STATE.floorPanX += dx;
         STATE.floorPanY += dy;
         applyFloorTransform();
@@ -4381,160 +4568,55 @@ function bindFloorGestures(){
         applyFloorTransform();
       }
     }
-    if (moved && e.cancelable) e.preventDefault();
+    if (g.moved && e.cancelable) e.preventDefault();
   }, {passive:false});
-  function cancelTableDrag(){
-    restoreTableEl(dragEl, origLeft, origTop);
-    startTable='';
-    dragEl=null;
-    STATE._floorDragActive=false;
-  }
-  function finishTableDrag(x, y){
-    markFloorOpenSuppressed();
-    var table=startTable;
-    var el=dragEl;
-    if (!moved || !table) {
-      restoreTableEl(el, origLeft, origTop);
-      startTable='';
-      dragEl=null;
-      STATE._floorDragActive=false;
-      return false;
-    }
-    var hit=combineTargetFromDrag(el, x, y, table);
-    restoreTableEl(el, origLeft, origTop);
-    startTable='';
-    dragEl=null;
-    STATE._floorDragActive=false;
-    if (hit && String(hit)!==String(table)) {
-      combineTables(table, hit);
-    } else {
-      var live=liveFloorTable(resolveTableNumber(table));
-      if (live) restoreOrigGeom(live);
-      renderTables();
-    }
-    return true;
-  }
-  function endPtr(e){
-    if (e.pointerType==='touch') return;
-    if (splitMode && count()>=2) {
-      endSplit(true);
-      delete pointers[e.pointerId];
-      lastDist=0;
-      markFloorOpenSuppressed();
-      clearFloorHold();
-      startTable='';
+  stage.addEventListener('touchstart', function(e){
+    var g=FLOOR_GESTURE;
+    if (g.source==='pointer') {
+      if (e.touches.length>=2 && e.cancelable) e.preventDefault();
       return;
     }
-    delete pointers[e.pointerId];
-    if (count()<2) lastDist=0;
-    clearFloorHold();
-    if (moved) finishTableDrag(e.clientX, e.clientY);
-    else restoreTableEl(dragEl, origLeft, origTop);
-    startTable='';
-    dragEl=null;
-    STATE._floorDragActive=false;
-  }
-  stage.addEventListener('pointerup', endPtr);
-  stage.addEventListener('pointercancel', function(e){
-    if (e.pointerType==='touch') return;
-    if (splitMode) endSplit(false);
-    delete pointers[e.pointerId];
-    if (count()<2) lastDist=0;
-    clearFloorHold();
-    markFloorOpenSuppressed();
-    var live=startTable ? liveFloorTable(resolveTableNumber(startTable)) : null;
-    if (live) restoreOrigGeom(live);
-    cancelTableDrag();
-    renderTables();
-  });
-  function syncTouches(e){
-    pointers={};
-    for (var i=0;i<e.touches.length;i++){
-      var t=e.touches[i];
-      pointers['t'+t.identifier]={x:t.clientX,y:t.clientY};
-    }
-  }
-  stage.addEventListener('touchstart', function(e){
-    syncTouches(e);
+    g.source='touch';
+    floorSyncTouches(e);
     if (e.touches.length===1) {
-      beginTableGesture(e.touches[0].clientX, e.touches[0].clientY);
+      beginFloorTableGesture(e.touches[0].clientX, e.touches[0].clientY);
     }
     if (e.touches.length>=2) {
       clearFloorHold();
-      cancelTableDrag();
-      lastDist=dist();
-      maybeBeginSplit();
+      floorAbortDrag();
+      g.lastDist=floorGestureDist();
+      floorMaybeBeginSplit();
       if (e.cancelable) e.preventDefault();
     }
   }, {passive:false});
   stage.addEventListener('touchmove', function(e){
+    var g=FLOOR_GESTURE;
     if (!e.touches.length) return;
+    if (g.source==='pointer') {
+      if ((g.moved || e.touches.length>=2) && e.cancelable) e.preventDefault();
+      return;
+    }
     var t=e.touches[0];
     var id='t'+t.identifier;
-    var prev=pointers[id];
-    if (floorViewLocked()) { syncTouches(e); return; }
+    var prev=g.pointers[id];
+    if (floorViewLocked()) { floorSyncTouches(e); return; }
     if (e.touches.length===1) {
       var stepDx=prev ? (t.clientX-prev.x) : 0;
       var stepDy=prev ? (t.clientY-prev.y) : 0;
-      var kind=noteMove(t.clientX, t.clientY, stepDx, stepDy);
-      if (kind==='pan' || (kind==='pan-step' && moved)) {
+      var kind=floorNoteMove(t.clientX, t.clientY, stepDx, stepDy);
+      if (kind==='pan' || (kind==='pan-step' && g.moved)) {
         STATE.floorPanX += stepDx;
         STATE.floorPanY += stepDy;
         applyFloorTransform();
       }
     } else if (e.touches.length>=2) {
-      moved=true;
+      g.moved=true;
       markFloorOpenSuppressed();
-      syncTouches(e);
-      handleTwoFingers();
+      floorSyncTouches(e);
+      floorHandleTwoFingers(stage);
     }
-    syncTouches(e);
-    if ((moved || e.touches.length>=2) && e.cancelable) e.preventDefault();
-  }, {passive:false});
-  function endTouch(e){
-    if (splitMode && (!e.touches || e.touches.length<2)) {
-      endSplit(true);
-      syncTouches(e);
-      lastDist=0;
-      markFloorOpenSuppressed();
-      clearFloorHold();
-      startTable='';
-      moved=false;
-      STATE._floorDragActive=false;
-      return;
-    }
-    var wasMoved=moved;
-    var x=tapX, y=tapY;
-    if (e.changedTouches && e.changedTouches[0]) {
-      x=e.changedTouches[0].clientX;
-      y=e.changedTouches[0].clientY;
-    }
-    syncTouches(e);
-    if (count()<2) lastDist=0;
-    clearFloorHold();
-    if (wasMoved) {
-      if (e.cancelable) e.preventDefault();
-      finishTableDrag(x, y);
-      return;
-    }
-    restoreTableEl(dragEl, origLeft, origTop);
-    startTable='';
-    dragEl=null;
-    STATE._floorDragActive=false;
-    if (e.touches && e.touches.length) return;
-    if (e.cancelable) e.preventDefault();
-  }
-  stage.addEventListener('touchend', endTouch, {passive:false});
-  stage.addEventListener('touchcancel', function(e){
-    if (splitMode) endSplit(false);
-    syncTouches(e);
-    if (count()<2) lastDist=0;
-    clearFloorHold();
-    markFloorOpenSuppressed();
-    var live=startTable ? liveFloorTable(resolveTableNumber(startTable)) : null;
-    if (live) restoreOrigGeom(live);
-    cancelTableDrag();
-    renderTables();
+    floorSyncTouches(e);
+    if ((g.moved || e.touches.length>=2) && e.cancelable) e.preventDefault();
   }, {passive:false});
   stage.addEventListener('click', function(e){
     if (!floorOpenBlocked()) return;
@@ -4542,6 +4624,7 @@ function bindFloorGestures(){
     e.stopPropagation();
   }, true);
 }
+
 function stationsAreBohOnly(){
   toast('Food Master Stations are created and edited in BOH only');
 }
@@ -4580,6 +4663,11 @@ function shiftFloorObj(o, dx, dy){
   return c;
 }
 function renderTables() {
+  discardDragClone();
+  FLOOR_GESTURE.restEl=null;
+  FLOOR_GESTURE.startTable='';
+  FLOOR_GESTURE.moved=false;
+  STATE._floorDragActive=false;
   reapplyCombines();
   var c=document.getElementById('app-content');
   var rooms = Array.isArray(STATE.rooms) ? STATE.rooms : [];
@@ -6915,21 +7003,16 @@ function geomSnap(o){
   return { x:o.x||0, y:o.y||0, w:o.w||70, h:o.h||70, seats:o.seats||2 };
 }
 function ensureOrigGeom(o){
-  if (!o) return;
-  if (!o._bohGeom && !o.hidden && !o.combinedInto) o._bohGeom=geomSnap(o);
-  if (!o._origGeom && o._bohGeom) o._origGeom=geomSnap(o._bohGeom);
+  if (!o || !o._bohGeom) return;
 }
 function restoreOrigGeom(o){
-  if (!o) return;
-  var g=o._bohGeom || o._origGeom;
-  if (g) {
-    o.x=g.x;
-    o.y=g.y;
-    o.w=g.w;
-    o.h=g.h;
-    o.seats=g.seats;
-    if (!o._bohGeom) o._bohGeom=geomSnap(g);
-  }
+  if (!o || !o._bohGeom) return;
+  var g=o._bohGeom;
+  o.x=g.x;
+  o.y=g.y;
+  o.w=g.w;
+  o.h=g.h;
+  o.seats=g.seats;
   delete o._origGeom;
   o.hidden=false;
   delete o.combinedInto;
@@ -6943,8 +7026,9 @@ function isCombinedTable(n){
   return !!(n && combinedDropsFor(n).length);
 }
 function combineAxisGrow(keep, drop){
-  var kg=(keep && keep._bohGeom) || geomSnap(keep||{});
-  var dg=(drop && drop._bohGeom) || geomSnap(drop||{});
+  var kg=keep && keep._bohGeom;
+  var dg=drop && drop._bohGeom;
+  if (!kg || !dg) return 'w';
   var kcx=(kg.x||0)+(kg.w||70)/2;
   var kcy=(kg.y||0)+(kg.h||70)/2;
   var dcx=(dg.x||0)+(dg.w||70)/2;
@@ -6954,11 +7038,10 @@ function combineAxisGrow(keep, drop){
 function applyCombineToObject(keep, drop){
   if (!keep || !drop) return;
   if (drop.hidden && String(drop.combinedInto)===String(tableKey(keep))) return;
-  ensureOrigGeom(keep);
-  ensureOrigGeom(drop);
-  var kg=keep._bohGeom || geomSnap(keep);
-  var dg=drop._bohGeom || geomSnap(drop);
-  keep.seats=(keep.seats||2)+(drop.seats||2);
+  var kg=keep._bohGeom;
+  var dg=drop._bohGeom;
+  if (!kg || !dg) return;
+  keep.seats=(keep.seats||kg.seats||2)+(dg.seats||2);
   keep.x=kg.x||0;
   keep.y=kg.y||0;
   if (combineAxisGrow(keep, drop)==='w') keep.w=(keep.w||kg.w||70)+(dg.w||70);
@@ -6968,10 +7051,7 @@ function applyCombineToObject(keep, drop){
 }
 function reapplyCombines(){
   eachLiveFloorObject(function(o){
-    if (!o) return;
-    var g=o._bohGeom || o._origGeom;
-    if (!g) return;
-    if (!o._bohGeom) o._bohGeom=geomSnap(g);
+    if (!o || !o._bohGeom) return;
     o.x=o._bohGeom.x;
     o.y=o._bohGeom.y;
     o.w=o._bohGeom.w;

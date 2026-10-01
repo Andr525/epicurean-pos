@@ -1,0 +1,8 @@
+{
+  "name": "epicurean-pos-table-geometry-tests",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "jsdom": "^26.1.0"
+  }
+}
