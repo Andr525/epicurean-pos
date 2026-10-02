@@ -5322,8 +5322,8 @@ function diningFireGroupKey(to, c, idx){
   if (!c) return 'x'+idx;
   if (c.noneChoice) return 'none:'+idx;
   var kind=diningCourseKind(c);
-  if (kind==='des' || c.later || c.mode==='later') return 'dolce';
   if (kind==='entremet' || c.entremets || c.mode==='entremets') return 'entremet';
+  if (kind==='des' || c.later || c.mode==='later') return 'dolce';
   if (c.auto || c.fireEach) return 'auto:'+normFireTitle(diningCourseTitle(to,c));
   if (kind==='app') return 'slot:app';
   if (kind==='main') return 'slot:main';

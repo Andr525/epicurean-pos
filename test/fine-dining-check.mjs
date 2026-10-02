@@ -322,4 +322,9 @@ const mainSrc = execSync('git show origin/main:index.html', { cwd: root, encodin
 assert.equal(src.includes('<!-- pos-build: scalini-print-v51 -->'), true);
 assert.equal(src.includes('Table Service · build 51'), true);
 
+if (w.STATE && w.STATE._seatTick) {
+  w.clearInterval(w.STATE._seatTick);
+  w.STATE._seatTick = null;
+}
+
 console.log('fine-dining-check tests passed');
