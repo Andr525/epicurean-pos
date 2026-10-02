@@ -205,16 +205,32 @@ assert.equal(/choose later/i.test(checkHtml), false);
 assert.equal(/Dolce — choose later/i.test(checkHtml), false);
 assert.equal(/not selected/i.test(checkHtml), false);
 
-// 7. entremet visible before dessert; fire groups include entremet
-assert.match(checkHtml, /PRE-DESSERT/);
-assert.match(checkHtml, /Coconut-Lime Sorbet/);
-assert.equal(w.hideEntremetUntilDessert({ mode: 'entremets' }, w.STATE.activeTastingOrders[0]), false);
+// 7. entremet hidden until dessert; complimentary is compact
+assert.equal(/Zucchini Milanese/i.test(checkHtml), false);
+assert.equal(/Smoked Salmon/i.test(checkHtml), false);
+assert.match(checkHtml, /COMPLIMENTARY/);
+assert.equal(/PRE-DESSERT/.test(checkHtml), false);
+assert.equal(/Coconut-Lime Sorbet/.test(checkHtml), false);
+assert.equal(w.hideEntremetUntilDessert({ mode: 'entremets' }, w.STATE.activeTastingOrders[0]), true);
 const fireGroups = w.collectDiningFireGroups();
-assert.ok(fireGroups.some((g) => g.key === 'entremet'), 'FIRE Entremet group missing');
+assert.ok(!fireGroups.some((g) => g.key === 'entremet'), 'FIRE Entremet should wait for dessert');
+assert.ok(fireGroups.some((g) => g.key === 'welcome'), 'FIRE Complimentary group missing');
 const live = w.liveCheckHtml();
-assert.match(live, /Coconut-Lime Sorbet/);
+assert.equal(/Coconut-Lime Sorbet/.test(live), false);
 assert.equal(/choose later/i.test(live), false);
-assert.match(live, /FIRE Entremet|Entremet/);
+assert.match(live, /COMPLIMENTARY/);
+w.STATE.activeTastingOrders.forEach(function (to) {
+  to.dessertChosen = true;
+  w.diningCourses(to).forEach(function (c) {
+    if (!(c.later || c.mode === 'later')) return;
+    c.choice = 'Napoleon of chocolate';
+    c.name = 'Napoleon of chocolate';
+    c.pending = false;
+  });
+});
+const afterDessert = w.workingCheckHtml();
+assert.match(afterDessert, /PRE-DESSERT/);
+assert.ok(w.collectDiningFireGroups().some((g) => g.key === 'entremet'), 'FIRE Entremet after dessert');
 
 // 8. handheld CSS fills removed
 assert.equal(src.includes('#fff3e8'), false);

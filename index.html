@@ -750,16 +750,30 @@ body.hh-on.floor-drawing .floor-stage { outline:2px dashed var(--primary); }
   color:#fff; font-weight:700; font-size:0.82rem; padding:0.7rem 0.9rem; cursor:pointer;
 }
 .line-menu-pop button:active { background:#2a3544; }
-.line-edit-bar { display:flex; flex-wrap:wrap; gap:6px; padding:0.25rem 0 0.45rem; }
+.line-edit-bar { display:flex; flex-wrap:wrap; gap:6px; padding:0.25rem 0 0.45rem; align-items:center; }
 .line-edit-bar button {
-  flex:1 1 30%; min-height:40px; font-weight:800; font-size:0.74rem;
+  flex:1 1 30%; min-height:34px; font-weight:800; font-size:0.74rem;
   border:1px solid var(--border); background:var(--surface-2); color:var(--text);
   border-radius:8px; cursor:pointer;
 }
 .line-edit-bar button.erase { background:#3b1212; color:#fecaca; border-color:#7f1d1d; }
+.line-edit-bar button.line-close {
+  flex:0 0 34px; min-width:32px; max-width:36px; min-height:32px; padding:0;
+  font-size:0.85rem; line-height:1;
+}
 .line-edit-bar .course-set { flex:1 1 100%; display:flex; gap:4px; }
-.line-edit-bar .course-set button { flex:1; min-height:36px; }
+.line-edit-bar .course-set button { flex:1; min-height:34px; }
 .line-edit-bar .course-set button.active { outline:2px solid #2f6fdb; outline-offset:-2px; }
+.wine-window { display:flex; flex-direction:column; gap:0; }
+.wine-window-list { display:flex; flex-direction:column; }
+.wine-row {
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  width:100%; min-height:36px; padding:0.28rem 0.4rem; text-align:left;
+  border:none; border-bottom:1px solid var(--border); background:transparent;
+  color:var(--text); font-weight:650; font-size:0.78rem; cursor:pointer;
+}
+.wine-row .wine-meta { font-size:0.62rem; font-weight:600; opacity:0.62; white-space:nowrap; }
+.wine-row .price { font-weight:800; margin-left:auto; }
 .seat-pick-list { display:flex; flex-direction:column; gap:0; margin:0.4rem 0 0.8rem; }
 .seat-pick-list button {
   width:100%; min-height:48px; text-align:left; padding:0 0.9rem;
@@ -2452,18 +2466,58 @@ function posKeywordExtras(text){
   return extra;
 }
 function posSearchHay(obj){
+  var vin=String((obj&& (obj.vin||''))||'').trim();
+  var lin=String((obj&& (obj.lin||''))||'').trim();
   var blob=[
     obj && obj.name, obj && obj.desc, obj && obj.description, obj && obj.ingredients,
     obj && obj.producer, obj && obj.region, obj && obj.varietal, obj && obj.grape,
     obj && obj.vintage, obj && obj.code, obj && obj.category, obj && obj.subtitle,
-    obj && obj.id, asList(obj && obj.allergens).join(' '), asList(obj && obj.dietaryFlags).join(' ')
+    obj && obj.id, vin, lin, vin?('VIN '+vin):'', lin?('LIN '+lin):'',
+    asList(obj && obj.allergens).join(' '), asList(obj && obj.dietaryFlags).join(' ')
   ].join(' ');
   return (blob+' '+posNameTokens(blob).join(' ')+' '+posKeywordExtras(blob).join(' ')).toLowerCase();
 }
 function posQueryWords(q){
   return String(q||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').split(' ').filter(function(w){
-    return w && w.length>1 && !posStopWord(w);
+    if (!w) return false;
+    if (/^\d{2,}$/.test(w)) return true;
+    return w.length>1 && !posStopWord(w);
   });
+}
+function posOpsLookup(q){
+  var s=String(q||'').trim();
+  if (!s) return null;
+  var m=s.match(/^\s*(vin|lin)\s*[:#\-\s]*(\d{2,})\s*$/i) || s.match(/^\s*(vin|lin)(\d{2,})\s*$/i);
+  if (m) return { kind:m[1].toLowerCase(), code:String(m[2]) };
+  if (/^\d{2,}$/.test(s)) return { kind:'bare', code:s };
+  return null;
+}
+function itemVinCode(it){
+  if (!it) return '';
+  if (it.vin) return String(it.vin).trim();
+  if (it.source==='wine' && it.code) return String(it.code).trim();
+  return '';
+}
+function itemLinCode(it){ return String((it&&it.lin)||'').trim(); }
+function filterByOpsLookup(items, lookup){
+  if (!lookup) return null;
+  var wines=[], lins=[];
+  (items||[]).forEach(function(it){
+    if (!it) return;
+    var vin=itemVinCode(it), lin=itemLinCode(it);
+    if (vin && vin===lookup.code) wines.push(it);
+    if (lin && lin===lookup.code) lins.push(it);
+  });
+  if (lookup.kind==='vin') return wines;
+  if (lookup.kind==='lin') return lins;
+  return wines.concat(lins);
+}
+function filterCatalogItems(items, q){
+  var lookup=posOpsLookup(q);
+  if (lookup) return filterByOpsLookup(items, lookup)||[];
+  var needle=String(q||'').trim();
+  if (!needle) return items||[];
+  return (items||[]).filter(function(it){ return itemMatchesSearch(it, needle); });
 }
 function barKindCat(kindOrItem){
   var it=(kindOrItem && typeof kindOrItem==='object') ? kindOrItem : {kind:kindOrItem};
@@ -2619,6 +2673,7 @@ function mapBarToPos(it, catId){
   return {
     id: String(it.id || it.code || ('bar-'+it.name)),
     code: String(it.code||''),
+    lin: String(it.lin||''),
     name: String(it.name||'').trim(),
     price: Number(it.price||0),
     category: catId,
@@ -2651,6 +2706,7 @@ function mapWineToPos(it, catId){
   return {
     id: String(it.id || it.vin || ('wine-'+it.name)),
     code: String(it.vin || it.code || ''),
+    vin: String(it.vin || it.code || ''),
     name: (function(){
       var n=String(it.name||'').trim();
       var v=(it.vintage && it.vintage!=='NV') ? String(it.vintage) : '';
@@ -2753,6 +2809,22 @@ function applyFoodFromMenuDoc(d){
     if (!named.length) return true;
     return named.some(function(id){ return !hidden[id]; });
   });
+}
+function posIdsFingerprint(list){
+  var ids=[];
+  (list||[]).forEach(function(it){ if (it && it.id) ids.push(String(it.id)); });
+  return ids.length+':'+ids.join(',');
+}
+function posCatalogFingerprint(){
+  return posIdsFingerprint(STATE.wines)+'|'+posIdsFingerprint(STATE.bar);
+}
+function applyCatalogAndRefresh(force){
+  var fp=posCatalogFingerprint();
+  if (!force && fp===STATE._catalogFp && (STATE.menuItems||[]).length) return false;
+  rebuildPosCatalog();
+  STATE._catalogFp=fp;
+  refreshOrderView();
+  return true;
 }
 function rebuildPosCatalog(){
   var cats = (STATE.foodCats||[]).slice();
@@ -2924,8 +2996,7 @@ function listenBohList(docName, key){
       STATE.menuLive = true;
       STATE[key] = bohList(doc.data());
       if (key==='bar') ensurePosBinwiseCellar();
-      rebuildPosCatalog();
-      refreshOrderView();
+      applyCatalogAndRefresh(key!=='bar' && key!=='wines');
     }
   }, function(){});
 }
@@ -2959,23 +3030,20 @@ function flattenPosWines(){
   else ensurePosBinwiseCellar();
   if (!(STATE.wines||[]).length) STATE.wines=all;
   STATE.menuLive=true;
-  rebuildPosCatalog();
-  refreshOrderView();
+  applyCatalogAndRefresh(false);
 }
 function listenWines(){
   ensurePosBinwiseCellar();
   if ((STATE.wines||[]).length) {
     STATE.menuLive=true;
-    rebuildPosCatalog();
-    refreshOrderView();
+    applyCatalogAndRefresh(false);
   }
   if (!fbReady) return;
   fbDb.collection('boh_shared').doc('wines').onSnapshot(function(doc){
     if (!doc.exists || !doc.data()) {
       ensurePosBinwiseCellar();
       STATE.menuLive=true;
-      rebuildPosCatalog();
-      refreshOrderView();
+      applyCatalogAndRefresh(false);
       return;
     }
     var d=doc.data();
@@ -4213,7 +4281,9 @@ function restoreFloorView(){
   floorResetView();
 }
 var FLOOR_HOLD_MS = 1000;
+var FLOOR_HOLD_OCCUPIED_MS = 500;
 var FLOOR_HOLD_JITTER = 14;
+var FLOOR_HOLD_OCCUPIED_JITTER = 18;
 var FLOOR_DRAG_PX = 20;
 function floorDisplacement(x0, y0, x1, y1){
   return Math.abs((x1||0)-(x0||0))+Math.abs((y1||0)-(y0||0));
@@ -4240,6 +4310,9 @@ function clearFloorHold(){
   }
   STATE._floorHoldTable='';
 }
+function floorHoldMs(tNum){
+  return tableInService(tNum) ? FLOOR_HOLD_OCCUPIED_MS : FLOOR_HOLD_MS;
+}
 function armFloorHold(tNum){
   clearFloorHold();
   tNum=String(tNum||'');
@@ -4251,7 +4324,7 @@ function armFloorHold(tNum){
     var n=STATE._floorHoldTable;
     STATE._floorHoldTable='';
     if (n) tapTable(n);
-  }, FLOOR_HOLD_MS);
+  }, floorHoldMs(tNum));
 }
 if (!window._floorClickGuard) {
   window._floorClickGuard=true;
@@ -5314,6 +5387,7 @@ function saveLineNote(lineId){
   var el=document.getElementById('line-mod-note');
   if (line && el) line.notes=String(el.value||'').trim();
   closeSheet();
+  STATE.selectedLineIds={};
   renderOrder();
   toast('Note saved');
 }
@@ -5323,6 +5397,7 @@ function diningFireGroupKey(to, c, idx){
   if (c.noneChoice) return 'none:'+idx;
   var kind=diningCourseKind(c);
   if (kind==='entremet' || c.entremets || c.mode==='entremets') return 'entremet';
+  if (isWelcomeTrioCourse(c)) return 'welcome';
   if (kind==='des' || c.later || c.mode==='later') return 'dolce';
   if (c.auto || c.fireEach) return 'auto:'+normFireTitle(diningCourseTitle(to,c));
   if (kind==='app') return 'slot:app';
@@ -5340,6 +5415,7 @@ function collectDiningFireGroups(){
         var label=diningCourseTitle(to,c);
         if (key==='dolce') label='Dolce';
         if (key==='entremet') label='Entremet';
+        if (key==='welcome') label='Complimentary';
         if (key==='slot:app') label='Appetizer';
         if (key==='slot:main') label='Main';
         if (key.indexOf('slot:')===0 && key!=='slot:app' && key!=='slot:main') label=c.course||label;
@@ -5504,16 +5580,32 @@ function collectWorkingCheckGroups(){
     if (welcomeBits.length) {
       addPlate({
         bucket:'welcome',
-        opName:welcomeBits.join(' / '),
+        opName:'COMPLIMENTARY',
         pfComp:true, pkg:false, unit:0,
         seat:to.seat, temp:'',
         selectKey:diningLineKey(to.id, welcomeIdx),
         status:'unsent', kind:'welcome',
+        note:positionSubForSeat('welcome', to.seat),
         ticketPos:defaultTicketPosForKind('welcome')
       });
     }
     diningCourses(to).forEach(function(c,i){
       if (isWelcomeTrioCourse(c)) return;
+      if (hideEntremetUntilDessert(c, to)) return;
+      if (isEntremetCourse(c)) {
+        addPlate({
+          bucket:'entremet',
+          opName:'PRE-DESSERT',
+          pfComp:true, pkg:false, unit:0,
+          seat:to.seat, temp:'',
+          selectKey:diningLineKey(to.id, i),
+          status:c.fired?'sent':(c.skipped?'held':'unsent'),
+          note:positionSubForSeat('entremet', to.seat),
+          kind:'entremet',
+          ticketPos:diningCourseTicketPos(c,i)
+        });
+        return;
+      }
       if (skipDiningDisplayCourse(c)) return;
       var raw=stripDisplayTempSuffix(c.choice||c.name||c.course||'');
       if (!String(raw).trim()) return;
@@ -5711,8 +5803,14 @@ function lineEditBarHtml(){
     html+='</div>';
   }
   html+='<button type="button" class="erase" onclick="eraseSelectedLines()">Erase</button>';
+  html+='<button type="button" class="line-close" onclick="clearLineSelection()" aria-label="Close">X</button>';
   html+='</div>';
   return html;
+}
+function clearLineSelection(){
+  STATE.selectedLineIds={};
+  renderOrder();
+  paintChrome();
 }
 function selectedSingleSpec(){
   var keys=selectedLineKeys();
@@ -5818,6 +5916,7 @@ function setSelectedServiceCourse(n){
     line.category=cat;
   }
   persistCheck(ensureOpenCheck(STATE.selectedTable));
+  STATE.selectedLineIds={};
   renderOrder();
   toast(n===2?'Serve with appetizer':(n===4?'Serve with dessert':'Serve with main'));
 }
@@ -5873,9 +5972,17 @@ function erasePrixFixeLine(line){
 }
 function modifySelectedLine(){
   var keys=selectedLineKeys();
-  if (keys.length!==1) { toast('Highlight one item to modify'); return; }
+  if (!keys.length) { toast('Highlight one item to modify'); return; }
   var spec=parseSelKey(keys[0]);
-  if (spec.type==='dining') { openDiningCourseEditor(spec.toId, spec.idx); return; }
+  if (spec.type==='dining') {
+    var found=findDiningCourse(spec);
+    if (found && isWelcomeTrioCourse(found.c)) { openPositionSubSheet('welcome'); return; }
+    if (found && isEntremetCourse(found.c)) { openPositionSubSheet('entremet'); return; }
+    if (keys.length!==1) { toast('Highlight one item to modify'); return; }
+    openDiningCourseEditor(spec.toId, spec.idx);
+    return;
+  }
+  if (keys.length!==1) { toast('Highlight one item to modify'); return; }
   beginModifyLine(spec.lineId);
 }
 function eraseSelectedLines(){
@@ -5901,26 +6008,60 @@ function startSeatTicker(){
     if (b) b.textContent=label;
   }, 15000);
 }
-function renderOrder() {
-  ensureOpenCheck(STATE.selectedTable);
-  startSeatTicker();
-  var c=document.getElementById('app-content');
+function menuNavFingerprint(){
+  var nav=STATE.menuNav||{};
+  return [nav.level||'', nav.cat||'', nav.family||'', STATE.menuSearch||'', STATE._posWineFind||'', STATE.menuFamily||'', STATE.orderCat||'', STATE.tilePage||0, STATE._catalogFp||''].join('|');
+}
+function menuPaneShouldRebuild(prev, next){
+  if (prev==null) prev=STATE._menuPaneFp;
+  if (next==null) next=menuNavFingerprint();
+  return String(prev||'')!==String(next||'');
+}
+function orderTopHtml(){
   var warn=reservationWarning(STATE.selectedTable);
-  var tot=checkTotals();
-  var html='<div class="ts-console toast-go'+(STATE.checkFocus?' focus':'')+(tableDiningOrders().length?' has-dining':'')+(String(STATE.menuSearch||'').trim()?' searching':'')+'">';
+  var html='<div id="order-top">';
   if (warn.text) html+='<div class="res-warn lvl'+warn.level+'">'+esc(warn.text)+'</div>';
   html+=liveCheckHtml();
   html+=renderGuestAllergyStrip();
   html+=renderSeatBar();
+  return html+'</div>';
+}
+function renderOrder() {
+  ensureOpenCheck(STATE.selectedTable);
+  startSeatTicker();
+  var c=document.getElementById('app-content');
+  if (!c) return;
+  var fp=menuNavFingerprint();
+  var pane=document.getElementById('add-items-pane');
+  var rebuildMenu=!pane || menuPaneShouldRebuild(STATE._menuPaneFp, fp);
+  var cls='ts-console toast-go'+(STATE.checkFocus?' focus':'')+(tableDiningOrders().length?' has-dining':'')+(String(STATE.menuSearch||'').trim()?' searching':'');
+  if (!rebuildMenu && pane) {
+    var consoleEl=c.querySelector('.ts-console');
+    var top=document.getElementById('order-top');
+    var keepScroll=pane.scrollTop;
+    if (consoleEl && top) {
+      consoleEl.className=cls;
+      top.outerHTML=orderTopHtml();
+      pane.scrollTop=keepScroll;
+      STATE._menuPaneFp=fp;
+      paintChrome();
+      scrollActiveSeatChip();
+      return;
+    }
+  }
+  var html='<div class="'+cls+'">';
+  html+=orderTopHtml();
   html+='<div class="add-items-pane" id="add-items-pane">';
   html+=addItemsHeaderHtml();
   html+=periodTabsHtml();
   html+=renderMenuGrid();
   html+='</div></div>';
   c.innerHTML=html;
+  STATE._menuPaneFp=fp;
   paintChrome();
   revealAddItemsContent();
   scrollActiveSeatChip();
+  bindWineWindowScroll();
 }
 function revealAddItemsContent(){
   var pane=document.getElementById('add-items-pane');
@@ -6033,9 +6174,7 @@ function renderMenuGrid(){
       }
       return paginateTiles(tiles, 'list');
     }
-    var q=findQ.toLowerCase();
-    items.forEach(function(item){
-      if (!itemMatchesSearch(item, q)) return;
+    filterCatalogItems(items, findQ).forEach(function(item){
       var click=item.eightySixed ? 'toast("86 — not available")' : 'beginAddItem('+JSON.stringify(String(item.id))+')';
       var wine=isPosWineItem(item);
       var t='<button type="button" class="ts-tile'+(item.eightySixed?' sold':'')+(wine?' wine':'')+'" onclick=\''+click+'\'>'+esc(item.name)+'<span class="price">'+posLineMoney(Number(item.price)||0)+'</span></button>';
@@ -6080,13 +6219,13 @@ function renderMenuGrid(){
     });
     var wineCat=isWineListCat(STATE.orderCat);
     if (wineCat) {
-      var q=String(STATE._posWineFind||'').trim().toLowerCase();
-      extra='<div><input class="search-box" id="pos-wine-find" value="'+esc(STATE._posWineFind||'')+'" placeholder="Find a wine ('+catItems.length+')" oninput="STATE._posWineFind=this.value;var s=this.selectionStart;renderOrder();var el=document.getElementById(\'pos-wine-find\');if(el){el.focus();try{el.setSelectionRange(s,s);}catch(e){}}"></div>';
-      if (q) catItems=catItems.filter(function(i){ return itemMatchesSearch(i,q); });
-      else if (catItems.length>80) catItems=catItems.slice(0,80);
+      extra='<div><input class="search-box" id="pos-wine-find" value="'+esc(STATE._posWineFind||'')+'" placeholder="Find a wine ('+catItems.length+')" oninput="STATE._posWineFind=this.value;STATE._wineWinStart=0;var s=this.selectionStart;renderOrder();var el=document.getElementById(\'pos-wine-find\');if(el){el.focus();try{el.setSelectionRange(s,s);}catch(e){}}"></div>';
+      var wineQ=String(STATE._posWineFind||STATE.menuSearch||'').trim();
+      if (wineQ) catItems=filterCatalogItems(catItems, wineQ);
+      return extra+renderWineWindow(catItems, tiles[0]||'');
     }
-    var findQ=String(STATE.menuSearch||'').trim();
-    if (findQ) catItems=catItems.filter(function(i){ return itemMatchesSearch(i, findQ); });
+    var findQ2=String(STATE.menuSearch||'').trim();
+    if (findQ2) catItems=filterCatalogItems(catItems, findQ2);
     catItems.forEach(function(item){
       var click=item.eightySixed ? 'toast("86 — not available")' : 'beginAddItem('+JSON.stringify(String(item.id))+')';
       var wine=isPosWineItem(item);
@@ -6095,9 +6234,57 @@ function renderMenuGrid(){
     });
   }
   var tileMode='';
-  if (isWineListCat(STATE.orderCat)) tileMode='list';
-  else if (STATE.menuFamily==='drinks' && nav.level==='cats') tileMode='drink-cats';
+  if (STATE.menuFamily==='drinks' && nav.level==='cats') tileMode='drink-cats';
   return extra+paginateTiles(tiles, tileMode);
+}
+var WINE_WINDOW_SIZE=50;
+function wineRowHtml(item){
+  var click=item.eightySixed ? 'toast("86 — not available")' : 'beginAddItem('+JSON.stringify(String(item.id))+')';
+  var vin=itemVinCode(item);
+  return '<button type="button" class="wine-row'+(item.eightySixed?' sold':'')+'" onclick=\''+click+'\'><span>'+esc(item.name)+(vin?' <span class="wine-meta">'+esc(vin)+'</span>':'')+'</span><span class="price">'+posLineMoney(Number(item.price)||0)+'</span></button>';
+}
+function wineWindowRows(items, start, size){
+  start=Math.max(0, start||0);
+  size=size||WINE_WINDOW_SIZE;
+  return items.slice(start, start+size).map(wineRowHtml).join('');
+}
+function renderWineWindow(items, backHtml){
+  STATE._wineWinItems=items||[];
+  var size=WINE_WINDOW_SIZE;
+  var max=Math.max(0, STATE._wineWinItems.length-size);
+  var start=Math.max(0, Math.min(STATE._wineWinStart||0, max));
+  STATE._wineWinStart=start;
+  var html='<div class="wine-window" id="menu-items-list">';
+  if (backHtml) html+=backHtml;
+  html+='<div class="wine-window-list" id="wine-window-list">'+wineWindowRows(STATE._wineWinItems, start, size)+'</div>';
+  if (STATE._wineWinItems.length>size) {
+    html+='<div class="wine-meta" style="padding:0.35rem 0.4rem">'+(start+1)+'–'+Math.min(STATE._wineWinItems.length, start+size)+' of '+STATE._wineWinItems.length+'</div>';
+  }
+  return html+'</div>';
+}
+function bindWineWindowScroll(){
+  var pane=document.getElementById('add-items-pane');
+  if (!pane || !document.getElementById('wine-window-list')) return;
+  if (pane._wineWinBound) return;
+  pane._wineWinBound=true;
+  pane.addEventListener('scroll', function(){
+    if (!STATE._wineWinItems || !document.getElementById('wine-window-list')) return;
+    var items=STATE._wineWinItems;
+    var size=WINE_WINDOW_SIZE;
+    var start=STATE._wineWinStart||0;
+    var max=Math.max(0, items.length-size);
+    var next=start;
+    if (pane.scrollTop<12) next=Math.max(0, start-size);
+    else if (pane.scrollHeight-pane.scrollTop-pane.clientHeight<12) next=Math.min(max, start+size);
+    if (next===start) return;
+    STATE._wineWinStart=next;
+    var list=document.getElementById('wine-window-list');
+    if (list) list.innerHTML=wineWindowRows(items, next, size);
+    var meta=pane.querySelector('.wine-window .wine-meta');
+    if (meta) meta.textContent=(next+1)+'–'+Math.min(items.length, next+size)+' of '+items.length;
+    if (next>start) pane.scrollTop=Math.max(24, pane.scrollHeight/3);
+    else pane.scrollTop=Math.max(24, pane.scrollHeight/2);
+  });
 }
 function menuNavBack(){
   var nav=STATE.menuNav||{level:'root'};
@@ -6497,8 +6684,81 @@ function dessertHasBeenChosen(to){
     return !!(name && !/take after|^dolce$|^none$/i.test(name));
   });
 }
+function isEntremetCourse(c){
+  return !!(c && (c.entremets || c.mode==='entremets'));
+}
 function hideEntremetUntilDessert(c, to){
-  return false;
+  if (!isEntremetCourse(c)) return false;
+  return !dessertHasBeenChosen(to);
+}
+function mergedPositionSubs(kind){
+  var map={};
+  tableDiningOrders().forEach(function(to){
+    var src=(to.positionSubs && to.positionSubs[kind]) || {};
+    Object.keys(src).forEach(function(k){ if (src[k]) map[String(k)]=src[k]; });
+    diningCourses(to).forEach(function(c){
+      if (!c || !c.positionSubs) return;
+      if (kind==='welcome' && !isWelcomeTrioCourse(c)) return;
+      if (kind==='entremet' && !isEntremetCourse(c)) return;
+      Object.keys(c.positionSubs).forEach(function(k){ if (c.positionSubs[k]) map[String(k)]=c.positionSubs[k]; });
+    });
+  });
+  return map;
+}
+function positionSubForSeat(kind, seat){
+  var map=mergedPositionSubs(kind);
+  var key=String(seat);
+  return map[key] || map[positionLabel(seat)] || '';
+}
+function diningPositionSubNote(to, c){
+  if (!to || !c) return '';
+  var kind=isWelcomeTrioCourse(c)?'welcome':(isEntremetCourse(c)?'entremet':'');
+  if (!kind) return '';
+  var map=(c.positionSubs && Object.keys(c.positionSubs).length)?c.positionSubs:((to.positionSubs&&to.positionSubs[kind])||{});
+  var text=map[String(to.seat)] || map[positionLabel(to.seat)] || '';
+  if (!text) return '';
+  return positionLabel(to.seat)+' — '+text;
+}
+function openPositionSubSheet(kind){
+  var n=sessionOf(STATE.selectedTable).guestCount||2;
+  var map=mergedPositionSubs(kind);
+  var title=kind==='entremet'?'Pre-dessert substitution':'Complimentary substitution';
+  var std=kind==='entremet'?'Coconut-lime sorbet with rum glazed pineapple':'Salmon · Zucchini Milanese · Shrimp';
+  var html='<h2>'+esc(title)+'</h2><p class="sheet-sub">Standard: '+esc(std)+'. Short replacement per position — does not rename the master dish.</p>';
+  for (var i=1;i<=n;i++){
+    html+='<label class="sheet-sub" style="display:block;margin:0.45rem 0 0.15rem">'+esc(positionLabel(i))+'</label>';
+    html+='<input class="search-box pos-sub-input" data-seat="'+i+'" value="'+esc(map[String(i)]||'')+'" placeholder="e.g. Salad instead of Zucchini">';
+  }
+  html+='<button class="primary-btn" onclick=\'savePositionSubs('+JSON.stringify(String(kind))+')\'>Save</button>';
+  html+='<button class="ghost-btn" onclick="closeSheet()">Cancel</button>';
+  openSheet(html);
+}
+function savePositionSubs(kind){
+  var map={};
+  document.querySelectorAll('.pos-sub-input').forEach(function(el){
+    var seat=String(el.getAttribute('data-seat')||'');
+    var v=String(el.value||'').trim();
+    if (seat && v) map[seat]=v;
+  });
+  tableDiningOrders().forEach(function(to){
+    to.positionSubs=to.positionSubs||{};
+    to.positionSubs[kind]=Object.assign({}, map);
+    diningCourses(to).forEach(function(c){
+      if (kind==='welcome' && !isWelcomeTrioCourse(c)) return;
+      if (kind==='entremet' && !isEntremetCourse(c)) return;
+      c.positionSubs=Object.assign({}, map);
+      var sub=diningPositionSubNote(to, c);
+      var keep=String(c.modNote||'').split(' · ').filter(function(p){
+        return p && p.indexOf('ALLERGY')>-1;
+      });
+      c.modNote=[sub].concat(keep).filter(Boolean).join(' · ');
+    });
+  });
+  closeSheet();
+  STATE.selectedLineIds={};
+  persistCheck(ensureOpenCheck(STATE.selectedTable));
+  renderOrder();
+  toast('Substitution saved');
 }
 function isWelcomeTrioCourse(c){
   if (!c || !(c.auto || c.fireEach)) return false;
@@ -6520,7 +6780,9 @@ function applyDiningAllergyNotes(){
       var auto=courseAllergyKitchenNote(c);
       var keep=String(c.modNote||'');
       var bits=[];
-      if (keep && keep.indexOf('ALLERGY')<0 && keep!==tableNote) bits.push(keep);
+      var sub=diningPositionSubNote(to, c);
+      if (sub) bits.push(sub);
+      if (keep && keep.indexOf('ALLERGY')<0 && keep!==tableNote && keep!==sub) bits.push(keep);
       if (auto) bits.push(auto);
       if (tableNote) bits.push(tableNote);
       var seen={};
@@ -7840,6 +8102,11 @@ function fireDiningCourse(to, quiet, idx){
   if (nextCourse.desc) notes.push(nextCourse.desc);
   if (nextCourse.cookNote) notes.push(nextCourse.cookNote);
   if (nextCourse.modNote) notes.push(nextCourse.modNote);
+  var subNote=diningPositionSubNote(to, nextCourse);
+  if (subNote && notes.indexOf(subNote)<0) notes.push(subNote);
+  if (subNote && String(nextCourse.modNote||'').indexOf(subNote)<0) {
+    nextCourse.modNote=nextCourse.modNote ? (nextCourse.modNote+' · '+subNote) : subNote;
+  }
   var allergyNote=courseAllergyKitchenNote(nextCourse);
   var tableNote=String(sessionOf(to.table||STATE.selectedTable).kitchenNote||'').trim();
   if (allergyNote && notes.indexOf(allergyNote)<0) notes.push(allergyNote);
@@ -7862,7 +8129,7 @@ function fireDiningCourse(to, quiet, idx){
       allergens:nextCourse.allergens||[],
       cookNote:nextCourse.cookNote||'',
       modNote:nextCourse.modNote||'',
-      choices:isPf ? courses.filter(function(s){return !s.pending;}).map(function(s){return s.course+': '+s.choice;}).join(' · ') : ''
+      choices:(isPf ? courses.filter(function(s){return !s.pending;}).map(function(s){return s.course+': '+s.choice;}).join(' · ') : '')+(subNote?(isPf?' · ':'')+subNote:'')
     },
     status:'new', sentAt:Date.now(), clearedAt:null,
     isTastingCourse:true, courseNum:i+1, tastingName:menuName,
@@ -7925,6 +8192,7 @@ function saveCourseNote(orderId, idx){
   var el=document.getElementById('course-mod-note');
   if (c && el) c.modNote=String(el.value||'').trim();
   closeSheet();
+  STATE.selectedLineIds={};
   renderOrder();
   toast('Note saved');
 }
@@ -8193,6 +8461,7 @@ function confirmDiningCourseEdit(toId, idx){
     var line=(STATE.currentOrder||[]).filter(function(i){ return i.diningOrderId===to.id || i.lineId===to._boundLine; })[0];
     if (line && line.selections && line.selections[idx]) line.selections[idx]=Object.assign({}, c);
     closePfSelector();
+    STATE.selectedLineIds={};
     renderOrder();
     toast('No prix-fixe dish — add through Add items if needed');
     return;
@@ -8211,6 +8480,7 @@ function confirmDiningCourseEdit(toId, idx){
   var line=(STATE.currentOrder||[]).filter(function(i){ return i.diningOrderId===to.id || i.lineId===to._boundLine; })[0];
   if (line && line.selections && line.selections[idx]) line.selections[idx]=Object.assign({}, c);
   closePfSelector();
+  STATE.selectedLineIds={};
   renderOrder();
   toast('Updated '+opt.name);
 }
