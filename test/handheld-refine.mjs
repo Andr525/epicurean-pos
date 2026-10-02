@@ -141,13 +141,13 @@ w.ensureOpenCheck('4');
 line.checkId = w.activeCheckId();
 w.STATE.selectedLineIds = { alc1: 1 };
 w.setSelectedServiceCourse(2);
-assert.deepEqual(w.selectedLineKeys(), []);
+assert.equal(w.selectedLineKeys().join(','), '');
 assert.equal(line.serviceCourse, 2);
 w.STATE.selectedLineIds = { alc1: 1 };
 assert.match(w.lineEditBarHtml(), /clearLineSelection/);
 assert.match(w.lineEditBarHtml(), />X</);
 w.clearLineSelection();
-assert.deepEqual(w.selectedLineKeys(), []);
+assert.equal(w.selectedLineKeys().join(','), '');
 const line2 = {
   lineId: 'alc2',
   name: 'Tuna Tartare',
@@ -165,7 +165,7 @@ line.ticketPos = 20;
 w.STATE.currentOrder = [line, line2];
 w.STATE.selectedLineIds = { alc1: 1 };
 w.moveSelectedLine(-1);
-assert.deepEqual(w.selectedLineKeys(), ['alc1']);
+assert.equal(w.selectedLineKeys().join(','), 'alc1');
 
 // 2. occupied hold 500ms, empty 1000ms
 seedTable(w, { guests: 2 });
