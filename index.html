@@ -811,6 +811,37 @@ body.hh-on.floor-drawing .floor-stage { outline:2px dashed var(--primary); }
   font-size:0.62rem; letter-spacing:0.08em; text-transform:uppercase;
   color:var(--text-muted); font-weight:800; padding:0.25rem 0.15rem 0.1rem;
 }
+.ts-course-head {
+  font-size:0.66rem; letter-spacing:0.08em; text-transform:uppercase;
+  font-weight:800; color:#1b2430; padding:0.42rem 0.08rem 0.16rem;
+  margin:0.12rem 0 0; border-top:1px solid #c5ced8;
+}
+.ts-check-lines > .ts-course-head:first-child,
+.ts-check-lines > .working-pkg + .ts-course-head { border-top:none; padding-top:0.12rem; }
+.ts-line.working-line,
+.ts-console.toast-go .ts-line.working-line,
+body.hh-on .ts-console.toast-go .ts-line.working-line {
+  display:grid;
+  grid-template-columns:26px minmax(0,1.35fr) minmax(72px,1.15fr) 46px;
+  gap:6px; align-items:baseline;
+  background:transparent; color:inherit;
+  padding:0.2rem 0.08rem; margin:0; border-radius:0;
+  border-bottom:1px solid #e4e8ee; font-size:0.82rem;
+}
+.ts-line.working-line .ts-qty { font-weight:800; font-variant-numeric:tabular-nums; }
+.ts-line.working-line .ts-name { font-weight:700; font-size:0.82rem; white-space:normal; overflow:visible; }
+.ts-line.working-line .ts-tokens { text-align:right; font-weight:600; font-size:0.74rem; line-height:1.35; }
+.ts-line.working-line .ts-alc-price {
+  text-align:right; font-size:0.74rem; font-weight:600;
+  font-variant-numeric:tabular-nums; color:#333;
+}
+.ts-line.working-pkg .ts-alc-price { font-size:0.82rem; font-weight:800; }
+.pos-token {
+  display:inline; border:none; background:none; padding:0; margin:0;
+  font:inherit; font-weight:700; color:inherit; cursor:pointer;
+}
+.pos-token.picked { outline:2px solid #2f6fdb; outline-offset:2px; border-radius:3px; }
+.tok-sep { font-weight:600; color:#555; }
 .toast-ops { grid-template-columns:1fr 1fr 1fr 1.3fr; }
 .allergy-strip.compact-line {
   display:flex; align-items:center; gap:8px; justify-content:space-between;
@@ -1111,9 +1142,6 @@ body.hh-on .ts-console.toast-go .ts-line {
 }
 body.hh-on .ts-console.toast-go .ts-line .ts-name { color:#000; }
 body.hh-on .ts-mod, body.hh-on .ts-meta, body.hh-on .ts-qty, body.hh-on .ts-money { color:#222; }
-body.hh-on .ts-line.unsent { background:#fff3e8; color:#000; }
-body.hh-on .ts-line.sent { background:#e8f6ee; color:#000; }
-body.hh-on .ts-line.held { background:#fff7e0; color:#000; }
 body.hh-on .toast-check-actions {
   display:grid; grid-template-columns:repeat(6,1fr); gap:4px; margin:0.35rem 0 0.2rem;
 }
@@ -1650,9 +1678,10 @@ function isHandheld(){
 }
 function sessionOf(table){
   var k = String(table);
-  if (!STATE.tableSessions[k]) STATE.tableSessions[k] = { guestCount: 2, allergies: { table: [] }, kitchenNote: '' };
+  if (!STATE.tableSessions[k]) STATE.tableSessions[k] = { guestCount: 2, allergies: { table: [] }, kitchenNote: '', femalePositions: {} };
   if (!STATE.tableSessions[k].allergies) STATE.tableSessions[k].allergies = { table: [] };
   if (STATE.tableSessions[k].kitchenNote==null) STATE.tableSessions[k].kitchenNote = '';
+  if (!STATE.tableSessions[k].femalePositions || typeof STATE.tableSessions[k].femalePositions!=='object') STATE.tableSessions[k].femalePositions = {};
   return STATE.tableSessions[k];
 }
 function isDrinkCat(cat){
@@ -1828,6 +1857,7 @@ function persistCheck(check){
     check.guest.totals={ subtotal:checkItemsTotal(check.id) };
     check.guestCount=sessionOf(check.table).guestCount||check.guestCount;
     check.seatedAt=sessionOf(check.table).seatedAt||check.seatedAt;
+    check.femalePositions=Object.assign({}, femalePositionsOf(check.table));
   }
   check.updatedAt=Date.now();
   STATE.checks[check.id]=check;
@@ -1851,6 +1881,13 @@ function ingestOpenChecks(list){
     sess.checkId=ch.id;
     if (ch.seatedAt && !sess.seatedAt) sess.seatedAt=ch.seatedAt;
     if (ch.guestCount) sess.guestCount=ch.guestCount;
+    if (ch.femalePositions && typeof ch.femalePositions==='object') {
+      sess.femalePositions=sess.femalePositions||{};
+      Object.keys(ch.femalePositions).forEach(function(k){
+        if (ch.femalePositions[k]) sess.femalePositions[String(k)]=true;
+        else delete sess.femalePositions[String(k)];
+      });
+    }
   });
 }
 function seatAllergies(seat){
@@ -1880,6 +1917,97 @@ function courseName(n){
 function seatName(seat){
   if (seat==='table' || seat==='TABLE' || seat==null || seat==='') return 'Share';
   return 'Seat '+seat;
+}
+function femalePositionsOf(table){
+  return sessionOf(table==null?STATE.selectedTable:table).femalePositions;
+}
+function isFemalePosition(seat){
+  if (seat==='table' || seat==='TABLE' || seat==null || seat==='') return false;
+  return !!femalePositionsOf()[String(seat)];
+}
+function toggleFemalePosition(seat){
+  if (seat==='table' || seat==='TABLE' || seat==null || seat==='') return;
+  var map=femalePositionsOf();
+  var k=String(seat);
+  if (map[k]) delete map[k];
+  else map[k]=true;
+  if (STATE.selectedTable) persistCheck(ensureOpenCheck(STATE.selectedTable));
+}
+function positionLabel(seat){
+  if (seat==='table' || seat==='TABLE' || seat==null || seat==='') return 'Share';
+  return String(seat)+(isFemalePosition(seat)?'F':'');
+}
+function tempToken(temp){
+  var t=String(temp||'').trim();
+  if (!t) return '';
+  var u=t.toUpperCase().replace(/\./g,' ').replace(/\s+/g,' ').trim();
+  if (/^(R|MR|M|MW|WD)$/.test(u)) return u;
+  if (/^WELL(\s*DONE)?$/.test(u)) return 'WD';
+  if (/MEDIUM\s*WELL/.test(u)) return 'MW';
+  if (/MEDIUM\s*RARE/.test(u)) return 'MR';
+  if (/^RARE$/.test(u)) return 'R';
+  if (/^MEDIUM$/.test(u)) return 'M';
+  return '';
+}
+function operationalDishName(name, item){
+  if (item) {
+    if (item.posName) return String(item.posName);
+    if (item.operationalName) return String(item.operationalName);
+    if (item.shortName) return String(item.shortName);
+  }
+  var raw=String(name==null?'':name);
+  var n=raw.toLowerCase().replace(/[\u201c\u201d\u2018\u2019"]/g,'').replace(/[\u2013\u2014]/g,'-');
+  var rules=[
+    [/osso\s*bucc[oa]/, 'Lamb Osso Bucco'],
+    [/linguini[\s\S]*pescatore|pescatore/, 'Linguini Pescatore'],
+    [/filet\s*mignon|giambotta/, 'Filet Mignon'],
+    [/zafferano/, 'Shrimp Zafferano'],
+    [/chocolate[\s\S]*(raspberry|caramel)[\s\S]*tart|chocolate-raspberry/, 'Chocolate Tart'],
+    [/coconut[\s\S]*lime[\s\S]*sorbet|lime[\s\S]*coconut[\s\S]*sorbet/, 'Coconut-Lime Sorbet'],
+    [/flourless\s*chocolate\s*cake/, 'Chocolate Cake'],
+    [/napoleon\s*of\s*chocolate|chocolate\s*napoleon/, 'Chocolate Napoleon'],
+    [/zucchini\s*milanese|breaded\s*zucchini/, 'Zucchini Milanese'],
+    [/smoked\s*salmon/, 'Smoked Salmon'],
+    [/porcini\s*raviol[oi]/, 'Porcini Ravioli'],
+    [/butternut\s*agnolotti/, 'Butternut Agnolotti'],
+    [/forrestiere|faroe/, 'Salmon Forrestiere'],
+    [/reggiano|medallions\s*of\s*pork/, 'Pork Reggiano'],
+    [/san\s*domenico|14\s*oz[\s\S]*pork\s*chop|pork\s*chop/, 'Pork Chop'],
+    [/valdostana|veal\s*scallopini/, 'Veal Valdostana'],
+    [/scarpariello/, 'Chicken Scarpariello'],
+    [/duck[\s\S]*murphy/, 'Duck Murphy'],
+    [/genovese|pignoli[\s\S]*sole/, 'Sole Genovese'],
+    [/basque\s*cheesecake/, 'Basque Cheesecake'],
+    [/pistachio[\s\S]*(creme|cr[eè]me|brulee|br[uû]l[eée]e|tart)/, 'Pistachio Tart'],
+    [/panino/, 'Panino'],
+    [/pineapple\s*tart/, 'Pineapple Tart'],
+    [/thinly\s*sliced\s*bananas|banana\s*fillo/, 'Banana Fillo'],
+    [/sorbetti|gelati/, 'Gelato'],
+    [/\bformaggio\b/, 'Formaggio'],
+    [/shrimp\s*(&|and)\s*lobster/, 'Shrimp & Lobster']
+  ];
+  for (var i=0;i<rules.length;i++){
+    if (rules[i][0].test(n)) return rules[i][1];
+  }
+  return raw;
+}
+function positionTempToken(seat, temp){
+  var pos=positionLabel(seat);
+  var t=tempToken(temp);
+  return t ? (pos+' '+t) : pos;
+}
+function sortServicePositions(a, b){
+  function seatOf(x){
+    if (x && typeof x==='object' && !Array.isArray(x) && x.seat!=null) return x.seat;
+    return x;
+  }
+  var as=seatOf(a), bs=seatOf(b);
+  var af=isFemalePosition(as)?0:1;
+  var bf=isFemalePosition(bs)?0:1;
+  if (af!==bf) return af-bf;
+  var an=parseInt(as,10), bn=parseInt(bs,10);
+  if (isFinite(an) && isFinite(bn) && an!==bn) return an-bn;
+  return String(as).localeCompare(String(bs), undefined, {numeric:true});
 }
 function extraOnItem(item){
   if (!item) return 0;
@@ -5007,6 +5135,8 @@ function unsentFor(table){
   return STATE.currentOrder.filter(function(i){ return String(i.table)===String(t); });
 }
 function setActiveSeat(seat){
+  var same=String(STATE.activeSeat)===String(seat);
+  if (same && seat!=='table' && seat!=null && seat!=='') toggleFemalePosition(seat);
   STATE.activeSeat=seat;
   STATE.allergySeat=seat;
   STATE.allergyOpen=true;
@@ -5028,7 +5158,7 @@ function openSeatPicker(){
   var html='<h2>Seat</h2><p class="sheet-sub">Share the plate, or put it on a seat.</p><div class="seat-pick-list">';
   html+='<button type="button" class="'+(cur==='table'?'active':'')+'" onclick="setActiveSeat(\'table\');closeSheet()">Share</button>';
   for (var i=1;i<=n;i++){
-    html+='<button type="button" class="'+(String(cur)===String(i)?'active':'')+'" onclick="setActiveSeat('+i+');closeSheet()">Seat '+i+'</button>';
+    html+='<button type="button" class="'+(String(cur)===String(i)?'active':'')+'" onclick="setActiveSeat('+i+');closeSheet()">'+esc(positionLabel(i))+'</button>';
   }
   html+='<button type="button" onclick="closeSheet();addGuestSeat()">+ Add seat</button></div>';
   html+='<button class="ghost-btn" onclick="closeSheet()">Cancel</button>';
@@ -5037,13 +5167,19 @@ function openSeatPicker(){
 function renderSeatBar(){
   var n=sessionOf(STATE.selectedTable).guestCount||STATE.guestCount||2;
   var html='<div class="seat-bar">';
-  html+='<button type="button" class="seat-now" onclick="openSeatPicker()">'+esc(seatName(STATE.activeSeat))+' ▾</button>';
+  html+='<button type="button" class="seat-now" onclick="openSeatPicker()">'+esc(positionLabel(STATE.activeSeat))+' ▾</button>';
   html+='<button type="button" class="seat-chip'+(STATE.activeSeat==='table'?' active':'')+'" onclick="setActiveSeat(\'table\')">Share</button>';
   for (var i=1;i<=n;i++){
-    html+='<button type="button" class="seat-chip'+(String(STATE.activeSeat)===String(i)?' active':'')+'" onclick="setActiveSeat('+i+')">Seat '+i+'</button>';
+    html+='<button type="button" class="seat-chip'+(String(STATE.activeSeat)===String(i)?' active':'')+'" data-seat="'+i+'" onclick="setActiveSeat('+i+')">'+esc(positionLabel(i))+'</button>';
   }
-  html+='<button type="button" class="seat-chip" onclick="addGuestSeat()">+ Add seat</button></div>';
+  html+='<button type="button" class="seat-chip add-seat" onclick="addGuestSeat()">+ Add</button></div>';
   return html;
+}
+function scrollActiveSeatChip(){
+  try {
+    var chip=document.querySelector('.seat-bar .seat-chip.active');
+    if (chip && chip.scrollIntoView) chip.scrollIntoView({ inline:'nearest', block:'nearest' });
+  } catch (e) {}
 }
 function orderBannerHtml(){
   var sess=sessionOf(STATE.selectedTable);
@@ -5249,38 +5385,269 @@ function fireDiningGroup(key){
   toast(n ? ('Fired '+group.label+' · '+n) : 'Already fired');
   renderOrder();
 }
-function liveCheckHtml(){
-  var rows=guestCheckItems();
-  var tot=checkTotals();
+function stripDisplayTempSuffix(name){
+  return String(name||'').replace(/\s*·\s*(Rare|Medium Rare|Medium Well|Medium|Well Done|Well|R|MR|MW|WD|M)\s*$/i,'');
+}
+function skipDiningDisplayCourse(c){
+  if (!c) return true;
+  if (c.noneChoice) return true;
+  if (courseNeedsDessertPick(c)) return true;
+  if ((c.later || c.mode==='later') && (!String(c.choice||'').trim() || /take after/i.test(c.choice||''))) return true;
+  return false;
+}
+function workingDisplayBucket(c, line){
+  if (c) {
+    if (c.entremets || c.mode==='entremets') return 'entremet';
+    if (isWelcomeTrioCourse(c)) return 'welcome';
+    var kind=diningCourseKind(c);
+    if (kind==='welcome') return 'welcome';
+    if (kind==='entremet') return 'entremet';
+    if (kind==='app') return 'app';
+    if (kind==='des') return 'des';
+    if (kind==='drink') return 'drink';
+    if (kind==='main') return 'main';
+    return 'main';
+  }
+  var ek=extraKindOf(line);
+  if (ek==='app') return 'app';
+  if (ek==='des') return 'des';
+  if (ek==='drink') return 'drink';
+  if (ek==='main') return 'main';
+  return 'other';
+}
+function workingCourseLabel(bucket){
+  return ({welcome:'WELCOME',app:'APPETIZER',main:'MAIN',entremet:'PRE-DESSERT',des:'DESSERT',drink:'DRINKS',other:'OTHER'})[bucket]||'OTHER';
+}
+function workingCourseRank(bucket){
+  return ({welcome:0,app:1,main:2,entremet:3,des:4,drink:5,other:6})[bucket];
+}
+function workingPlateTemp(src){
+  if (!src) return '';
+  if (src.selectedTemp) return src.selectedTemp;
+  return '';
+}
+function checkLineSource(row){
+  if (!row) return null;
+  var src=(STATE.currentOrder||[]).filter(function(i){ return i.lineId===row.lineId; })[0];
+  if (src) return src;
+  var found=null;
+  (STATE.orders||[]).forEach(function(o){
+    (o.items||[]).forEach(function(i){
+      if (!found && i.lineId===row.lineId) found=i;
+    });
+  });
+  return found||row;
+}
+function isPackageCheckLine(src){
+  return !!(src && (src.isPrixFixe || src.isTasting || src.isPairing));
+}
+function workingTokenText(plates){
+  return (plates||[]).slice().sort(sortServicePositions).map(function(p){
+    return positionTempToken(p.seat, p.temp);
+  }).join(' · ');
+}
+function collectWorkingCheckGroups(){
+  var groups={};
+  var order=[];
+  function addPlate(opts){
+    var key=[opts.bucket, opts.opName, opts.pfComp?'1':'0', opts.pkg?'1':'0'].join('\x1f');
+    if (!groups[key]) {
+      groups[key]={
+        bucket:opts.bucket,
+        opName:opts.opName,
+        pfComp:!!opts.pfComp,
+        pkg:!!opts.pkg,
+        unit:Number(opts.unit)||0,
+        plates:[],
+        notes:[],
+        extraPlate:!!opts.extraPlate,
+        kind:opts.kind||opts.bucket,
+        ticketPos:opts.ticketPos
+      };
+      order.push(groups[key]);
+    }
+    var g=groups[key];
+    g.plates.push({
+      seat:opts.seat,
+      temp:opts.temp||'',
+      selectKey:opts.selectKey,
+      status:opts.status||'unsent',
+      lineId:opts.lineId||'',
+      qty:opts.qty||1
+    });
+    if (opts.note && g.notes.indexOf(opts.note)<0) g.notes.push(opts.note);
+    if (opts.ticketPos!=null && (g.ticketPos==null || opts.ticketPos<g.ticketPos)) g.ticketPos=opts.ticketPos;
+  }
   var dining=tableDiningOrders();
+  var boundPkg={};
+  dining.forEach(function(to){
+    var tasting=to.type==='tasting';
+    var pkgName=tasting ? String(to.tastingName||'Tasting') : 'Prix Fixe';
+    var unit=Number(to.totalPrice)||0;
+    var line=diningLineOnCheck(to, activeCheckId());
+    if (line && Number(line.price)) unit=Number(line.price);
+    if (line && line.lineId) boundPkg[line.lineId]=1;
+    addPlate({
+      bucket:'pkg', opName:pkgName, pkg:true, pfComp:false,
+      unit:unit, seat:to.seat, temp:'',
+      selectKey:line&&line.lineId?line.lineId:('pkg|'+to.id),
+      status:'unsent', qty:1
+    });
+    var welcomeBits=[];
+    var welcomeIdx=-1;
+    diningCourses(to).forEach(function(c,i){
+      if (isWelcomeTrioCourse(c)) {
+        welcomeBits.push(welcomeTrioShort(c));
+        if (welcomeIdx<0) welcomeIdx=i;
+      }
+    });
+    if (welcomeBits.length) {
+      addPlate({
+        bucket:'welcome',
+        opName:welcomeBits.join(' / '),
+        pfComp:true, pkg:false, unit:0,
+        seat:to.seat, temp:'',
+        selectKey:diningLineKey(to.id, welcomeIdx),
+        status:'unsent', kind:'welcome',
+        ticketPos:defaultTicketPosForKind('welcome')
+      });
+    }
+    diningCourses(to).forEach(function(c,i){
+      if (isWelcomeTrioCourse(c)) return;
+      if (skipDiningDisplayCourse(c)) return;
+      var raw=stripDisplayTempSuffix(c.choice||c.name||c.course||'');
+      if (!String(raw).trim()) return;
+      addPlate({
+        bucket:workingDisplayBucket(c),
+        opName:operationalDishName(raw, c),
+        pfComp:true, pkg:false, unit:0,
+        seat:to.seat, temp:workingPlateTemp(c),
+        selectKey:diningLineKey(to.id, i),
+        status:c.fired?'sent':(c.skipped?'held':'unsent'),
+        note:c.modNote||'',
+        kind:diningCourseKind(c),
+        ticketPos:diningCourseTicketPos(c,i)
+      });
+    });
+  });
+  guestCheckItems().forEach(function(row){
+    var src=checkLineSource(row);
+    if (boundPkg[row.lineId]) return;
+    if (isPackageCheckLine(src)) {
+      if (dining.length) return;
+      boundPkg[row.lineId]=1;
+      var tasting=!!(src&&src.isTasting);
+      addPlate({
+        bucket:'pkg',
+        opName:tasting ? String((src&&src.name)||'Tasting') : 'Prix Fixe',
+        pkg:true, pfComp:false,
+        unit:Number(row.price)||Number(src&&src.price)||0,
+        seat:row.seat, temp:'',
+        selectKey:row.lineId,
+        status:row.status||'unsent',
+        qty:parseInt(row.qty,10)||1,
+        lineId:row.lineId
+      });
+      return;
+    }
+    var qty=parseInt(row.qty,10)||1;
+    addPlate({
+      bucket:workingDisplayBucket(null, src||row),
+      opName:operationalDishName(stripDisplayTempSuffix(row.name), src||row),
+      pfComp:false, pkg:false,
+      unit:Number(row.price)||0,
+      seat:row.seat, temp:workingPlateTemp(src||row),
+      selectKey:row.lineId,
+      status:row.status||'unsent',
+      note:row.notes||row.mods||'',
+      extraPlate:!!(row.extraPlate||(src&&src.extraPlate)),
+      kind:extraKindOf(src||row),
+      ticketPos:extraTicketPos(src||row),
+      qty:qty,
+      lineId:row.lineId
+    });
+  });
+  return order;
+}
+function workingTokensHtml(plates){
+  return (plates||[]).slice().sort(sortServicePositions).map(function(p,i){
+    var picked=!!(STATE.selectedLineIds && STATE.selectedLineIds[p.selectKey]);
+    return (i?'<span class="tok-sep"> · </span>':'')+
+      '<button type="button" class="pos-token'+(picked?' picked':'')+'" onclick="event.stopPropagation();toggleLineSelect('+JSON.stringify(String(p.selectKey))+')">'+
+      esc(positionTempToken(p.seat, p.temp))+'</button>';
+  }).join('');
+}
+function workingLineQty(g){
+  var n=0;
+  (g.plates||[]).forEach(function(p){ n+=p.qty||1; });
+  return n||1;
+}
+function workingCheckHtml(){
+  var groups=collectWorkingCheckGroups();
+  if (!groups.length) return '<div class="ts-empty lc-empty">Tap a tile to add food or drinks.</div>';
+  var html='';
+  var pkgs=groups.filter(function(g){ return g.pkg; });
+  var food=groups.filter(function(g){ return !g.pkg; });
+  pkgs.forEach(function(g){
+    var qty=workingLineQty(g);
+    var total=(Number(g.unit)||0)*qty;
+    html+='<div class="ts-line lc-line working-line working-pkg">'+
+      '<div class="ts-qty">'+qty+'</div>'+
+      '<div class="ts-name">'+esc(g.opName)+'</div>'+
+      '<div class="ts-tokens"></div>'+
+      '<div class="ts-alc-price">'+(total?('$'+(total%1?total.toFixed(0):String(Math.round(total)))):'')+'</div></div>';
+  });
+  food.sort(function(a,b){
+    var ra=workingCourseRank(a.bucket), rb=workingCourseRank(b.bucket);
+    if (ra==null) ra=9;
+    if (rb==null) rb=9;
+    if (ra!==rb) return ra-rb;
+    return (Number(a.ticketPos)||0)-(Number(b.ticketPos)||0);
+  });
+  var lastBucket='';
+  food.forEach(function(g){
+    if (g.bucket!==lastBucket) {
+      lastBucket=g.bucket;
+      html+='<div class="ts-course-head">'+esc(workingCourseLabel(g.bucket))+'</div>';
+    }
+    var qty=workingLineQty(g);
+    var plates=g.plates||[];
+    var picked=plates.some(function(p){ return STATE.selectedLineIds && STATE.selectedLineIds[p.selectKey]; });
+    var first=plates[0];
+    var price='';
+    if (!g.pfComp) {
+      var total=(Number(g.unit)||0)*qty;
+      if (total) price='$'+(total%1?String(Math.round(total)):String(Math.round(total)));
+    }
+    var nameClick=qty===1 && first
+      ? 'onclick="event.stopPropagation();toggleLineSelect('+JSON.stringify(String(first.selectKey))+')"'
+      : '';
+    var extraAttr='';
+    if (g.extraPlate && first && first.selectKey) {
+      extraAttr=' data-extra-line="'+esc(String(first.selectKey))+'" onpointerdown="extraDragStart(event,'+JSON.stringify(String(first.selectKey))+')"';
+    }
+    var dropKind=g.kind||g.bucket||'';
+    var dropPos=g.ticketPos!=null?g.ticketPos:defaultTicketPosForKind(dropKind);
+    var st=picked?' picked':'';
+    if (first && first.status) st+=' '+first.status;
+    html+='<div class="ts-line lc-line working-line'+(g.extraPlate?' extra-line':'')+st+'" data-drop-kind="'+esc(String(dropKind))+'" data-drop-pos="'+dropPos+'"'+extraAttr+'>'+
+      '<div class="ts-qty">'+qty+'</div>'+
+      '<div class="ts-name" '+nameClick+'>'+esc(g.opName)+
+      (g.notes&&g.notes.length?'<div class="ts-mod">'+esc(g.notes.join(' · '))+'</div>':'')+
+      '</div>'+
+      '<div class="ts-tokens">'+workingTokensHtml(plates)+'</div>'+
+      '<div class="ts-alc-price">'+price+'</div></div>';
+  });
+  return html;
+}
+function liveCheckHtml(){
+  var tot=checkTotals();
   var html='<div class="ts-check live-check" onclick="event.target===this&&toggleCheckFocus()">';
   html+='<div class="ts-check-meta"><div>#'+esc(String(STATE.selectedTable))+', Table '+esc(String(STATE.selectedTable))+'</div>';
   html+='<span>'+esc(STATE.currentServer?STATE.currentServer.name:'Food Master')+'</span></div>';
-  html+='<div class="ts-check-head"><div>Name</div><div>Qty</div><div>Each</div><div>Total</div><div></div></div>';
   html+=lineEditBarHtml();
   html+='<div class="ts-check-lines">';
-  if (!rows.length && !dining.length) html+='<div class="ts-empty lc-empty">Tap a tile to add food or drinks.</div>';
-  rows.forEach(function(row){
-    var src=STATE.currentOrder.filter(function(i){ return i.lineId===row.lineId; })[0];
-    if (src && (src.isPrixFixe || src.isTasting) && dining.length) return;
-    if (dining.length && (row.extraPlate || (src && src.extraPlate))) return;
-    var picked=!!(STATE.selectedLineIds && STATE.selectedLineIds[row.lineId]);
-    var each=Number(row.price)||0;
-    var qty=parseInt(row.qty,10)||1;
-    var mods=[];
-    if (row.mods) mods.push(row.mods);
-    if (row.notes) mods.push(row.notes);
-    if (src && src.extraPlate && mods.join(' ').indexOf('Extra plate')<0) mods.push('Extra plate');
-    html+='<div class="ts-line lc-line '+row.status+(picked?' picked':'')+'" onclick="toggleLineSelect(\''+row.lineId+'\')">'+
-      '<div><div class="ts-name">'+esc(row.name)+'</div>'+
-      mods.map(function(m){ return '<div class="ts-mod">'+esc(m)+'</div>'; }).join('')+
-      '<div class="ts-meta lc-meta">'+seatName(row.seat)+' · '+row.status.toUpperCase()+'</div></div>'+
-      '<div class="ts-qty">'+qty+'</div>'+
-      '<div class="ts-money">'+(each?posLineMoney(each):'')+'</div>'+
-      '<div class="ts-money">'+(each? posLineMoney(each*qty):'')+'</div>'+
-      lineKebabBtn({ lineId:row.lineId })+'</div>';
-  });
-  html+=renderDiningProgress();
+  html+=workingCheckHtml();
   html+='</div>';
   html+=lineEditBarHtml();
   html+=renderCourseFireRow();
@@ -5553,6 +5920,7 @@ function renderOrder() {
   c.innerHTML=html;
   paintChrome();
   revealAddItemsContent();
+  scrollActiveSeatChip();
 }
 function revealAddItemsContent(){
   var pane=document.getElementById('add-items-pane');
@@ -6130,7 +6498,7 @@ function dessertHasBeenChosen(to){
   });
 }
 function hideEntremetUntilDessert(c, to){
-  return !!(c && (c.entremets || c.mode==='entremets') && !dessertHasBeenChosen(to));
+  return false;
 }
 function isWelcomeTrioCourse(c){
   if (!c || !(c.auto || c.fireEach)) return false;
@@ -7724,61 +8092,7 @@ function applyExtraDrop(lineId, row, clientY){
 }
 
 function renderDiningProgress(){
-  var list=tableDiningOrders();
-  if (!list.length) return '';
-  var usedExtra={};
-  var allExtras=extraInvoiceEntries();
-  var html='';
-  list.forEach(function(to, toIndex){
-    var courses=diningCourses(to);
-    var visible=courses.filter(function(c){ return !hideEntremetUntilDessert(c,to); });
-    var done=visible.filter(function(c){ return c.fired || c.skipped; }).length;
-    html+='<div class="ts-sec-label">'+esc(to.tastingName||to.prixFixeName)+' · '+esc(seatName(to.seat||'table'))+' · '+done+' / '+visible.length+' fired</div>';
-    var welcome=[];
-    courses.forEach(function(c,i){
-      if (hideEntremetUntilDessert(c,to)) return;
-      if (isWelcomeTrioCourse(c)) welcome.push({c:c,i:i});
-    });
-    if (welcome.length) {
-      var names=welcome.map(function(w){ return welcomeTrioShort(w.c); }).join(' / ');
-      var welcomeFired=welcome.every(function(w){ return w.c.fired || w.c.skipped; });
-      var welcomeMods=[];
-      welcome.forEach(function(w){
-        if (w.c.modNote) welcomeMods.push(welcomeTrioShort(w.c)+': '+w.c.modNote);
-        var hits=guestAllergyHits(w.c.allergens);
-        if (hits.length) welcomeMods.push(welcomeTrioShort(w.c)+' ⚠ '+hits.join(', '));
-      });
-      html+='<div class="ts-line lc-line dining-line welcome-trio '+(welcomeFired?'sent':'unsent')+'" data-drop-kind="welcome" data-drop-pos="'+defaultTicketPosForKind('welcome')+'">'+
-        '<div><div class="ts-name">'+esc(names)+'</div>'+
-        '<div class="ts-mod">complimentary welcome</div>'+
-        (welcomeMods.length?'<div class="ts-mod">'+esc(welcomeMods.join(' · '))+'</div>':'')+
-        '</div></div>';
-    }
-    var extras=allExtras.filter(function(ex){
-      if (usedExtra[ex.lineId]) return false;
-      if (!extraBelongsToDining(ex, to, list, toIndex)) return false;
-      usedExtra[ex.lineId]=1;
-      return true;
-    });
-    var mixed=[];
-    courses.forEach(function(c,i){
-      if (hideEntremetUntilDessert(c,to)) return;
-      if (isWelcomeTrioCourse(c)) return;
-      mixed.push({ type:'dining', c:c, i:i, ticketPos:diningCourseTicketPos(c,i) });
-    });
-    extras.forEach(function(ex){
-      mixed.push({ type:'extra', extra:ex, ticketPos:ex.ticketPos });
-    });
-    mixed.sort(function(a,b){
-      if (a.ticketPos!==b.ticketPos) return a.ticketPos-b.ticketPos;
-      return (a.type==='dining'?0:1)-(b.type==='dining'?0:1);
-    });
-    mixed.forEach(function(m){
-      if (m.type==='dining') html+=diningCourseLineHtml(to, m.c, m.i);
-      else html+=extraInvoiceLineHtml(m.extra);
-    });
-  });
-  return html;
+  return workingCheckHtml();
 }
 
 function diningCourseOptions(to, c){
