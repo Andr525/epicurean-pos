@@ -314,6 +314,70 @@ assert.equal(b.selections[4].choice, beforeMains[1]);
 assert.equal(a.selections[4].selectedTemp, 'Medium');
 assert.equal(b.selections[4].selectedTemp, 'Medium Rare');
 
+// Handlers must be valid HTML: single-quoted attrs around JSON.stringify keys.
+seedTable(w, { guests: 2 });
+const clickCheck = w.ensureOpenCheck('4');
+w.STATE.activeTastingOrders = [
+  diningOrder(w, 'to2', 1, { temp: 'Medium', dessert: false })
+];
+w.STATE.currentOrder = [{
+  lineId: 'ex1',
+  name: 'Split 10 oz. filet mignon',
+  price: 18,
+  qty: 1,
+  seat: 1,
+  extraPlate: true,
+  pfCourseKind: 'main',
+  table: '4',
+  checkId: clickCheck.id,
+  category: 'mains',
+  serviceCourse: 3
+}];
+w.STATE.selectedLineIds = {};
+w.STATE._extraDrag = null;
+const clickHtml = w.workingCheckHtml();
+assert.match(clickHtml, /onclick='event\.stopPropagation\(\);toggleLineSelect\("d\|to2\|4"\)'/);
+assert.equal(clickHtml.includes('onclick="event.stopPropagation();toggleLineSelect("d|to2|4")"'), false);
+assert.match(clickHtml, /onpointerdown='extraDragStart\(event,"ex1"\)'/);
+assert.equal(clickHtml.includes('onpointerdown="extraDragStart(event,"ex1")"'), false);
+
+const host = w.document.getElementById('app-content');
+host.innerHTML = clickHtml;
+const filetName = [...host.querySelectorAll('.ts-name')].find((el) => /Filet Mignon/.test(el.textContent) && el.closest('.working-line') && !el.closest('.extra-line'));
+assert.ok(filetName, 'qty===1 Filet name missing');
+const filetRow = filetName.closest('.working-line');
+const token = filetRow.querySelector('.pos-token');
+assert.ok(token, 'position token missing');
+assert.ok(token.onclick, 'token onclick must parse');
+assert.equal(w.STATE.selectedLineIds['d|to2|4'], undefined);
+token.click();
+assert.equal(w.STATE.selectedLineIds['d|to2|4'], 1);
+
+w.STATE.selectedLineIds = {};
+host.innerHTML = w.workingCheckHtml();
+const nameEl = [...host.querySelectorAll('.ts-name')].find((el) => /Filet Mignon/.test(el.textContent) && el.closest('.working-line') && !el.closest('.extra-line'));
+assert.ok(nameEl && nameEl.onclick, 'qty===1 name onclick must parse');
+assert.equal(w.STATE.selectedLineIds['d|to2|4'], undefined);
+nameEl.click();
+assert.equal(w.STATE.selectedLineIds['d|to2|4'], 1);
+
+w.STATE.selectedLineIds = {};
+w.STATE._extraDrag = null;
+host.innerHTML = w.workingCheckHtml();
+const extraRow = host.querySelector('.extra-line');
+assert.ok(extraRow, 'extra-plate row missing');
+const extraHandler = extraRow.getAttribute('onpointerdown');
+assert.equal(extraHandler, 'extraDragStart(event,"ex1")');
+const pev = new w.Event('pointerdown', { bubbles: true, cancelable: true });
+pev.button = 0;
+pev.clientX = 12;
+pev.clientY = 18;
+pev.pointerId = 7;
+const runExtra = extraRow.onpointerdown || new w.Function('event', extraHandler);
+runExtra.call(extraRow, pev);
+assert.ok(w.STATE._extraDrag, 'extra drag did not start');
+assert.equal(w.STATE._extraDrag.lineId, 'ex1');
+
 // 11. floor geometry source identity vs origin/main
 const mainSrc = execSync('git show origin/main:index.html', { cwd: root, encoding: 'utf8' });
 ['var FLOOR_GESTURE =', 'function finishFloorTableDrag(', 'function ensureDragClone('].forEach((needle) => {

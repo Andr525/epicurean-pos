@@ -5573,7 +5573,7 @@ function workingTokensHtml(plates){
   return (plates||[]).slice().sort(sortServicePositions).map(function(p,i){
     var picked=!!(STATE.selectedLineIds && STATE.selectedLineIds[p.selectKey]);
     return (i?'<span class="tok-sep"> · </span>':'')+
-      '<button type="button" class="pos-token'+(picked?' picked':'')+'" onclick="event.stopPropagation();toggleLineSelect('+JSON.stringify(String(p.selectKey))+')">'+
+      '<button type="button" class="pos-token'+(picked?' picked':'')+'" onclick=\'event.stopPropagation();toggleLineSelect('+JSON.stringify(String(p.selectKey))+')\'>'+
       esc(positionTempToken(p.seat, p.temp))+'</button>';
   }).join('');
 }
@@ -5620,11 +5620,11 @@ function workingCheckHtml(){
       if (total) price='$'+(total%1?String(Math.round(total)):String(Math.round(total)));
     }
     var nameClick=qty===1 && first
-      ? 'onclick="event.stopPropagation();toggleLineSelect('+JSON.stringify(String(first.selectKey))+')"'
+      ? 'onclick=\'event.stopPropagation();toggleLineSelect('+JSON.stringify(String(first.selectKey))+')\''
       : '';
     var extraAttr='';
     if (g.extraPlate && first && first.selectKey) {
-      extraAttr=' data-extra-line="'+esc(String(first.selectKey))+'" onpointerdown="extraDragStart(event,'+JSON.stringify(String(first.selectKey))+')"';
+      extraAttr=' data-extra-line="'+esc(String(first.selectKey))+'" onpointerdown=\'extraDragStart(event,'+JSON.stringify(String(first.selectKey))+')\'';
     }
     var dropKind=g.kind||g.bucket||'';
     var dropPos=g.ticketPos!=null?g.ticketPos:defaultTicketPosForKind(dropKind);
