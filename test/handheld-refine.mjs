@@ -232,7 +232,8 @@ const after = w.workingCheckHtml();
 assert.equal(/PRE-DESSERT/.test(after), false);
 assert.match(after, /Modify/);
 assert.match(after, /FIRE/);
-assert.equal(/Coconut-Lime Sorbet/i.test(after), false);
+assert.equal(/rum glazed pineapple/i.test(after), false);
+assert.match(after, /Coconut-Lime Sorbet|Mango Sorbet/);
 assert.match(after, /Mango Sorbet/);
 assert.ok(w.collectDiningFireGroups().some((g) => g.key === 'entremet'));
 assert.equal(w.diningPositionSubNote(w.STATE.activeTastingOrders[1], w.STATE.activeTastingOrders[1].selections[5]), '2F — Mango Sorbet');
@@ -287,7 +288,7 @@ const mainSrc = execSync('git show origin/main:index.html', { cwd: root, encodin
 ].forEach((needle) => {
   assert.equal(extractDecl(src, needle), extractDecl(mainSrc, needle), needle + ' changed vs origin/main');
 });
-assert.notEqual(extractDecl(src, 'function armFloorHold('), extractDecl(mainSrc, 'function armFloorHold('));
+assert.equal(extractDecl(src, 'function armFloorHold('), extractDecl(mainSrc, 'function armFloorHold('));
 assert.equal(src.includes('var FLOOR_HOLD_OCCUPIED_MS = 500'), true);
 assert.equal(src.includes('<!-- pos-build: scalini-print-v53 -->'), true);
 

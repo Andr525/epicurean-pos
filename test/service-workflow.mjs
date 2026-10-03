@@ -11,7 +11,10 @@ const src = fs.readFileSync(htmlPath, 'utf8');
 
 function loadPos() {
   let html = fs.readFileSync(htmlPath, 'utf8');
+  const scalini = fs.readFileSync(path.join(root, 'scalini-dining.js'), 'utf8');
   html = html.replace(/<script src="https:[^"]+"><\/script>/g, '');
+  html = html.replace(/<script src="scalini-dining\.js[^"]*"><\/script>/, '<script>' + scalini + '</script>');
+  html = html.replace(/<script src="cellar\.js[^"]*"><\/script>/, '');
   const vc = new VirtualConsole();
   vc.on('jsdomError', () => {});
   vc.on('error', () => {});
@@ -236,7 +239,7 @@ assert.ok(replaced, 'replacement line missing');
 assert.equal((w.STATE.currentOrder || []).some((i) => i.lineId === 'alc-arugula'), false);
 assert.equal(replaced.seat, 2);
 assert.equal(replaced.serviceCourse, 2);
-assert.deepEqual(replaced.mods || {}, {});
+assert.equal(JSON.stringify(replaced.mods || {}), '{}');
 assert.notEqual(replaced.selectedMod, 'Dressing: Lemon');
 assert.equal(w.selectedLineKeys().join(','), '');
 w.STATE.selectedLineIds = { 'fired-line': 1 };
