@@ -208,7 +208,9 @@ assert.equal(/not selected/i.test(checkHtml), false);
 // 7. entremet hidden until dessert; complimentary is compact
 assert.equal(/Zucchini Milanese/i.test(checkHtml), false);
 assert.equal(/Smoked Salmon/i.test(checkHtml), false);
-assert.match(checkHtml, /COMPLIMENTARY/);
+assert.equal(/COMPLIMENTARY/.test(checkHtml), false);
+assert.match(checkHtml, /Modify/);
+assert.match(checkHtml, /FIRE/);
 assert.equal(/PRE-DESSERT/.test(checkHtml), false);
 assert.equal(/Coconut-Lime Sorbet/.test(checkHtml), false);
 assert.equal(w.hideEntremetUntilDessert({ mode: 'entremets' }, w.STATE.activeTastingOrders[0]), true);
@@ -218,7 +220,8 @@ assert.ok(fireGroups.some((g) => g.key === 'welcome'), 'FIRE Complimentary group
 const live = w.liveCheckHtml();
 assert.equal(/Coconut-Lime Sorbet/.test(live), false);
 assert.equal(/choose later/i.test(live), false);
-assert.match(live, /COMPLIMENTARY/);
+assert.equal(/COMPLIMENTARY/.test(live), false);
+assert.match(live, /Modify/);
 w.STATE.activeTastingOrders.forEach(function (to) {
   to.dessertChosen = true;
   w.diningCourses(to).forEach(function (c) {
@@ -229,7 +232,9 @@ w.STATE.activeTastingOrders.forEach(function (to) {
   });
 });
 const afterDessert = w.workingCheckHtml();
-assert.match(afterDessert, /PRE-DESSERT/);
+assert.equal(/PRE-DESSERT/.test(afterDessert), false);
+assert.match(afterDessert, /Modify/);
+assert.match(afterDessert, /FIRE/);
 assert.ok(w.collectDiningFireGroups().some((g) => g.key === 'entremet'), 'FIRE Entremet after dessert');
 
 // 8. handheld CSS fills removed
@@ -282,7 +287,7 @@ assert.equal(line.serviceCourse, 2);
 assert.equal(line.category, catBefore);
 assert.equal(line.category, 'mains');
 const moved = w.workingCheckHtml();
-assert.match(moved, /APPETIZER/);
+assert.equal(/APPETIZER/.test(moved), false);
 assert.match(moved, /Filet Mignon/);
 
 // F toggle: first tap selects, second tap on active numbered chip flips F
