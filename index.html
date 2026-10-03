@@ -5686,20 +5686,25 @@ function collectWorkingCheckGroups(){
     });
     var welcomeBits=[];
     var welcomeIdx=-1;
+    var welcomeCourses=[];
     diningCourses(to).forEach(function(c,i){
       if (isWelcomeTrioCourse(c)) {
         welcomeBits.push(welcomeTrioShort(c));
+        welcomeCourses.push(c);
         if (welcomeIdx<0) welcomeIdx=i;
       }
     });
     if (welcomeBits.length) {
+      var welcomeStatus='unsent';
+      if (welcomeCourses.every(function(c){ return c.fired; })) welcomeStatus='sent';
+      else if (welcomeCourses.every(function(c){ return c.fired || c.skipped; }) && welcomeCourses.some(function(c){ return c.skipped; })) welcomeStatus='held';
       addPlate({
         bucket:'welcome',
         opName:welcomeBits.filter(Boolean).join(' · ') || 'Welcome',
         pfComp:true, pkg:false, unit:0,
         seat:to.seat, temp:'',
         selectKey:diningLineKey(to.id, welcomeIdx),
-        status:'unsent', kind:'welcome',
+        status:welcomeStatus, kind:'welcome',
         note:positionSubForSeat('welcome', to.seat),
         ticketPos:defaultTicketPosForKind('welcome'),
         rowFire:true

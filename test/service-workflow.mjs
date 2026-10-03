@@ -163,6 +163,10 @@ assert.match(checkHtml, new RegExp('modifyWorkingRow\\("' + welcomeKey.replace(/
 assert.match(checkHtml, new RegExp('fireWorkingRow\\("' + w.diningLineKey(tasting.id, porciniIdx).replace(/\|/g, '\\|') + '"\\)'));
 assert.equal(/FIRE Complimentary/.test(w.renderCourseFireRow()), false);
 assert.equal(/FIRE Entremet/.test(w.renderCourseFireRow()), false);
+w.fireDiningGroup('welcome');
+const welcomeFireRe = new RegExp('fireWorkingRow\\("' + welcomeKey.replace(/\|/g, '\\|') + '"\\)');
+assert.equal(welcomeFireRe.test(w.workingCheckHtml()), false, 'welcome FIRE must hide after fire');
+assert.match(w.workingCheckHtml(), new RegExp('modifyWorkingRow\\("' + welcomeKey.replace(/\|/g, '\\|') + '"\\)'));
 
 // 5. complimentary Modify writes order-level positionSubs; seed dish unchanged
 const seedName = (w.EPICUREAN_SCALINI.tasting.courses || []).find((c) => /smoked salmon/i.test(c.name || '')).name;
@@ -195,7 +199,11 @@ assert.match(afterDes, /Modify/);
 assert.match(afterDes, /FIRE/);
 assert.ok(w.collectDiningFireGroups().some((g) => g.key === 'entremet'));
 const entremetIdx = courses.findIndex((c) => w.isEntremetCourse(c));
-assert.match(afterDes, new RegExp('modifyWorkingRow\\("' + w.diningLineKey(tasting.id, entremetIdx).replace(/\|/g, '\\|') + '"\\)'));
+const entremetKey = w.diningLineKey(tasting.id, entremetIdx);
+assert.match(afterDes, new RegExp('modifyWorkingRow\\("' + entremetKey.replace(/\|/g, '\\|') + '"\\)'));
+assert.match(afterDes, new RegExp('fireWorkingRow\\("' + entremetKey.replace(/\|/g, '\\|') + '"\\)'));
+w.fireDiningGroup('entremet');
+assert.equal(new RegExp('fireWorkingRow\\("' + entremetKey.replace(/\|/g, '\\|') + '"\\)').test(w.workingCheckHtml()), false, 'entremet FIRE must hide after fire');
 
 // 7. à la carte selectable + Change/Replace
 seedTable(w);
