@@ -101,6 +101,8 @@ const salmon = (deadHit.courses || []).find((c) => /forestiere|forrestiere|sf_m_
 const filet = (deadHit.courses || []).find((c) => /giambotta|sf_m_giambotta/i.test((c.name || '') + (c.dishId || '')));
 assert.ok(salmon && salmon.askTemp === 'salmon', 'Forestiere askTemp missing');
 assert.ok(filet && filet.askTemp === 'steak', 'Giambotta askTemp missing');
+const pfMerged = w.mergeScaliniList([], w.SEED_PRIX_FIXE_MENUS, ['pf_lunch', 'pf_brunch', 'pf1', 'pf2']);
+assert.equal(!!regionalFrom(pfMerged), false, 'tasting harden must not pollute prix-fixe merge');
 
 // 2. addTastingMenu hydrates predetermined courses
 seedTable(w);

@@ -3235,7 +3235,8 @@ function mergeScaliniList(list, seed, dummyIds){
     if (seedMenu && !merged.some(function(x){ return x.id===seedMenu.id; })) merged.unshift(seedMenu);
     merged=merged.filter(function(x){ return x && x.active !== false; });
   }
-  return hardenRegionalTastingList(merged, incoming, seed);
+  var tastingMerge=(seedMenu && seedMenu.id==='tm_scalini_128') || dummyIds.indexOf('tm_chef7')>=0;
+  return tastingMerge ? hardenRegionalTastingList(merged, incoming, seed) : (merged||[]);
 }
 function applyBohTables(d){
   if (!d) return;
