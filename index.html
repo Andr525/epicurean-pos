@@ -6294,6 +6294,7 @@ function menuPaneShouldRebuild(prev, next){
   if (next==null) next=menuNavFingerprint();
   return String(prev||'')!==String(next||'');
 }
+var RAPID_VOICE_OPERATOR_ENABLED = false;
 function ensureRapidVoice(){
   if (!STATE.rapidVoice || typeof STATE.rapidVoice!=='object') {
     STATE.rapidVoice={ on:false, listening:false, drafts:[], activeSeat:null, lastUndo:null };
@@ -6363,6 +6364,7 @@ function rapidVoiceDraftClass(draft){
   return 'rv-draft rv-high';
 }
 function toggleRapidVoice(force){
+  if (!RAPID_VOICE_OPERATOR_ENABLED) return;
   var rv=ensureRapidVoice();
   rv.on = force==null ? !rv.on : !!force;
   if (rv.on) {
@@ -6377,12 +6379,14 @@ function toggleRapidVoice(force){
   refreshRapidVoiceChrome();
 }
 function startRapidVoiceListen(){
+  if (!RAPID_VOICE_OPERATOR_ENABLED) return;
   var rv=ensureRapidVoice();
   rv.listening=true;
   toast('Microphone is Phase 2');
   refreshRapidVoiceChrome();
 }
 function undoRapidVoice(){
+  if (!RAPID_VOICE_OPERATOR_ENABLED) return;
   var rv=ensureRapidVoice();
   if (rv.drafts && rv.drafts.length) {
     rv.lastUndo=rv.drafts.pop();
@@ -6398,6 +6402,7 @@ function undoRapidVoice(){
   refreshRapidVoiceChrome();
 }
 function reviewSendRapidVoice(){
+  if (!RAPID_VOICE_OPERATOR_ENABLED) return;
   sendOrder({});
 }
 function refreshRapidVoiceChrome(){

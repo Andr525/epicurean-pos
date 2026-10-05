@@ -88,18 +88,21 @@ const filet = w.posVoiceCatalog().find((it) => it.id === 'sf_m_giambotta');
 assert.ok(filet, 'FILET missing from voice catalog');
 assert.equal(filet.voiceKeyword, 'FILET');
 
-// 3. inactive daily special omitted; historical line remains
+// 3. active daily special preserved; inactive omitted; historical line remains
 seedTable(w);
 w.STATE.dailySpecials = [
+  { id: 'ds_live', name: 'Halibut special', price: 48, active: true, voiceKeyword: 'HALIBUT' },
   { id: 'ds_dead', name: 'Venison special', price: 42, active: false, voiceKeyword: 'VENISON' }
 ];
 w.rebuildPosCatalog();
+assert.equal((w.STATE.menuItems || []).some((it) => it.id === 'ds_live'), true);
+assert.equal(w.posVoiceCatalog().some((it) => it.id === 'ds_live'), true);
 assert.equal((w.STATE.menuItems || []).some((it) => it.id === 'ds_dead'), false);
 assert.equal(w.posVoiceCatalog().some((it) => it.id === 'ds_dead'), false);
 w.STATE.currentOrder = [{ lineId: 'hist1', name: 'Venison special', price: 42, qty: 1, seat: 1, table: '4' }];
 assert.match(w.workingCheckHtml(), /Venison special/);
 
-// 4. MIC does not send/fire; REVIEW/SEND is the send entry
+// 4. disabled operator Voice actions cannot mutate or send
 seedTable(w);
 let sent = 0;
 let fired = 0;
@@ -109,12 +112,22 @@ const fg = w.fireDiningGroup;
 w.sendOrder = function () { sent += 1; };
 w.fireDiningCourse = function () { fired += 1; };
 w.fireDiningGroup = function () { fired += 1; };
+w.STATE.checkFocus = false;
+w.STATE.rapidVoice.drafts = [{ name: 'Keep draft' }];
+w.STATE.currentOrder = [{ lineId: 'voice1', name: 'Keep line', voiceLine: true }];
+w.toggleRapidVoice(true);
+assert.equal(w.STATE.rapidVoice.on, false);
+assert.equal(w.STATE.menuOpen, true);
+assert.equal(w.STATE.checkFocus, false);
 w.startRapidVoiceListen();
-assert.equal(w.STATE.rapidVoice.listening, true);
+assert.equal(w.STATE.rapidVoice.listening, false);
+w.undoRapidVoice();
+assert.equal(w.STATE.rapidVoice.drafts.length, 1);
+assert.equal(w.STATE.currentOrder.length, 1);
 assert.equal(sent, 0);
 assert.equal(fired, 0);
 w.reviewSendRapidVoice();
-assert.equal(sent, 1);
+assert.equal(sent, 0);
 assert.equal(fired, 0);
 w.sendOrder = so;
 w.fireDiningCourse = fc;
@@ -190,7 +203,12 @@ assert.equal(w.menuPaneShouldRebuild(prev, w.menuNavFingerprint()), false);
 
 // 10. forced voice state still renders the complete manual ordering UI
 seedTable(w);
-w.STATE.rapidVoice.on = true;
+w.STATE.checkFocus = false;
+w.toggleRapidVoice(true);
+assert.equal(w.STATE.rapidVoice.on, false);
+assert.equal(w.STATE.menuOpen, true);
+assert.equal(w.STATE.checkFocus, false);
+assert.equal(w.STATE.rapidVoice.listening, false);
 w.STATE.menuFamily = 'food';
 w.STATE.menuNav = { level: 'cats', family: 'food' };
 w.STATE.orderCat = null;
