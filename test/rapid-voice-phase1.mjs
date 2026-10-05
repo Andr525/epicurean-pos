@@ -170,7 +170,7 @@ const checkHtml = w.workingCheckHtml();
 // 8. floor clone-drag decls unchanged vs origin/main
 const main = execSync('git show origin/main:index.html', { cwd: root, encoding: 'utf8' });
 [
-  'function FLOOR_GESTURE',
+  'var FLOOR_GESTURE',
   'function ensureDragClone',
   'function applyCloneDrag',
   'function finishFloorTableDrag',
