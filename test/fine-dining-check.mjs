@@ -159,14 +159,14 @@ seedTable(w, { guests: 2 });
 assert.equal(w.positionLabel(1), '1');
 w.toggleFemalePosition(2);
 assert.equal(w.isFemalePosition(2), true);
-assert.equal(w.positionLabel(2), '2F');
+assert.equal(w.positionLabel(2), '2A');
 assert.equal(w.positionLabel(1), '1');
 const bar2 = w.renderSeatBar();
 const barDom2 = new JSDOM(bar2);
 const numbered2 = [...barDom2.window.document.querySelectorAll('.seat-chip[data-seat]')];
 assert.equal(numbered2.length, 2);
 assert.equal(numbered2.filter((el) => el.getAttribute('data-seat') === '2').length, 1);
-assert.equal(numbered2[1].textContent, '2F');
+assert.equal(numbered2[1].textContent, '2A');
 assert.equal(barDom2.window.document.querySelectorAll('.seat-chip').length >= 4, true);
 assert.match(bar2, /Share/);
 assert.match(bar2, /\+\s*Add/);
@@ -179,8 +179,8 @@ const plates = [
   { seat: 13, temp: 'Medium' },
   { seat: 12, temp: 'Medium Rare' }
 ].sort(w.sortServicePositions);
-assert.equal(w.workingTokenText(plates), '13F M · 12 MR');
-assert.equal(w.positionTempToken(13, 'Medium'), '13F M');
+assert.equal(w.workingTokenText(plates), '13A M · 12 MR');
+assert.equal(w.positionTempToken(13, 'Medium'), '13A M');
 assert.equal(w.positionTempToken(12, 'Medium Rare'), '12 MR');
 
 // 5. two $89 PF → $178, no $89 package total
@@ -256,7 +256,7 @@ const extras = chips.filter((el) => !el.getAttribute('data-seat'));
 assert.equal(numbered.length, 13);
 assert.ok(extras.some((el) => /Share/.test(el.textContent)));
 assert.ok(extras.some((el) => /\+\s*Add/.test(el.textContent)));
-assert.equal(numbered[12].textContent, '13F');
+assert.equal(numbered[12].textContent, '13A');
 assert.equal(src.includes('min-height:44px'), true);
 assert.equal(src.includes('min-width:52px'), true);
 const chipStyle = w.getComputedStyle(numbered[0]);
@@ -298,7 +298,7 @@ assert.equal(w.STATE.activeSeat, 2);
 assert.equal(w.isFemalePosition(2), false);
 w.setActiveSeat(2);
 assert.equal(w.isFemalePosition(2), true);
-assert.equal(w.positionLabel(2), '2F');
+assert.equal(w.positionLabel(2), '2A');
 w.setActiveSeat('table');
 assert.equal(w.isFemalePosition('table'), false);
 assert.equal(w.positionLabel('table'), 'Share');
@@ -318,7 +318,7 @@ w.ingestOpenChecks([{
   guestCount: 4
 }]);
 assert.equal(w.isFemalePosition(3), true);
-assert.equal(w.positionLabel(4), '4F');
+assert.equal(w.positionLabel(4), '4A');
 
 // display-only consolidation does not rewrite seats / ownership
 seedTable(w, { guests: 2 });

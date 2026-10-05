@@ -26,6 +26,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js"></script>
 <script src="cellar.js?v=binwise-375-park-v1"></script>
 <script src="scalini-dining.js?v=menu-ai-maps-20260913"></script>
+<script src="voice-vocab.js"></script>
 <script async src="https://sandbox.web.squarecdn.com/v1/square.js"></script>
 <style>
 :root {
@@ -884,6 +885,27 @@ body.hh-on .ts-console.toast-go .ts-line.working-line {
 }
 .ts-console.toast-go.has-dining .add-items-pane { flex:1 1 auto; min-height:0; }
 .add-items-pane.menu-closed { display:none; }
+.ts-console.rv-on .ts-check { flex:1 1 auto; max-height:none; min-height:42vh; }
+.ts-console.rv-on .add-items-pane { flex:0 1 22vh; min-height:0; }
+.ts-console.rv-on .add-items-pane.menu-closed { display:none; }
+.rv-toggle { min-height:32px; padding:0 0.7rem; border:1px solid var(--border); background:var(--surface-2); color:var(--text); font-weight:800; font-size:0.72rem; border-radius:8px; cursor:pointer; letter-spacing:0.04em; }
+.rv-toggle.on { background:var(--primary-glow); border-color:var(--primary); color:var(--primary-light); }
+.rv-meta { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:0.2rem 0 0.35rem; }
+.rv-pos-row { display:flex; flex-wrap:wrap; gap:6px; margin:0.25rem 0 0.4rem; }
+.rv-pos { min-height:32px; padding:0 0.55rem; border:1px solid var(--border); background:var(--surface-2); color:var(--text); font-weight:800; font-size:0.72rem; border-radius:8px; cursor:pointer; }
+.rv-pos.on { outline:2px solid var(--primary-light); }
+.rv-pos.pass { opacity:0.55; }
+.rv-pos.nodrink { border-color:var(--warning); }
+.rv-seat-block { margin:0.35rem 0; }
+.rv-seat-h { font-size:0.68rem; font-weight:800; letter-spacing:0.06em; color:var(--primary-light); margin-bottom:0.15rem; }
+.rv-draft { padding:0.28rem 0.2rem; font-size:0.8rem; font-weight:700; }
+.rv-high::before { content:'✓ '; color:var(--success); }
+.rv-amb::before { content:'? '; color:var(--warning); }
+.rv-need::before { content:'⚠ '; color:var(--warning); }
+.rv-footer { display:flex; gap:6px; margin:0.45rem 0 0.2rem; }
+.rv-footer button { flex:1; min-height:40px; border:1px solid var(--border); background:var(--surface-2); color:var(--text); font-weight:800; font-size:0.72rem; border-radius:10px; cursor:pointer; }
+.rv-footer .rv-send { background:var(--primary-glow); border-color:var(--primary); color:var(--primary-light); }
+.rv-compact { margin-top:0.45rem; opacity:0.85; }
 .add-items-row {
   display:grid; grid-template-columns:1fr 32px; align-items:center; gap:6px;
   flex-shrink:0; padding:0.15rem 0 0.45rem;
@@ -1700,7 +1722,9 @@ var STATE = {
   _floorHoldTable: '',
   _floorDragActive: false,
   _floorSuppressTimer: null,
-  menuOpen: true
+  menuOpen: true,
+  dailySpecials: [],
+  rapidVoice: { on:false, listening:false, drafts:[], activeSeat:null, lastUndo:null }
 };
 var COMMON_ALLERGENS = ['Fish','Shellfish','Dairy','Egg','Gluten','Soy','Sesame','Nuts','Tree Nut','Sulfites'];
 
@@ -1713,6 +1737,7 @@ function sessionOf(table){
   if (!STATE.tableSessions[k].allergies) STATE.tableSessions[k].allergies = { table: [] };
   if (STATE.tableSessions[k].kitchenNote==null) STATE.tableSessions[k].kitchenNote = '';
   if (!STATE.tableSessions[k].femalePositions || typeof STATE.tableSessions[k].femalePositions!=='object') STATE.tableSessions[k].femalePositions = {};
+  if (!STATE.tableSessions[k].positionStates || typeof STATE.tableSessions[k].positionStates!=='object') STATE.tableSessions[k].positionStates = {};
   return STATE.tableSessions[k];
 }
 function isDrinkCat(cat){
@@ -1970,9 +1995,35 @@ function toggleFemalePosition(seat){
   else map[k]=true;
   if (STATE.selectedTable) persistCheck(ensureOpenCheck(STATE.selectedTable));
 }
+function isPriorityPosition(seat){ return isFemalePosition(seat); }
+function togglePriorityPosition(seat){ return toggleFemalePosition(seat); }
 function positionLabel(seat){
   if (seat==='table' || seat==='TABLE' || seat==null || seat==='') return 'Share';
-  return String(seat)+(isFemalePosition(seat)?'F':'');
+  return String(seat)+(isPriorityPosition(seat)?'A':'');
+}
+function positionStatesOf(table){
+  var s=sessionOf(table==null?STATE.selectedTable:table);
+  if (!s.positionStates || typeof s.positionStates!=='object') s.positionStates={};
+  return s.positionStates;
+}
+function positionState(seat, table){
+  if (seat==='table' || seat==='TABLE' || seat==null || seat==='') return { pass:false, noDrink:false };
+  var map=positionStatesOf(table);
+  var k=String(seat);
+  if (!map[k]) map[k]={ pass:false, noDrink:false };
+  if (map[k].pass==null) map[k].pass=false;
+  if (map[k].noDrink==null) map[k].noDrink=false;
+  return map[k];
+}
+function togglePositionPass(seat){
+  var st=positionState(seat);
+  st.pass=!st.pass;
+  refreshRapidVoiceChrome();
+}
+function togglePositionNoDrink(seat){
+  var st=positionState(seat);
+  st.noDrink=!st.noDrink;
+  refreshRapidVoiceChrome();
 }
 function tempToken(temp){
   var t=String(temp||'').trim();
@@ -2702,7 +2753,9 @@ function mapBohMenuItem(it){
     code: String(it.code||''),
     source: it.source || 'menu',
     eightySixed: itemIsEightySixed(it),
-    active: it.active !== false
+    active: it.active !== false,
+    voiceKeyword: it.voiceKeyword || '',
+    voiceAliases: asList(it.voiceAliases)
   });
 }
 function mapBarToPos(it, catId){
@@ -2729,7 +2782,9 @@ function mapBarToPos(it, catId){
     bottleOz: it.bottleOz,
     eightySixed: itemIsEightySixed(it),
     active: it.active !== false,
-    unit: it.unit || ''
+    unit: it.unit || '',
+    voiceKeyword: it.voiceKeyword || '',
+    voiceAliases: asList(it.voiceAliases)
   };
 }
 function mapWineToPos(it, catId){
@@ -2778,7 +2833,9 @@ function mapWineToPos(it, catId){
     byTheGlass: btg,
     scaliniOnly: !!it.scaliniOnly,
     glassPrice: glass,
-    bottlePrice: bottle
+    bottlePrice: bottle,
+    voiceKeyword: it.voiceKeyword || '',
+    voiceAliases: asList(it.voiceAliases)
   };
 }
 function mapRetailToPos(it, catId){
@@ -2912,7 +2969,9 @@ function rebuildPosCatalog(){
     });
     btg.forEach(function(w){
       if (!w || !String(w.name||'').trim()) return;
-      items.push(mapWineToPos(Object.assign({}, w, {byTheGlass:true, scaliniOnly:true, price:w.glassPrice}), glassCat));
+      var mapped=mapWineToPos(Object.assign({}, w, {byTheGlass:true, scaliniOnly:true, price:w.glassPrice}), glassCat);
+      if (typeof EPICUREAN_VOICE!=='undefined') EPICUREAN_VOICE.applyApprovedKeywords(mapped);
+      items.push(mapped);
     });
   }
   var hasRetail=(STATE.retail||[]).some(function(it){ return it && it.visible!==false && String(it.name||'').trim(); });
@@ -2920,6 +2979,21 @@ function rebuildPosCatalog(){
   (STATE.retail||[]).forEach(function(it){
     if (!it || it.visible===false || !String(it.name||'').trim()) return;
     items.push(mapRetailToPos(it, retailCatId));
+  });
+  (STATE.dailySpecials||[]).forEach(function(it){
+    if (!it || !String(it.name||'').trim()) return;
+    var live=true;
+    if (typeof EPICUREAN_VOICE!=='undefined' && EPICUREAN_VOICE.dailySpecialIsLive) {
+      live=EPICUREAN_VOICE.dailySpecialIsLive(it);
+    } else if (it.active===false) live=false;
+    if (!live) return;
+    var mapped=attachFoodModifiers(mapBohMenuItem(Object.assign({}, it, {
+      source:'special', dailySpecial:true, category:it.course||it.category||'specials'
+    })), it);
+    mapped.source='special';
+    mapped.dailySpecial=true;
+    if (typeof EPICUREAN_VOICE!=='undefined') EPICUREAN_VOICE.applyApprovedKeywords(mapped);
+    items.push(mapped);
   });
   SEED_DRINK_EXTRAS.forEach(function(it){
     var exists=items.some(function(x){
@@ -3312,6 +3386,7 @@ function loadData() {
   listenBohList('bar','bar');
   listenWines();
   listenBohList('retail','retail');
+  listenBohList('daily_specials','dailySpecials');
   fbDb.collection('boh_shared').doc('menu_photos').onSnapshot(function(doc){
     STATE.menuPhotos = (doc.exists && doc.data() && doc.data().urls) ? doc.data().urls : {};
     applyBohMenuPhotos();
@@ -5895,10 +5970,16 @@ function liveCheckHtml(){
   html+='<span>'+esc(STATE.currentServer?STATE.currentServer.name:'Food Master')+'</span></div>';
   html+=lineEditBarHtml();
   html+='<div class="ts-check-lines">';
-  html+=workingCheckHtml();
+  if (STATE.rapidVoice && STATE.rapidVoice.on) {
+    html+=rapidVoiceCheckHtml();
+    html+='<div class="rv-compact">'+workingCheckHtml()+'</div>';
+  } else {
+    html+=workingCheckHtml();
+  }
   html+='</div>';
   html+=lineEditBarHtml();
   html+=renderCourseFireRow();
+  if (STATE.rapidVoice && STATE.rapidVoice.on) html+=rapidVoiceFooterHtml();
   var t=checkTotals();
   var canFire=!!(t.sendable||Object.keys(selectedOrderLineIds()).length);
   html+='<div class="toast-check-actions">';
@@ -6219,10 +6300,183 @@ function menuPaneShouldRebuild(prev, next){
   if (next==null) next=menuNavFingerprint();
   return String(prev||'')!==String(next||'');
 }
+function ensureRapidVoice(){
+  if (!STATE.rapidVoice || typeof STATE.rapidVoice!=='object') {
+    STATE.rapidVoice={ on:false, listening:false, drafts:[], activeSeat:null, lastUndo:null };
+  }
+  if (!Array.isArray(STATE.rapidVoice.drafts)) STATE.rapidVoice.drafts=[];
+  return STATE.rapidVoice;
+}
+function voiceApi(){ return (typeof EPICUREAN_VOICE!=='undefined') ? EPICUREAN_VOICE : null; }
+function posVoiceCatalog(){
+  var items=[];
+  var seen={};
+  function add(it){
+    if (!it || !it.id || seen[it.id]) return;
+    if (it.active===false) return;
+    if (it.dailySpecial || it.source==='special') {
+      var api=voiceApi();
+      if (api && !api.dailySpecialIsLive(it)) return;
+    }
+    if (typeof EPICUREAN_VOICE!=='undefined') EPICUREAN_VOICE.applyApprovedKeywords(it);
+    seen[it.id]=1;
+    items.push(it);
+  }
+  (STATE.menuItems||[]).forEach(add);
+  (STATE.dailySpecials||[]).forEach(function(it){
+    add(Object.assign({}, it, { source:'special', dailySpecial:true }));
+  });
+  var sc=(typeof EPICUREAN_SCALINI!=='undefined') ? EPICUREAN_SCALINI : null;
+  if (sc) {
+    ((sc.prixFixe&&sc.prixFixe.dishes)||[]).forEach(add);
+    (sc.gelatoScoops||[]).forEach(add);
+    (sc.winesByGlass||[]).forEach(add);
+    ((sc.tasting&&sc.tasting.courses)||[]).forEach(function(c){
+      if (c && !c.headingOnly) add(Object.assign({}, c, { id:c.id||c.dishId }));
+    });
+  }
+  return items;
+}
+function makeRapidVoiceGelatoDraft(flavors, seat){
+  var sc=(typeof EPICUREAN_SCALINI!=='undefined') ? EPICUREAN_SCALINI : null;
+  var item=null;
+  (sc && sc.prixFixe && sc.prixFixe.dishes || []).forEach(function(d){ if (d && d.id==='sf_d_gelato') item=d; });
+  if (!item) item={ id:'sf_d_gelato', name:'Sorbetti e gelati — three scoops', course:'Dolce', voiceKeyword:'GELATO', chooseCount:3 };
+  var api=voiceApi();
+  if (api) api.applyApprovedKeywords(item);
+  var list=(flavors||[]).slice();
+  var need=api ? api.gelatoNeedLabel(list, item.chooseCount||3) : ((list.length<(item.chooseCount||3)) ? ('GELATO — '+list.length+' OF '+(item.chooseCount||3)+' FLAVORS') : '');
+  return {
+    seat: seat==null?(STATE.activeSeat||1):seat,
+    keyword: 'GELATO',
+    itemId: item.id,
+    name: item.name,
+    course: item.course || 'Dolce',
+    temp: '',
+    mods: [],
+    vin: '',
+    confidence: need ? 'need' : 'high',
+    need: need,
+    pass: false,
+    noDrink: false,
+    flavors: list
+  };
+}
+function rapidVoiceDraftClass(draft){
+  if (!draft) return 'rv-draft';
+  if (draft.need || draft.confidence==='need') return 'rv-draft rv-need';
+  if (draft.confidence==='ambiguous' || draft.confidence==='amb') return 'rv-draft rv-amb';
+  return 'rv-draft rv-high';
+}
+function toggleRapidVoice(force){
+  var rv=ensureRapidVoice();
+  rv.on = force==null ? !rv.on : !!force;
+  if (rv.on) {
+    STATE.menuOpen=false;
+    STATE.checkFocus=true;
+    rv.activeSeat=STATE.activeSeat||1;
+  } else {
+    STATE.menuOpen=true;
+    STATE.checkFocus=false;
+    rv.listening=false;
+  }
+  refreshRapidVoiceChrome();
+}
+function startRapidVoiceListen(){
+  var rv=ensureRapidVoice();
+  rv.listening=true;
+  toast('Microphone is Phase 2');
+  refreshRapidVoiceChrome();
+}
+function undoRapidVoice(){
+  var rv=ensureRapidVoice();
+  if (rv.drafts && rv.drafts.length) {
+    rv.lastUndo=rv.drafts.pop();
+  } else {
+    var lines=STATE.currentOrder||[];
+    for (var i=lines.length-1;i>=0;i--){
+      if (lines[i] && lines[i].voiceLine) {
+        rv.lastUndo=lines.splice(i,1)[0];
+        break;
+      }
+    }
+  }
+  refreshRapidVoiceChrome();
+}
+function reviewSendRapidVoice(){
+  sendOrder({});
+}
+function refreshRapidVoiceChrome(){
+  var c=document.getElementById('app-content');
+  var consoleEl=c && c.querySelector('.ts-console');
+  var top=document.getElementById('order-top');
+  var pane=document.getElementById('add-items-pane');
+  var rv=ensureRapidVoice();
+  if (consoleEl && top && pane) {
+    consoleEl.classList.toggle('rv-on', !!rv.on);
+    consoleEl.classList.toggle('focus', !!STATE.checkFocus);
+    pane.classList.toggle('menu-closed', STATE.menuOpen===false);
+    pane.setAttribute('data-open', STATE.menuOpen===false?'false':'true');
+    top.outerHTML=orderTopHtml();
+    paintChrome();
+    return;
+  }
+  renderOrder();
+}
+function rapidVoiceToggleHtml(){
+  var on=ensureRapidVoice().on;
+  return '<button type="button" class="rv-toggle'+(on?' on':'')+'" onclick="toggleRapidVoice()">Voice</button>';
+}
+function rapidVoiceFooterHtml(){
+  return '<div class="rv-footer">'+
+    '<button type="button" onclick="undoRapidVoice()">UNDO</button>'+
+    '<button type="button" onclick="startRapidVoiceListen()">MIC</button>'+
+    '<button type="button" class="rv-send" onclick="reviewSendRapidVoice()">REVIEW/SEND</button>'+
+    '</div>';
+}
+function rapidVoicePositionRowHtml(){
+  var n=sessionOf(STATE.selectedTable).guestCount||2;
+  var html='<div class="rv-pos-row">';
+  for (var i=1;i<=n;i++){
+    var st=positionState(i);
+    var cls='rv-pos'+(String(STATE.activeSeat)===String(i)?' on':'')+(st.pass?' pass':'')+(st.noDrink?' nodrink':'');
+    html+='<button type="button" class="'+cls+'" onclick="setActiveSeat('+i+')">'+esc(positionLabel(i))+
+      (st.pass?' · PASS':'')+(st.noDrink?' · NO DRINK':'')+'</button>';
+  }
+  return html+'</div>';
+}
+function rapidVoiceCheckHtml(){
+  var n=sessionOf(STATE.selectedTable).guestCount||2;
+  var rv=ensureRapidVoice();
+  var html='<div class="rv-meta"><div>#'+esc(String(STATE.selectedTable))+' · '+n+' guests</div>'+rapidVoiceToggleHtml()+'</div>';
+  html+=rapidVoicePositionRowHtml();
+  function draftsFor(seat){
+    return (rv.drafts||[]).filter(function(d){ return String(d.seat)===String(seat); });
+  }
+  function linesFor(seat){
+    return (STATE.currentOrder||[]).filter(function(l){ return String(l.seat)===String(seat); });
+  }
+  function block(seat){
+    var label=positionLabel(seat);
+    html+='<div class="rv-seat-block"><div class="rv-seat-h">'+esc(label)+'</div>';
+    draftsFor(seat).forEach(function(d){
+      var text=d.need || d.name || d.keyword || '';
+      html+='<div class="'+rapidVoiceDraftClass(d)+'">'+esc(text)+'</div>';
+    });
+    linesFor(seat).forEach(function(l){
+      html+='<div class="rv-draft rv-high">'+esc(l.name||'')+'</div>';
+    });
+    html+='</div>';
+  }
+  block('table');
+  for (var i=1;i<=n;i++) block(i);
+  return html;
+}
 function orderTopHtml(){
   var warn=reservationWarning(STATE.selectedTable);
   var html='<div id="order-top">';
   if (warn.text) html+='<div class="res-warn lvl'+warn.level+'">'+esc(warn.text)+'</div>';
+  if (!(STATE.rapidVoice && STATE.rapidVoice.on)) html+='<div class="rv-meta">'+rapidVoiceToggleHtml()+'</div>';
   html+=liveCheckHtml();
   html+=renderGuestAllergyStrip();
   html+=renderSeatBar();
@@ -6236,7 +6490,7 @@ function renderOrder() {
   var fp=menuNavFingerprint();
   var pane=document.getElementById('add-items-pane');
   var rebuildMenu=!pane || menuPaneShouldRebuild(STATE._menuPaneFp, fp);
-  var cls='ts-console toast-go'+(STATE.checkFocus?' focus':'')+(tableDiningOrders().length?' has-dining':'')+(String(STATE.menuSearch||'').trim()?' searching':'');
+  var cls='ts-console toast-go'+(STATE.checkFocus?' focus':'')+(tableDiningOrders().length?' has-dining':'')+(String(STATE.menuSearch||'').trim()?' searching':'')+((STATE.rapidVoice&&STATE.rapidVoice.on)?' rv-on':'');
   if (!rebuildMenu && pane) {
     var consoleEl=c.querySelector('.ts-console');
     var top=document.getElementById('order-top');
