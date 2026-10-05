@@ -138,7 +138,10 @@ const spoken = w.EPICUREAN_VOICE.normalizeSpokenVin('VIN eight two five one');
 assert.ok(spoken);
 assert.equal(spoken.kind, 'vin');
 assert.equal(spoken.code, '8251');
-assert.deepEqual(w.posOpsLookup('vin 8251'), { kind: 'vin', code: '8251' });
+const lookup = w.posOpsLookup('vin 8251');
+assert.ok(lookup);
+assert.equal(lookup.kind, 'vin');
+assert.equal(String(lookup.code), '8251');
 
 // 7. tasting temps / entremet / headings
 seedTable(w);

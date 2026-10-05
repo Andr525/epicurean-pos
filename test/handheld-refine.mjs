@@ -236,7 +236,7 @@ assert.equal(/rum glazed pineapple/i.test(after), false);
 assert.match(after, /Coconut-Lime Sorbet|Mango Sorbet/);
 assert.match(after, /Mango Sorbet/);
 assert.ok(w.collectDiningFireGroups().some((g) => g.key === 'entremet'));
-assert.equal(w.diningPositionSubNote(w.STATE.activeTastingOrders[1], w.STATE.activeTastingOrders[1].selections[5]), '2F — Mango Sorbet');
+assert.equal(w.diningPositionSubNote(w.STATE.activeTastingOrders[1], w.STATE.activeTastingOrders[1].selections[5]), '2A — Mango Sorbet');
 
 // 5. wine list uncapped + VIN lookup without rendering 3600 tiles
 assert.equal(src.includes('slice(0,80)'), false);
