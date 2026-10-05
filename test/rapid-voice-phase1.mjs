@@ -250,6 +250,7 @@ w.STATE.bar = [
 ];
 w.STATE.retail = [];
 w.rebuildPosCatalog();
+w.STATE._bevIndex = null;
 w.setMenuFamily('drinks');
 const drinkPane = app.querySelector('#add-items-pane');
 assert.ok(drinkPane, 'Drinks pane missing');
