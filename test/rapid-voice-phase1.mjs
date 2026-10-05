@@ -47,6 +47,7 @@ function extractDecl(text, needle) {
 
 function seedTable(w, opts) {
   opts = opts || {};
+  if (w.posSheetOpen()) w.closeSheet();
   w.STATE.currentServer = { name: 'Test', role: 'manager', code: '5000' };
   w.STATE.selectedTable = '4';
   w.STATE.activeSeat = 1;
@@ -240,6 +241,9 @@ const tabs = [...pane.querySelectorAll('.period-tab')].map((el) => el.textConten
 });
 
 w.STATE.foodCats = Array.from(w.foodCategories(w.SEED_CATEGORIES));
+w.STATE.foodItems = [
+  Object.assign({}, filet, { category: 'entrees', catIds: ['entrees'] })
+];
 w.STATE.wines = [
   { id: 'manual_bottle', vin: '8251', name: 'Manual Barolo', bottlePrice: 95, size: '750ml', active: true }
 ];
