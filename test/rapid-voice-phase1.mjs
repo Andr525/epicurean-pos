@@ -188,6 +188,90 @@ const prev = w.menuNavFingerprint();
 w.STATE.selectedLineIds = { alc1: 1 };
 assert.equal(w.menuPaneShouldRebuild(prev, w.menuNavFingerprint()), false);
 
+// 10. forced voice state still renders the complete manual ordering UI
+seedTable(w);
+w.STATE.rapidVoice.on = true;
+w.STATE.menuFamily = 'food';
+w.STATE.menuNav = { level: 'cats', family: 'food' };
+w.STATE.orderCat = null;
+w.STATE.menuSearch = '';
+w.STATE.currentOrder = [
+  { lineId: 'manual1', name: 'Manual pasta', price: 24, qty: 1, seat: 1, table: '4' }
+];
+w.STATE._menuPaneFp = null;
+w.renderOrder();
+const app = w.document.getElementById('app-content');
+assert.ok(app.querySelector('.live-check'), 'normal live check missing');
+assert.match(app.querySelector('.ts-check-lines').textContent, /Manual pasta/);
+assert.equal(app.querySelector('.rv-toggle'), null, 'Voice toggle rendered');
+assert.equal(app.querySelector('.rv-footer'), null, 'MIC shell rendered');
+assert.equal(app.querySelector('.rv-seat-block'), null, 'voice check rendered');
+const controlLabels = [...app.querySelectorAll('button')].map((button) => button.textContent.trim());
+assert.equal(controlLabels.includes('Voice'), false);
+assert.equal(controlLabels.includes('MIC'), false);
+assert.equal(app.querySelector('.ts-console').classList.contains('rv-on'), false);
+const pane = app.querySelector('#add-items-pane');
+assert.ok(pane, 'add-items pane missing');
+assert.equal(pane.getAttribute('data-open'), 'true');
+assert.equal(pane.classList.contains('menu-closed'), false);
+assert.match(pane.querySelector('.add-items-label').textContent, /Add items/i);
+
+const tabs = [...pane.querySelectorAll('.period-tab')].map((el) => el.textContent.trim());
+['Food', 'Drinks', 'Prix Fixe', 'Tasting'].forEach((label) => {
+  assert.ok(tabs.includes(label), label + ' tab missing');
+});
+
+w.STATE.foodCats = Array.from(w.foodCategories(w.SEED_CATEGORIES));
+w.STATE.wines = [
+  { id: 'manual_bottle', vin: '8251', name: 'Manual Barolo', bottlePrice: 95, size: '750ml', active: true }
+];
+w.STATE.bar = [
+  { id: 'manual_cocktail', kind: 'Cocktail', name: 'Manual Negroni', price: 18, active: true },
+  { id: 'manual_spirit', kind: 'Spirit', name: 'Manual Rye', lin: '2746', price: 20, active: true },
+  { id: 'manual_beer', kind: 'Beer', name: 'Manual Pilsner', price: 9, active: true }
+];
+w.STATE.retail = [];
+w.rebuildPosCatalog();
+w.setMenuFamily('drinks');
+const drinkPane = app.querySelector('#add-items-pane');
+assert.ok(drinkPane, 'Drinks pane missing');
+assert.match(drinkPane.querySelector('#pos-item-find').getAttribute('placeholder'), /VIN, LIN/);
+const protectedDrinkLabels = [
+  'Wines by the Glass',
+  'Wines by the Bottle',
+  'Cocktails',
+  'Spirits',
+  'Beer',
+  'Coffees',
+  'Mocktails',
+  'After Dinner',
+  'Soft Drinks'
+];
+const drinkLabels = Array.from(w.familyCategories(), (cat) => String(cat.name)).sort();
+assert.deepEqual(drinkLabels, protectedDrinkLabels.slice().sort());
+
+const glassItem = w.STATE.menuItems.find((item) => item.category === 'wine-glass');
+assert.ok(glassItem, 'representative wine by the glass missing');
+[
+  { label: 'Wines by the Glass', query: glassItem.name, id: glassItem.id },
+  { label: 'Wines by the Bottle', query: 'Manual Barolo', id: 'manual_bottle' },
+  { label: 'Cocktails', query: 'Manual Negroni', id: 'manual_cocktail' },
+  { label: 'Spirits', query: 'Manual Rye', id: 'manual_spirit' },
+  { label: 'Beer', query: 'Manual Pilsner', id: 'manual_beer' },
+  { label: 'Coffees', query: 'Espresso', id: 'cf_esp' },
+  { label: 'Mocktails', query: 'Virgin Spritz', id: 'mk_spritz' },
+  { label: 'After Dinner', query: 'Amaro Nonino', id: 'ad_amaro' },
+  { label: 'Soft Drinks', query: 'Coca-Cola', id: 'sd_coke' }
+].forEach((workflow) => {
+  const hits = w.filterBeverageHits(workflow.query);
+  assert.ok(hits.some((item) => item.id === workflow.id), workflow.label + ' search unavailable');
+});
+assert.equal(w.posOpsLookup('VIN 8251').kind, 'vin');
+assert.equal(w.posOpsLookup('LIN 2746').kind, 'lin');
+assert.ok(w.filterBeverageHits('VIN 8251').some((item) => item.id === 'manual_bottle'));
+assert.ok(w.filterBeverageHits('LIN 2746').some((item) => item.id === 'manual_spirit'));
+assert.ok(w.filterCatalogItems(w.STATE.menuItems, 'FILET').length > 0, 'manual item search unavailable');
+
 if (w.STATE._seatTick) {
   w.clearInterval(w.STATE._seatTick);
   w.STATE._seatTick = null;

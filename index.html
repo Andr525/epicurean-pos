@@ -11,14 +11,14 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<link rel="manifest" href="manifest.json?b=55">
-<link rel="apple-touch-icon" href="icon-192.png?b=55">
-<link rel="apple-touch-icon" sizes="180x180" href="icon-192.png?b=55">
-<link rel="apple-touch-icon" sizes="192x192" href="icon-192.png?b=55">
-<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?b=55">
-<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?b=55">
+<link rel="manifest" href="manifest.json?b=56">
+<link rel="apple-touch-icon" href="icon-192.png?b=56">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-192.png?b=56">
+<link rel="apple-touch-icon" sizes="192x192" href="icon-192.png?b=56">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?b=56">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?b=56">
 <title>Epicurean POS</title>
-<!-- pos-build: scalini-print-v55 -->
+<!-- pos-build: scalini-print-v56 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
@@ -1318,7 +1318,7 @@ body.hh-on .floor-retry { background:#fff; color:#000; border-color:#c5ced8; }
 <div id="login-screen" class="screen active">
   <h1>Epicurean POS</h1>
   <p class="subtitle">Enter your 4-digit code</p>
-  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 55</p>
+  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 56</p>
   <div class="pin-display" id="pin-display">
     <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
   </div>
@@ -5970,16 +5970,10 @@ function liveCheckHtml(){
   html+='<span>'+esc(STATE.currentServer?STATE.currentServer.name:'Food Master')+'</span></div>';
   html+=lineEditBarHtml();
   html+='<div class="ts-check-lines">';
-  if (STATE.rapidVoice && STATE.rapidVoice.on) {
-    html+=rapidVoiceCheckHtml();
-    html+='<div class="rv-compact">'+workingCheckHtml()+'</div>';
-  } else {
-    html+=workingCheckHtml();
-  }
+  html+=workingCheckHtml();
   html+='</div>';
   html+=lineEditBarHtml();
   html+=renderCourseFireRow();
-  if (STATE.rapidVoice && STATE.rapidVoice.on) html+=rapidVoiceFooterHtml();
   var t=checkTotals();
   var canFire=!!(t.sendable||Object.keys(selectedOrderLineIds()).length);
   html+='<div class="toast-check-actions">';
@@ -6413,7 +6407,7 @@ function refreshRapidVoiceChrome(){
   var pane=document.getElementById('add-items-pane');
   var rv=ensureRapidVoice();
   if (consoleEl && top && pane) {
-    consoleEl.classList.toggle('rv-on', !!rv.on);
+    consoleEl.classList.remove('rv-on');
     consoleEl.classList.toggle('focus', !!STATE.checkFocus);
     pane.classList.toggle('menu-closed', STATE.menuOpen===false);
     pane.setAttribute('data-open', STATE.menuOpen===false?'false':'true');
@@ -6476,7 +6470,6 @@ function orderTopHtml(){
   var warn=reservationWarning(STATE.selectedTable);
   var html='<div id="order-top">';
   if (warn.text) html+='<div class="res-warn lvl'+warn.level+'">'+esc(warn.text)+'</div>';
-  if (!(STATE.rapidVoice && STATE.rapidVoice.on)) html+='<div class="rv-meta">'+rapidVoiceToggleHtml()+'</div>';
   html+=liveCheckHtml();
   html+=renderGuestAllergyStrip();
   html+=renderSeatBar();
@@ -6490,7 +6483,7 @@ function renderOrder() {
   var fp=menuNavFingerprint();
   var pane=document.getElementById('add-items-pane');
   var rebuildMenu=!pane || menuPaneShouldRebuild(STATE._menuPaneFp, fp);
-  var cls='ts-console toast-go'+(STATE.checkFocus?' focus':'')+(tableDiningOrders().length?' has-dining':'')+(String(STATE.menuSearch||'').trim()?' searching':'')+((STATE.rapidVoice&&STATE.rapidVoice.on)?' rv-on':'');
+  var cls='ts-console toast-go'+(STATE.checkFocus?' focus':'')+(tableDiningOrders().length?' has-dining':'')+(String(STATE.menuSearch||'').trim()?' searching':'');
   if (!rebuildMenu && pane) {
     var consoleEl=c.querySelector('.ts-console');
     var top=document.getElementById('order-top');
