@@ -188,4 +188,9 @@ const prev = w.menuNavFingerprint();
 w.STATE.selectedLineIds = { alc1: 1 };
 assert.equal(w.menuPaneShouldRebuild(prev, w.menuNavFingerprint()), false);
 
+if (w.STATE._seatTick) {
+  w.clearInterval(w.STATE._seatTick);
+  w.STATE._seatTick = null;
+}
+
 console.log('rapid-voice-phase1.mjs ok');
