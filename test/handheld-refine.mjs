@@ -290,7 +290,7 @@ const mainSrc = execSync('git show origin/main:index.html', { cwd: root, encodin
 });
 assert.equal(extractDecl(src, 'function armFloorHold('), extractDecl(mainSrc, 'function armFloorHold('));
 assert.equal(src.includes('var FLOOR_HOLD_OCCUPIED_MS = 500'), true);
-assert.equal(src.includes('<!-- pos-build: scalini-print-v56 -->'), true);
+assert.equal(src.includes('<!-- pos-build: scalini-print-v57 -->'), true);
 
 if (w.STATE && w.STATE._seatTick) {
   w.clearInterval(w.STATE._seatTick);

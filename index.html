@@ -11,14 +11,14 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<link rel="manifest" href="manifest.json?b=56">
-<link rel="apple-touch-icon" href="icon-192.png?b=56">
-<link rel="apple-touch-icon" sizes="180x180" href="icon-192.png?b=56">
-<link rel="apple-touch-icon" sizes="192x192" href="icon-192.png?b=56">
-<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?b=56">
-<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?b=56">
+<link rel="manifest" href="manifest.json?b=57">
+<link rel="apple-touch-icon" href="icon-192.png?b=57">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-192.png?b=57">
+<link rel="apple-touch-icon" sizes="192x192" href="icon-192.png?b=57">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?b=57">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?b=57">
 <title>Epicurean POS</title>
-<!-- pos-build: scalini-print-v56 -->
+<!-- pos-build: scalini-print-v57 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
@@ -27,6 +27,7 @@
 <script src="cellar.js?v=binwise-375-park-v1"></script>
 <script src="scalini-dining.js?v=menu-ai-maps-20260913"></script>
 <script src="voice-vocab.js"></script>
+<script src="voice-engine.js?v=57"></script>
 <script async src="https://sandbox.web.squarecdn.com/v1/square.js"></script>
 <style>
 :root {
@@ -1260,6 +1261,19 @@ body.hh-on .ts-tile.back { color:#000; background:#fff; }
 body.hh-on .table-card { background:#fff; color:#000; border:1px solid #c5ced8; }
 body.hh-on .floor-empty-note { color:#333; }
 body.hh-on .floor-retry { background:#fff; color:#000; border-color:#c5ced8; }
+.voice-test { margin:0.35rem 0 0.7rem; padding:0.55rem 0.65rem; border:1px dashed var(--primary); border-radius:12px; background:rgba(184,115,51,0.08); }
+.voice-test label { display:block; font-size:0.72rem; font-weight:800; letter-spacing:0.08em; color:var(--primary-light); margin-bottom:0.35rem; }
+.voice-test-row { display:flex; gap:8px; }
+.voice-test input { flex:1; min-height:44px; margin:0; font-size:16px; }
+.voice-test button { flex:0 0 auto; min-height:44px; padding:0 0.9rem; border-radius:12px; border:1px solid var(--primary); background:var(--primary); color:#1a1008; font-weight:800; }
+.voice-test .voice-rev { margin-top:0.35rem; font-size:0.68rem; color:var(--text-muted); }
+.voice-draft { margin:0 0 0.45rem; padding:0.55rem 0.65rem; border-radius:10px; border:1px solid var(--warning); background:rgba(251,146,60,0.12); color:var(--text); }
+.voice-draft b { font-size:0.72rem; letter-spacing:0.04em; }
+.voice-draft .voice-draft-acts { display:flex; gap:8px; margin-top:0.4rem; }
+.voice-draft .voice-draft-acts button { min-height:36px; padding:0.3rem 0.7rem; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-weight:700; }
+body.hh-on .voice-test, body.hh-on .voice-draft { background:#fff; color:#000; }
+body.hh-on .voice-test label, body.hh-on .voice-rev { color:#7a4b12; }
+body.hh-on .voice-draft .voice-draft-acts button { background:#fff; color:#000; }
 </style>
 </head>
 <body>
@@ -1318,7 +1332,7 @@ body.hh-on .floor-retry { background:#fff; color:#000; border-color:#c5ced8; }
 <div id="login-screen" class="screen active">
   <h1>Epicurean POS</h1>
   <p class="subtitle">Enter your 4-digit code</p>
-  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 56</p>
+  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 57</p>
   <div class="pin-display" id="pin-display">
     <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
   </div>
@@ -3385,6 +3399,7 @@ function loadData() {
   }, function(){ if (!STATE.menuLive) seedOfflineCatalog(); });
   listenBohList('bar','bar');
   listenWines();
+  listenVoiceVocabulary();
   listenBohList('retail','retail');
   listenBohList('daily_specials','dailySpecials');
   fbDb.collection('boh_shared').doc('menu_photos').onSnapshot(function(doc){
@@ -5431,7 +5446,9 @@ function renderSeatBar(){
   html+='<button type="button" class="seat-now" onclick="openSeatPicker()">'+esc(positionLabel(STATE.activeSeat))+' ▾</button>';
   html+='<button type="button" class="seat-chip'+(STATE.activeSeat==='table'?' active':'')+'" onclick="setActiveSeat(\'table\')">Share</button>';
   for (var i=1;i<=n;i++){
-    html+='<button type="button" class="seat-chip'+(String(STATE.activeSeat)===String(i)?' active':'')+'" data-seat="'+i+'" onclick="setActiveSeat('+i+')">'+esc(positionLabel(i))+'</button>';
+    var pst=positionState(i);
+    var mark=(pst.pass?' PASS':'')+(pst.noDrink?' NO DRINK':'');
+    html+='<button type="button" class="seat-chip'+(String(STATE.activeSeat)===String(i)?' active':'')+'" data-seat="'+i+'" onclick="setActiveSeat('+i+')">'+esc(positionLabel(i)+mark)+'</button>';
   }
   html+='<button type="button" class="seat-chip add-seat" onclick="addGuestSeat()">+ Add</button></div>';
   return html;
@@ -5970,6 +5987,7 @@ function liveCheckHtml(){
   html+='<span>'+esc(STATE.currentServer?STATE.currentServer.name:'Food Master')+'</span></div>';
   html+=lineEditBarHtml();
   html+='<div class="ts-check-lines">';
+  html+=voiceDraftsHtml();
   html+=workingCheckHtml();
   html+='</div>';
   html+=lineEditBarHtml();
@@ -6471,6 +6489,248 @@ function rapidVoiceCheckHtml(){
   for (var i=1;i<=n;i++) block(i);
   return html;
 }
+function voiceEngine(){
+  return (typeof EPICUREAN_VOICE_ENGINE!=='undefined') ? EPICUREAN_VOICE_ENGINE : null;
+}
+function ensureVoiceDrafts(){
+  if (!Array.isArray(STATE.voiceDrafts)) STATE.voiceDrafts=[];
+  return STATE.voiceDrafts;
+}
+function settleVoiceDraftForItem(itemId){
+  if (!itemId || !STATE.voiceDrafts) return;
+  STATE.voiceDrafts=STATE.voiceDrafts.filter(function(d){
+    return !(d && d.itemId===itemId && d.confidence==='MISSING');
+  });
+}
+function listenVoiceVocabulary(){
+  if (!fbReady || !fbDb || STATE._voiceVocabWatch) return;
+  STATE._voiceVocabWatch=true;
+  fbDb.collection('boh_shared').doc('voice_vocab_active').onSnapshot(function(doc){
+    var ctrl=doc.exists ? (doc.data()||{}) : null;
+    var rev=ctrl && ctrl.activeRevision ? String(ctrl.activeRevision) : '';
+    var slot=STATE.voiceVocab;
+    if (slot && slot.index && !slot.stale && slot.revision===rev && rev) return;
+    STATE.voiceVocab={ revision:rev, stale:true, index:null, reason:'rebuilding' };
+    if (!rev) return;
+    loadVoiceRevision(ctrl);
+  }, function(){
+    STATE.voiceVocab={ revision:(STATE.voiceVocab&&STATE.voiceVocab.revision)||'', stale:true, index:null, reason:'listener' };
+  });
+}
+function readSharedDoc(id){
+  if (!fbReady || !fbDb || !fbDb.collection) return Promise.resolve(null);
+  return fbDb.collection('boh_shared').doc(id).get().then(function(snap){
+    return (snap && snap.exists) ? (snap.data()||null) : null;
+  }).catch(function(){ return null; });
+}
+function loadVoiceRevision(ctrl){
+  var eng=voiceEngine();
+  var rev=String((ctrl&&ctrl.activeRevision)||'');
+  var n=Number(ctrl&&ctrl.chunkCount)||0;
+  var ids=Array.isArray(ctrl&&ctrl.chunkIds) ? ctrl.chunkIds.slice() : [];
+  var i;
+  if (!ids.length) {
+    for (i=0;i<n;i++) ids.push('voice_vocab_'+rev+'_'+i);
+  }
+  var seq=(STATE._voiceLoadSeq=(STATE._voiceLoadSeq||0)+1);
+  return Promise.all(ids.map(readSharedDoc)).then(function(docs){
+    if (seq!==STATE._voiceLoadSeq) return;
+    STATE.voiceVocab=eng ? eng.assemble(ctrl, docs) : { revision:rev, stale:true, index:null, reason:'engine' };
+    if (STATE.activeTab==='order' && STATE.currentServer) renderOrder();
+  }).catch(function(){
+    if (seq!==STATE._voiceLoadSeq) return;
+    STATE.voiceVocab={ revision:rev, stale:true, index:null, reason:'load-failed' };
+  });
+}
+function applyVoiceSeat(seat, priority){
+  if (seat==null || seat==='table') return;
+  var n=Number(seat);
+  if (!(n>=1 && n<=20)) return;
+  var sess=sessionOf(STATE.selectedTable);
+  if (n>(sess.guestCount||0)) {
+    sess.guestCount=n;
+    STATE.guestCount=n;
+  }
+  STATE.activeSeat=n;
+  STATE.allergySeat=n;
+  if (priority) femalePositionsOf()[String(n)]=true;
+  persistCheck(ensureOpenCheck(STATE.selectedTable));
+}
+function voicePushDraft(parsed){
+  var drafts=ensureVoiceDrafts();
+  drafts.unshift({
+    id:genId(),
+    text:parsed.text||'',
+    confidence:parsed.confidence||'NO_MATCH',
+    kind:parsed.kind||'draft',
+    seat:parsed.seat,
+    priority:!!parsed.priority,
+    name:parsed.name||'',
+    itemId:parsed.itemId||'',
+    need:parsed.need||'',
+    suggestion:parsed.suggestion||'',
+    candidates:parsed.candidates||[]
+  });
+  if (drafts.length>8) drafts.length=8;
+  toast('Voice '+drafts[0].confidence);
+  renderOrder();
+}
+function voicePlaceHigh(item, parsed){
+  var seat=parsed.seat!=null ? parsed.seat : STATE.activeSeat;
+  if (!item || item.active===false || item.eightySixed) {
+    voicePushDraft(Object.assign({}, parsed, {
+      confidence:'MISSING',
+      kind:'draft',
+      need:item&&item.eightySixed ? '86 — not available' : 'inactive',
+      itemId:item&&item.id,
+      name:item&&item.name
+    }));
+    return;
+  }
+  var eng=voiceEngine();
+  var groups=eng ? eng.modifierGroups(item) : [];
+  if (groups.length) {
+    voicePushDraft(Object.assign({}, parsed, { confidence:'MISSING', kind:'draft', need:groups.join(', '), itemId:item.id, name:item.name }));
+    return;
+  }
+  if (allergenHits(item, seat).length) {
+    voicePushDraft(Object.assign({}, parsed, { confidence:'MISSING', kind:'draft', need:'allergy', itemId:item.id, name:item.name }));
+    return;
+  }
+  ensureOpenCheck(STATE.selectedTable);
+  var before=(STATE.currentOrder||[]).length;
+  STATE._voiceCommit=true;
+  try {
+    beginAddItem(item.id);
+    if (STATE.pendingItem && STATE.pendingItem.id===item.id) {
+      if (!modifiersReady(STATE.pendingItem) || allergenHits(STATE.pendingItem, STATE.pendingItem.seat).length) {
+        closeSheet();
+        voicePushDraft(Object.assign({}, parsed, { confidence:'MISSING', kind:'draft', need:'modifier', itemId:item.id, name:item.name }));
+        return;
+      }
+      commitPendingItem();
+    }
+  } finally {
+    STATE._voiceCommit=false;
+  }
+  var lines=STATE.currentOrder||[];
+  var line=lines[lines.length-1];
+  if (!line || line.id!==item.id || lines.length<=before || !line.voiceOrigin) {
+    voicePushDraft(Object.assign({}, parsed, { confidence:'MISSING', kind:'draft', need:'not added', itemId:item.id, name:item.name }));
+    return;
+  }
+  renderOrder();
+}
+function applyVoiceCommand(text){
+  var eng=voiceEngine();
+  if (!eng) { toast('Voice engine unavailable'); return null; }
+  if (!STATE.selectedTable) { toast('Open a table first'); return null; }
+  var slot=STATE.voiceVocab||{};
+  var parsed=eng.parse(text, {
+    index: slot.stale ? null : (slot.index||null),
+    stale: !slot.index || !!slot.stale,
+    activeRevision: slot.revision||'',
+    catalog: STATE.menuItems||[]
+  });
+  if (parsed.positionTouched) applyVoiceSeat(parsed.seat, parsed.priority);
+  if (parsed.kind==='position') {
+    toast('Seat '+positionLabel(parsed.seat));
+    renderOrder();
+    return parsed;
+  }
+  if (parsed.kind==='pass' || parsed.kind==='noDrink') {
+    var seat=parsed.seat!=null ? parsed.seat : STATE.activeSeat;
+    if (seat==null || seat==='table' || seat==='') {
+      voicePushDraft(Object.assign({}, parsed, { confidence:'MISSING', need:'position' }));
+      return parsed;
+    }
+    var st=positionState(seat);
+    if (parsed.kind==='pass') st.pass=true;
+    else st.noDrink=true;
+    toast(positionLabel(seat)+(parsed.kind==='pass'?' PASS':' NO DRINK'));
+    renderOrder();
+    return parsed;
+  }
+  if (parsed.confidence==='HIGH' && parsed.itemId) {
+    var item=findPosMenuItem(parsed.itemId);
+    if (!item) {
+      voicePushDraft(Object.assign({}, parsed, { confidence:'MISSING', kind:'draft', need:'not on the POS menu' }));
+      return parsed;
+    }
+    if (parsed.code && parsed.code.code) {
+      var lookup=posOpsLookup(parsed.code.kind+' '+parsed.code.code);
+      var hits=filterByOpsLookup(STATE.menuItems, lookup)||[];
+      if (hits.length!==1 || hits[0].id!==item.id) {
+        voicePushDraft(Object.assign({}, parsed, {
+          confidence: hits.length>1 ? 'AMBIGUOUS' : 'INVALID_CODE',
+          kind:'draft',
+          itemId:'',
+          candidates:hits.map(function(it){ return { id:it.id, name:it.name, keyword:'' }; })
+        }));
+        return parsed;
+      }
+    }
+    voicePlaceHigh(item, parsed);
+    return parsed;
+  }
+  voicePushDraft(parsed);
+  return parsed;
+}
+function submitVoiceTest(){
+  var el=document.getElementById('voice-test-input');
+  var text=el ? el.value : '';
+  if (!String(text||'').trim()) return;
+  applyVoiceCommand(text);
+}
+function dismissVoiceDraft(id){
+  STATE.voiceDrafts=ensureVoiceDrafts().filter(function(d){ return d.id!==id; });
+  renderOrder();
+}
+function openVoiceDraft(id){
+  var d=ensureVoiceDrafts().filter(function(x){ return x.id===id; })[0];
+  if (!d || !d.itemId) return;
+  if (d.seat!=null) applyVoiceSeat(d.seat, d.priority);
+  beginAddItem(d.itemId);
+}
+function voiceDraftText(d){
+  var bits=['VOICE', d.confidence||''];
+  if (d.seat!=null) bits.push(positionLabel(d.seat));
+  if (d.need) bits.push(d.need);
+  if (d.name) bits.push(d.name);
+  else if (d.text) bits.push(d.text);
+  if (d.suggestion) bits.push('did you mean '+d.suggestion);
+  if (d.candidates && d.candidates.length>1) {
+    bits.push(d.candidates.map(function(c){ return c.name||c.keyword||c.id; }).filter(Boolean).join(' / '));
+  }
+  return bits.filter(Boolean).join(' · ');
+}
+function voiceDraftsHtml(){
+  var drafts=ensureVoiceDrafts();
+  if (!drafts.length) return '';
+  return drafts.map(function(d){
+    var canOpen=d.itemId && d.confidence==='MISSING' && d.need && d.need!=='inactive' && d.need.indexOf('86')!==0 && d.need!=='allergy' && d.need!=='not on the POS menu' && d.need!=='not added';
+    var html='<div class="voice-draft" data-voice-draft="'+esc(d.confidence)+'">';
+    html+='<b>'+esc(voiceDraftText(d))+'</b>';
+    html+='<div class="voice-draft-acts">';
+    if (canOpen) html+='<button type="button" onclick=\'openVoiceDraft('+JSON.stringify(d.id)+')\'>Resolve</button>';
+    html+='<button type="button" onclick=\'dismissVoiceDraft('+JSON.stringify(d.id)+')\'>Dismiss</button>';
+    html+='</div></div>';
+    return html;
+  }).join('');
+}
+function voiceRevisionLabel(){
+  var s=STATE.voiceVocab;
+  if (!s || !s.revision) return 'vocabulary not loaded';
+  if (s.stale || !s.index) return 'STALE';
+  return s.revision;
+}
+function voiceTestHtml(){
+  return '<div class="voice-test" data-voice-test="1"><label for="voice-test-input">VOICE TEST</label>'+
+    '<div class="voice-test-row"><input id="voice-test-input" autocomplete="off" enterkeyhint="done" placeholder="3A CHAMPAGNE" '+
+    'onkeydown="if(event.key===\'Enter\'){event.preventDefault();submitVoiceTest();}">'+
+    '<button type="button" onclick="submitVoiceTest()">Enter</button></div>'+
+    '<div class="voice-rev">'+esc(voiceRevisionLabel())+'</div></div>';
+}
 function orderTopHtml(){
   var warn=reservationWarning(STATE.selectedTable);
   var html='<div id="order-top">';
@@ -6478,6 +6738,7 @@ function orderTopHtml(){
   html+=liveCheckHtml();
   html+=renderGuestAllergyStrip();
   html+=renderSeatBar();
+  html+=voiceTestHtml();
   return html+'</div>';
 }
 function renderOrder() {
@@ -7959,6 +8220,8 @@ function maybeAllergyThenAdd(){
 function commitPendingItem(){
   var p=STATE.pendingItem; if(!p) return;
   if (!modifiersReady(p)) { toast('Choose required modifiers'); return; }
+  if (STATE._voiceCommit) p.voiceOrigin=true;
+  settleVoiceDraftForItem(p.id);
   if (p.serviceCourse==null) p.serviceCourse=p.course||defaultCourse(p);
   if (p.extraPlate && (p.ticketPos==null || !isFinite(Number(p.ticketPos)))) {
     p.ticketPos=defaultTicketPosForKind(extraKindOf(p))+1;
