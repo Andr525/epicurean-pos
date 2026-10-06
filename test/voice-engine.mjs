@@ -299,6 +299,39 @@ assert.equal(good.index.revision, 'rLIVE');
 assert.equal(good.index.modifiers[0].voiceRole, 'service');
 
 const w = loadPos();
+const krugRows = [
+  { id: 'w2148NV750ml', vin: '2148', name: 'Krug Grande Cuvée', size: '750ml', bottlePrice: 275, stock: 9, ozOnHand: 100 },
+  { id: 'w2148NV375ml', vin: '2148', name: 'Grande Cuvée (375ml)', size: '375ml', bottlePrice: 275, stock: 8, ozOnHand: 50 }
+];
+assert.equal(w.applyBundledSkuVins(krugRows, [
+  { id: 'w2148NV750ml', vin: '2148' },
+  { id: 'w2148NV375ml', vin: '20007' }
+]), true);
+assert.equal(krugRows[0].vin, '2148');
+assert.equal(krugRows[1].vin, '20007');
+assert.equal(krugRows[1].stock, 8);
+assert.equal(krugRows[1].ozOnHand, 50);
+assert.equal(w.filterByOpsLookup(krugRows, w.posOpsLookup('vin 2148')).map((it) => it.id).join(','), 'w2148NV750ml');
+assert.equal(w.filterByOpsLookup(krugRows, w.posOpsLookup('vin 20007')).map((it) => it.id).join(','), 'w2148NV375ml');
+assert.equal(w.applyBundledSkuVins(krugRows, [
+  { id: 'w2148NV750ml', vin: '2148' },
+  { id: 'w2148NV375ml', vin: '20007' }
+]), false);
+const heldRows = [
+  { id: 'w15542021750ml', vin: '1554', name: 'Clau de Nell' },
+  { id: 'w15541999750ml', vin: '1554', name: 'Brunate- Le Coste' }
+];
+assert.equal(w.applyBundledSkuVins(heldRows, heldRows.map((row) => ({ id: row.id, vin: row.vin }))), false);
+assert.equal(heldRows[0].vin, '1554');
+assert.equal(heldRows[1].vin, '1554');
+const half = w.mapWineToPos({ id: 'w2148NV375ml', vin: '20007', name: 'Grande Cuvée (375ml)', size: '375ml', vintage: 'NV', bottlePrice: 275, stock: 12 });
+assert.equal(half.name, 'Grande Cuvée (375ml)');
+assert.equal(half.vin, '20007');
+assert.equal(half.price, 275);
+const spaced = w.mapWineToPos({ id: 'x', vin: '1', name: 'House (375 ml)', size: '375ml', vintage: 'NV', bottlePrice: 10 });
+assert.equal(spaced.name, 'House (375 ml)');
+const magnum = w.mapWineToPos({ id: 'm', vin: '2', name: 'Único (Magnum)', size: '1.5L', vintage: '1986', bottlePrice: 3200 });
+assert.equal(magnum.name, 'Único (Magnum) 1986 (1.5L)');
 seedTable(w);
 w.STATE.foodItems = w.SEED_ITEMS.slice();
 w.STATE.bar = [
@@ -626,7 +659,6 @@ const main = execSync('git show origin/main:index.html', { cwd: root, encoding: 
   'function fireDiningCourse',
   'function fireWorkingRow',
   'function mapBarToPos',
-  'function mapWineToPos',
   'function rebuildPosCatalog',
   'function posOpsLookup',
   'function filterByOpsLookup',
@@ -635,8 +667,8 @@ const main = execSync('git show origin/main:index.html', { cwd: root, encoding: 
 ].forEach((fn) => {
   assert.equal(extractDecl(src, fn), extractDecl(main, fn), fn);
 });
-execSync('git diff --exit-code origin/main -- cellar.js scalini-dining.js voice-vocab.js', { cwd: root, stdio: 'pipe' });
-assert.match(src, /pos-build: scalini-print-v58/);
+execSync('git diff --exit-code origin/main -- scalini-dining.js voice-vocab.js', { cwd: root, stdio: 'pipe' });
+assert.match(src, /pos-build: scalini-print-v59/);
 assert.doesNotMatch(fs.readFileSync(path.join(root, 'voice-engine.js'), 'utf8'), /sendOrder|fireDining|reviewSendRapidVoice/);
 const prevTab = w.STATE.activeTab;
 w.STATE.activeTab = 'tables';

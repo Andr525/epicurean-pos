@@ -11,20 +11,20 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<link rel="manifest" href="manifest.json?b=58">
-<link rel="apple-touch-icon" href="icon-192.png?b=58">
-<link rel="apple-touch-icon" sizes="180x180" href="icon-192.png?b=58">
-<link rel="apple-touch-icon" sizes="192x192" href="icon-192.png?b=58">
-<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?b=58">
-<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?b=58">
+<link rel="manifest" href="manifest.json?b=59">
+<link rel="apple-touch-icon" href="icon-192.png?b=59">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-192.png?b=59">
+<link rel="apple-touch-icon" sizes="192x192" href="icon-192.png?b=59">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?b=59">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?b=59">
 <title>Epicurean POS</title>
-<!-- pos-build: scalini-print-v58 -->
+<!-- pos-build: scalini-print-v59 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js"></script>
-<script src="cellar.js?v=binwise-375-park-v1"></script>
+<script src="cellar.js?v=binwise-375-park-v2"></script>
 <script src="scalini-dining.js?v=menu-ai-maps-20260913"></script>
 <script src="voice-vocab.js"></script>
 <script src="voice-engine.js?v=58"></script>
@@ -1332,7 +1332,7 @@ body.hh-on .voice-draft .voice-draft-acts button { background:#fff; color:#000; 
 <div id="login-screen" class="screen active">
   <h1>Epicurean POS</h1>
   <p class="subtitle">Enter your 4-digit code</p>
-  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 58</p>
+  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 59</p>
   <div class="pin-display" id="pin-display">
     <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
   </div>
@@ -2817,7 +2817,7 @@ function mapWineToPos(it, catId){
       var n=String(it.name||'').trim();
       var v=(it.vintage && it.vintage!=='NV') ? String(it.vintage) : '';
       if (v && n.indexOf(v)===-1) n += ' '+v;
-      if (it.size && it.size!=='750ml') n += ' ('+it.size+')';
+      if (it.size && it.size!=='750ml' && !nameHasBottleSize(n, it.size)) n += ' ('+it.size+')';
       return n;
     })(),
     price: (btg && glass) ? glass : (bottle || glass || Number(it.price||0)),
@@ -3134,6 +3134,39 @@ function listenBohList(docName, key){
     }
   }, function(){});
 }
+function nameHasBottleSize(name, size){
+  var token=String(size||'').replace(/\s+/g,'').toLowerCase();
+  if (!token) return false;
+  return String(name||'').toLowerCase().replace(/\s+/g,'').indexOf(token)>=0;
+}
+function applyBundledSkuVins(list, seedWines){
+  var seed=seedWines || ((typeof BINWISE_CELLAR!=='undefined' && BINWISE_CELLAR && BINWISE_CELLAR.wines) || []);
+  var planned={};
+  (seed||[]).forEach(function(w){
+    if (!w || !w.id) return;
+    planned[String(w.id)]=String(w.vin==null?'':w.vin).trim();
+  });
+  var counts={};
+  (list||[]).forEach(function(w){
+    if (!w) return;
+    var key=String(w.vin==null?'':w.vin).trim();
+    if (!key) return;
+    counts[key]=(counts[key]||0)+1;
+  });
+  var changed=false;
+  (list||[]).forEach(function(w){
+    if (!w || !w.id) return;
+    var next=planned[String(w.id)];
+    var cur=String(w.vin==null?'':w.vin).trim();
+    if (!next || !cur || next===cur) return;
+    if ((counts[cur]||0)<2) return;
+    w.vin=next;
+    counts[cur]-=1;
+    counts[next]=(counts[next]||0)+1;
+    changed=true;
+  });
+  return changed;
+}
 function clonePosCellar(list){ return JSON.parse(JSON.stringify(list||[])); }
 function ensurePosBinwiseCellar(){
   var seed=typeof BINWISE_CELLAR!=='undefined' ? BINWISE_CELLAR : null;
@@ -3154,6 +3187,7 @@ function ensurePosBinwiseCellar(){
     STATE.bar=bar.concat(clonePosCellar(seed.beers||[]), clonePosCellar(seed.spirits||[]));
     changed=true;
   }
+  if (applyBundledSkuVins(STATE.wines)) changed=true;
   return changed;
 }
 function flattenPosWines(){
@@ -3163,6 +3197,7 @@ function flattenPosWines(){
   if (all.length>=50) STATE.wines=all;
   else ensurePosBinwiseCellar();
   if (!(STATE.wines||[]).length) STATE.wines=all;
+  applyBundledSkuVins(STATE.wines);
   STATE.menuLive=true;
   applyCatalogAndRefresh(false);
 }
