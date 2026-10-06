@@ -14,7 +14,7 @@ const data = sandbox.window.BINWISE_CELLAR;
 const wines = data.wines.filter((w) => String(w.id).length < 80);
 const monster = data.wines.find((w) => String(w.id).length > 80);
 
-assert.equal(data.v, 'binwise-375-park-v2');
+assert.equal(data.v, 'binwise-375-park-v3');
 assert.equal(data.wines.length, 3612);
 assert.equal(wines.length, 3611);
 
@@ -26,7 +26,7 @@ assert.equal(bottle.name, 'Krug Grande Cuvée');
 assert.equal(bottle.size, '750ml');
 assert.equal(bottle.bottlePrice, 275);
 assert.equal(bottle.stock, 12);
-assert.equal(half.vin, '20007');
+assert.equal(half.vin, '400');
 assert.equal(half.name, 'Grande Cuvée (375ml)');
 assert.equal(half.size, '375ml');
 assert.equal(half.bottlePrice, 275);
@@ -39,8 +39,20 @@ wines.forEach((w) => {
   counts[w.vin] = (counts[w.vin] || 0) + 1;
 });
 const shared = Object.keys(counts).filter((vin) => counts[vin] > 1).sort();
-assert.deepEqual(shared, ['1554', '16136', '16270', '17918', '9416']);
-['20258', '20259', '20260', '20261'].forEach((vin) => assert.equal(counts[vin], undefined));
+assert.deepEqual(shared, ['9416']);
+Object.keys(counts).forEach((vin) => {
+  const n = Number(vin);
+  assert.ok(n < 20000 || n > 20257, 'temporary VIN remains ' + vin);
+});
+assert.equal(byId.w15542021750ml.vin, '100');
+assert.equal(byId.w179182024750ml.vin, '101');
+assert.equal(byId.w161362022750ml.vin, '200');
+assert.equal(byId.w162702022750ml.vin, '201');
+assert.equal(byId.w92822018375ml.vin, '500');
+assert.equal(byId.w15541999750ml.vin, '1554');
+assert.equal(byId.w161362021750ml.vin, '16136');
+assert.equal(byId.w162702018750ml.vin, '16270');
+assert.equal(byId.w179182018750ml.vin, '17918');
 assert.equal(byId.wx6e6df6d12021750ml.vin, 'x6e6df6d1');
 assert.equal(byId.wxe9bc315bNV750ml.vin, 'xe9bc315b');
 assert.ok(monster);
@@ -65,11 +77,13 @@ data.wines.forEach((w) => {
   });
   if (w.vin !== old.vin) vinChanges += 1;
 });
-assert.equal(vinChanges, 258);
-assert.equal(beforeById.w2148NV375ml.vin, '2148');
+assert.equal(vinChanges, 262);
+assert.equal(beforeById.w2148NV375ml.vin, '20007');
+assert.equal(beforeById.w2148NV750ml.vin, '2148');
 
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-assert.match(html, /cellar\.js\?v=binwise-375-park-v2/);
+assert.match(html, /cellar\.js\?v=binwise-375-park-v3/);
+assert.match(html, /pos-build: scalini-print-v60/);
 assert.match(html, /voice-engine\.js\?v=58/);
 assert.doesNotMatch(fs.readFileSync(path.join(root, 'voice-engine.js'), 'utf8'), /20007/);
 

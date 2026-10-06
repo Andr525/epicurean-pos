@@ -317,6 +317,13 @@ assert.equal(w.applyBundledSkuVins(krugRows, [
   { id: 'w2148NV750ml', vin: '2148' },
   { id: 'w2148NV375ml', vin: '20007' }
 ]), false);
+const publishedHalf = [{ id: 'w2148NV375ml', vin: '20007', stock: 8 }];
+assert.equal(w.applyBundledSkuVins(publishedHalf, [{ id: 'w2148NV375ml', vin: '400' }]), true);
+assert.equal(publishedHalf[0].vin, '400');
+assert.equal(publishedHalf[0].stock, 8);
+const managerVin = [{ id: 'w2148NV375ml', vin: '8801' }];
+assert.equal(w.applyBundledSkuVins(managerVin, [{ id: 'w2148NV375ml', vin: '400' }]), false);
+assert.equal(managerVin[0].vin, '8801');
 const heldRows = [
   { id: 'w15542021750ml', vin: '1554', name: 'Clau de Nell' },
   { id: 'w15541999750ml', vin: '1554', name: 'Brunate- Le Coste' }
@@ -668,7 +675,7 @@ const main = execSync('git show origin/main:index.html', { cwd: root, encoding: 
   assert.equal(extractDecl(src, fn), extractDecl(main, fn), fn);
 });
 execSync('git diff --exit-code origin/main -- scalini-dining.js voice-vocab.js', { cwd: root, stdio: 'pipe' });
-assert.match(src, /pos-build: scalini-print-v59/);
+assert.match(src, /pos-build: scalini-print-v60/);
 assert.doesNotMatch(fs.readFileSync(path.join(root, 'voice-engine.js'), 'utf8'), /sendOrder|fireDining|reviewSendRapidVoice/);
 const prevTab = w.STATE.activeTab;
 w.STATE.activeTab = 'tables';
