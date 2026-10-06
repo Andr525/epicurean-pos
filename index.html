@@ -6848,11 +6848,16 @@ function voiceAuthToken(){
   } catch (e) {}
   return Promise.resolve('');
 }
+function voiceKeywordHints(){
+  var index=STATE.voiceVocab && STATE.voiceVocab.index;
+  var keys=index && index.byKeyword ? Object.keys(index.byKeyword) : [];
+  return keys.slice(0, 400);
+}
 function postVoiceClip(url, blob){
   var body=new FormData();
   var name=/wav/i.test(blob && blob.type) ? 'utterance.wav' : 'utterance.m4a';
   body.append('audio', blob, name);
-  body.append('hints', 'Restaurant order. Positions such as 3A. VIN numbers. Wine names.');
+  body.append('keyterms', JSON.stringify(voiceKeywordHints()));
   return voiceAuthToken().catch(function(){ return ''; }).then(function(token){
     var headers={};
     if (token) headers.Authorization='Bearer '+token;
