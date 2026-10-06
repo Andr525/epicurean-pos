@@ -11,14 +11,14 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<link rel="manifest" href="manifest.json?b=61">
-<link rel="apple-touch-icon" href="icon-192.png?b=61">
-<link rel="apple-touch-icon" sizes="180x180" href="icon-192.png?b=61">
-<link rel="apple-touch-icon" sizes="192x192" href="icon-192.png?b=61">
-<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?b=61">
-<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?b=61">
+<link rel="manifest" href="manifest.json?b=62">
+<link rel="apple-touch-icon" href="icon-192.png?b=62">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-192.png?b=62">
+<link rel="apple-touch-icon" sizes="192x192" href="icon-192.png?b=62">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?b=62">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?b=62">
 <title>Epicurean POS</title>
-<!-- pos-build: scalini-print-v61 -->
+<!-- pos-build: scalini-print-v62 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
@@ -561,8 +561,8 @@ body.hh-on.floor-drawing .floor-stage { outline:2px dashed var(--primary); }
 @media (max-width:767px) {
   body.hh-on .app-nav { display:none !important; }
   body.hh-on.hh-table .app-header { display:none !important; }
-  body.hh-on #hh-top { display:flex; align-items:center; justify-content:space-between; gap:8px;
-    padding: calc(0.45rem + env(safe-area-inset-top)) 0.75rem 0.45rem;
+  body.hh-on #hh-top { display:flex; align-items:center; justify-content:space-between; gap:4px;
+    padding: calc(0.45rem + env(safe-area-inset-top)) 0.4rem 0.45rem;
     background:var(--surface); border-bottom:1px solid var(--border); flex-shrink:0; }
   body.hh-on.hh-table #hh-bar {
     display:flex; flex-direction:column; gap:8px; flex-shrink:0;
@@ -594,7 +594,7 @@ body.hh-on.floor-drawing .floor-stage { outline:2px dashed var(--primary); }
   #hh-top, #hh-bar { display:none !important; }
   body.tableside .app-header, body.tableside .app-nav { display:none !important; }
   body.tableside #hh-top {
-    display:flex !important; align-items:center; justify-content:space-between; gap:8px;
+    display:flex !important; align-items:center; justify-content:space-between; gap:4px;
     padding:0.5rem 0.9rem; background:var(--surface); border-bottom:1px solid var(--border); flex-shrink:0;
   }
   body.tableside #hh-bar {
@@ -1047,9 +1047,19 @@ body.hh-table .app-content, body.tableside .app-content {
 .svc-head h2 { margin:0; font-size:1.05rem; color:var(--text); }
 .svc-head .meta { font-size:0.75rem; color:var(--text-muted); }
 .hh-back, .hh-more {
-  min-width:44px; min-height:44px; border:1px solid var(--border); border-radius:12px;
-  background:var(--surface-2); color:var(--text); font-size:1.1rem; cursor:pointer;
+  flex:0 0 auto; box-sizing:border-box; min-width:44px; min-height:44px; padding:0 0.35rem;
+  border:1px solid var(--border); border-radius:12px;
+  background:var(--surface-2); color:var(--text); font-size:0.78rem; font-weight:800; cursor:pointer;
 }
+.hh-title { flex:1 1 auto; min-width:0; overflow:hidden; }
+.hh-title span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.hh-guests {
+  display:inline-flex; align-items:center; min-height:44px; margin:0; padding:0 0.35rem;
+  border:0; background:transparent; color:inherit; font:inherit; font-weight:800; cursor:pointer;
+}
+.guest-keypad.count-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:0.6rem 0; }
+.guest-keypad.count-grid button { min-height:56px; font-size:1.25rem; font-weight:800; }
+.guest-keypad.count-grid .cancel-party { grid-column:1 / -1; min-height:52px; }
 @media print {
   body * { visibility:hidden !important; }
   #print-root, #print-root * { visibility:visible !important; }
@@ -1215,7 +1225,7 @@ body.hh-on .toast-check-ops {
   display:grid; grid-template-columns:repeat(4,1fr); gap:4px; margin:0.2rem 0 0.45rem;
 }
 body.hh-on .toast-check-ops button {
-  min-height:36px; border:1px solid #c5ced8; background:#eef1f5; color:#000;
+  min-height:44px; border:1px solid #c5ced8; background:#eef1f5; color:#000;
   font-weight:700; font-size:0.7rem; cursor:pointer;
 }
 body.hh-on .toast-check-ops .pay { background:#c9daf8; }
@@ -1335,7 +1345,7 @@ body.hh-on .voice-draft .voice-draft-acts button { background:#fff; color:#000; 
 <div id="login-screen" class="screen active">
   <h1>Epicurean POS</h1>
   <p class="subtitle">Enter your 4-digit code</p>
-  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 61</p>
+  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 62</p>
   <div class="pin-display" id="pin-display">
     <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
   </div>
@@ -2435,7 +2445,7 @@ function renderHandheldTop(){
   document.getElementById('hh-top').innerHTML=
     '<button class="hh-back" onclick="handheldBack()" aria-label="Back">←</button>'+
     '<div class="hh-title">#'+esc(String(STATE.selectedTable))+' · Table '+esc(String(STATE.selectedTable))+
-      '<span>'+sess.guestCount+' guests · '+(STATE.currentServer?esc(STATE.currentServer.name):'')+
+      '<span><button type="button" class="hh-guests" onclick="openPartySheet()">'+sess.guestCount+' guests</button> · '+(STATE.currentServer?esc(STATE.currentServer.name):'')+
       ' · <span id="hh-seated">'+seatedLabelFor(STATE.selectedTable)+'</span></span></div>'+
     '<button class="hh-more" onclick="printCheck()" aria-label="Print">⎙</button>'+
     '<button class="hh-more" onclick="openSwitchUser()" aria-label="Switch user">⇄</button>'+
@@ -4726,10 +4736,8 @@ function beginFloorTableGesture(x, y){
   if (g.restEl) {
     g.origLeft=parseFloat(g.restEl.style.left)||0;
     g.origTop=parseFloat(g.restEl.style.top)||0;
-    armFloorHold(g.startTable);
-  } else {
-    clearFloorHold();
   }
+  clearFloorHold();
 }
 function floorNoteMove(x, y, stepDx, stepDy){
   var g=FLOOR_GESTURE;
@@ -4899,8 +4907,13 @@ function floorEndPointer(e){
   if (floorGestureCount()<2) g.lastDist=0;
   clearFloorHold();
   var x=e?e.clientX:g.tapX, y=e?e.clientY:g.tapY;
-  if (g.moved) finishFloorTableDrag(x, y);
-  else floorAbortDrag();
+  var table=g.startTable;
+  var moved=g.moved;
+  if (moved) finishFloorTableDrag(x, y);
+  else {
+    floorAbortDrag();
+    if (table && !floorOpenBlocked()) tapTable(table);
+  }
   g.source=floorGestureCount() ? g.source : '';
 }
 function floorCancelPointer(e){
@@ -4916,6 +4929,7 @@ function floorCancelPointer(e){
 }
 function floorEndTouch(e){
   var g=FLOOR_GESTURE;
+  if (!g.splitMode && !g.startTable && !g.moved && g.source!=='touch' && g.source!=='pointer') return;
   if (g.splitMode && (!e.touches || e.touches.length<2)) {
     floorEndSplit(true);
     floorSyncTouches(e);
@@ -4929,6 +4943,7 @@ function floorEndTouch(e){
     return;
   }
   var wasMoved=g.moved;
+  var table=g.startTable;
   var x=g.tapX, y=g.tapY;
   if (e.changedTouches && e.changedTouches[0]) {
     x=e.changedTouches[0].clientX;
@@ -4946,7 +4961,8 @@ function floorEndTouch(e){
   floorAbortDrag();
   g.source=floorGestureCount() ? g.source : '';
   if (e.touches && e.touches.length) return;
-  if (e.cancelable) e.preventDefault();
+  if (e.cancelable && e.preventDefault) e.preventDefault();
+  if (table && !floorOpenBlocked()) tapTable(table);
 }
 function floorCancelTouch(e){
   var g=FLOOR_GESTURE;
@@ -5242,6 +5258,26 @@ function tableInService(tNum){
   var chk=sess.checkId && STATE.checks[sess.checkId];
   return !!(chk && chk.status==='open');
 }
+function tableSession(tNum){
+  return STATE.tableSessions && STATE.tableSessions[String(tNum)];
+}
+function tableServiceState(tNum){
+  tNum=String(resolveTableNumber(tNum)||tNum||'');
+  if (unsentFor(tNum).length) return 'unsent';
+  var dining=(STATE.activeTastingOrders||[]).some(function(o){
+    return o && String(o.table)===tNum && o.status!=='closed' && o.status!=='paid' && o.status!=='void';
+  });
+  var live=(STATE.orders||[]).some(function(o){
+    return o && String(o.table)===tNum && o.status!=='cleared' && o.status!=='paid' && o.status!=='void';
+  });
+  if (dining || live) return 'sent';
+  var sess=tableSession(tNum);
+  var check=sess && sess.checkId && STATE.checks[sess.checkId];
+  if (check && (check.status==='paid' || check.status==='closed')) return 'paid';
+  if (sess && sess.seatedAt) return 'seated';
+  if (check && check.status==='open') return 'seated';
+  return 'empty';
+}
 function tableSeatedAt(tNum, o){
   var sess=STATE.tableSessions && STATE.tableSessions[String(tNum)];
   if (sess && sess.seatedAt) return sess.seatedAt;
@@ -5381,26 +5417,88 @@ function selectTable(t) {
   showGuestCountSheet(t);
 }
 
+function partySheetHtml(title){
+  var nums=[];
+  for (var n=1;n<=12;n++) nums.push('<button type="button" onclick="chooseGuestCount('+n+')">'+n+'</button>');
+  return '<h2>'+esc(title)+'</h2>'+
+    '<p class="sheet-sub">One tap. Cancel does not seat the table.</p>'+
+    '<div class="guest-keypad count-grid">'+nums.join('')+
+    '<button type="button" class="cancel-party" onclick="cancelGuestCount()">Cancel</button></div>';
+}
 function showGuestCountSheet(t){
-  var sess=sessionOf(t);
-  var n=sess.guestCount||currentTurnParty(findFloorTable(t))||2;
-  sess.guestCount=n;
-  STATE._guestBuf='';
-  paintGuestCountSheet(t);
+  STATE._guestPickTable=String(t);
+  STATE._guestPickMode='seat';
+  openSheet(partySheetHtml('Table '+t));
+}
+function openPartySheet(){
+  STATE._guestPickTable='';
+  STATE._guestPickMode='change';
+  openSheet(partySheetHtml('Guests'));
+}
+function cancelGuestCount(){
+  if (STATE._guestPickMode==='seat') {
+    var t=String(STATE._guestPickTable||'');
+    var sess=tableSession(t);
+    if (sess && !sess.seatedAt && !sess.checkId && tableServiceState(t)==='empty') delete STATE.tableSessions[t];
+  }
+  STATE._guestPickMode='';
+  STATE._guestPickTable='';
+  closeSheet();
+}
+function highestItemSeat(tNum){
+  var n=0;
+  function consider(seat){
+    var v=parseInt(seat,10);
+    if (v>n) n=v;
+  }
+  unsentFor(tNum).forEach(function(i){ consider(i.seat); });
+  (STATE.orders||[]).forEach(function(o){
+    if (!o || String(o.table)!==String(tNum) || o.status==='paid' || o.status==='cleared') return;
+    (o.items||[]).forEach(function(i){ consider(i.seat); });
+  });
+  return n;
+}
+function chooseGuestCount(n){
+  n=parseInt(n,10);
+  if (!(n>=1 && n<=20)) return;
+  if (STATE._guestPickMode==='change') {
+    var sess=sessionOf(STATE.selectedTable);
+    sess.guestCount=n;
+    STATE.guestCount=n;
+    var chk=STATE.checks[activeCheckId()]||ensureOpenCheck(STATE.selectedTable);
+    chk.guestCount=n;
+    persistCheck(chk);
+    var high=highestItemSeat(STATE.selectedTable);
+    STATE._guestPickMode='';
+    closeSheet();
+    renderOrder();
+    paintChrome();
+    toast(high>n ? ('Items remain on seat '+high) : (n+' guests'));
+    return;
+  }
+  var t=String(STATE._guestPickTable||STATE.selectedTable||'');
+  var seatSess=sessionOf(t);
+  seatSess.guestCount=n;
+  seatSess.seatedAt=Date.now();
+  STATE.selectedTable=t;
+  STATE.guestCount=n;
+  STATE.activeSeat=1;
+  STATE.hhMode='service';
+  STATE.checkFocus=false;
+  STATE.menuNav={ level:'cats', family:'food' };
+  STATE.menuFamily='food';
+  STATE.menuOpen=true;
+  STATE.tilePage=0;
+  ensureOpenCheck(t);
+  STATE.viewCheckId=seatSess.checkId;
+  STATE._guestPickMode='';
+  STATE._guestPickTable='';
+  closeSheet();
+  switchTab('order');
+  toast('Table '+t+' · '+n+' guests');
 }
 function paintGuestCountSheet(t){
-  var buf=STATE._guestBuf||'';
-  openSheet(
-    '<h2>Number of Guests</h2>'+
-    '<div class="guest-display" id="guest-count-display">'+(buf||'')+'</div>'+
-    '<div class="guest-keypad">'+
-      [1,2,3,4,5,6,7,8,9].map(function(k){ return '<button type="button" onclick="guestKey(\''+k+'\')">'+k+'</button>'; }).join('')+
-      '<button type="button" onclick="guestKey(\'C\')">C</button>'+
-      '<button type="button" onclick="guestKey(\'0\')">0</button>'+
-      '<button type="button" class="done" onclick="confirmGuests()">Done</button>'+
-    '</div>'+
-    '<button class="ghost-btn" onclick="closeSheet()">Cancel</button>'
-  );
+  showGuestCountSheet(t);
 }
 function guestKey(k){
   var buf=STATE._guestBuf||'';
@@ -6043,7 +6141,9 @@ function liveCheckHtml(){
   html+='</div>';
   html+='<div class="toast-totals"><span class="due">Balance Due: '+posTotalMoney(tot.grand)+'</span><span class="tot">TOTAL: '+posTotalMoney(tot.grand)+'</span></div>';
   html+='<div class="toast-check-ops">';
-  html+='<button type="button" onclick="openSeatPicker()">'+esc(String(sessionOf(STATE.selectedTable).guestCount||2))+' Guests</button>';
+  html+='<button type="button" onclick="openPartySheet()">'+esc(String(sessionOf(STATE.selectedTable).guestCount||2))+' Guests</button>';
+  if (tableServiceState(STATE.selectedTable)==='seated') html+='<button type="button" onclick="clearAccidentalTable()">Clear table</button>';
+  html+='<button type="button" onclick="openMoveTableSheet()">Move</button>';
   html+='<button type="button" onclick="STATE.menuOpen=true;setMenuFamily(\'food\')">Dining</button>';
   html+='<button type="button" onclick="printCheck()">Print</button>';
   html+='<button type="button" class="pay" onclick="openPayment(checkTotals().grand)">Pay '+posTotalMoney(tot.grand)+'</button>';
@@ -6727,65 +6827,215 @@ function submitVoiceTest(){
   if (!String(text||'').trim()) return;
   applyVoiceCommand(text);
 }
-function startVoiceMicrophone(){
-  if (STATE._voiceRec) {
-    STATE._voiceRec._cancelled=true;
-    try { STATE._voiceRec.stop(); } catch (e) {}
-    return;
-  }
-  if (!STATE.selectedTable) { toast('Open a table first'); return; }
-  var Ctor=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if (!Ctor) { toast('Microphone is not available in this browser'); return; }
-  var rec=new Ctor();
-  var latest='';
-  var submitted=false;
-  function finish(){
-    if (STATE._voiceRec===rec) STATE._voiceRec=null;
-  }
-  function deliver(){
-    if (submitted) return;
-    submitted=true;
-    finish();
-    if (String(latest||'').trim()) applyVoiceCommand(latest);
-    else { toast('No speech heard'); renderOrder(); }
-  }
-  rec.lang='en-US';
-  rec.continuous=false;
-  rec.interimResults=true;
-  rec.onresult=function(ev){
-    var i, row, alt;
-    for (i=ev.resultIndex||0;i<(ev.results||[]).length;i++){
-      row=ev.results[i];
-      alt=row && row[0];
-      if (alt && alt.transcript) latest=alt.transcript;
+function voiceTranscriberReady(){
+  return !!(window.EPICUREAN_VOICE_TRANSCRIBE || window.EPICUREAN_VOICE_TRANSCRIBE_URL);
+}
+function voiceMimeType(){
+  var Rec=window.MediaRecorder;
+  var types=['audio/mp4','audio/webm;codecs=opus','audio/webm'];
+  if (!Rec || !Rec.isTypeSupported) return '';
+  for (var i=0;i<types.length;i++) if (Rec.isTypeSupported(types[i])) return types[i];
+  return '';
+}
+function stopVoiceTracks(stream){
+  try { (stream&&stream.getTracks?stream.getTracks():[]).forEach(function(t){ t.stop(); }); } catch (e) {}
+}
+function voiceAuthToken(){
+  try {
+    if (typeof fbAuth!=='undefined' && fbAuth && fbAuth.currentUser && fbAuth.currentUser.getIdToken) {
+      return fbAuth.currentUser.getIdToken();
     }
-  };
-  rec.onerror=function(){
-    if (submitted || rec._cancelled) return;
-    submitted=true;
-    finish();
-    toast('Microphone did not capture');
-    renderOrder();
-  };
-  rec.onend=function(){
-    if (rec._cancelled) {
-      submitted=true;
-      finish();
-      renderOrder();
+  } catch (e) {}
+  return Promise.resolve('');
+}
+function postVoiceClip(url, blob){
+  var body=new FormData();
+  var name=/wav/i.test(blob && blob.type) ? 'utterance.wav' : 'utterance.m4a';
+  body.append('audio', blob, name);
+  body.append('hints', 'Restaurant order. Positions such as 3A. VIN numbers. Wine names.');
+  return voiceAuthToken().catch(function(){ return ''; }).then(function(token){
+    var headers={};
+    if (token) headers.Authorization='Bearer '+token;
+    return fetch(url, { method:'POST', headers:headers, body:body });
+  }).then(function(res){
+    if (!res.ok) throw new Error('transcribe');
+    return res.json();
+  }).then(function(data){ return data && (data.transcript||data.text) || ''; });
+}
+function voicePcmBlob(blob){
+  var Ctx=window.AudioContext||window.webkitAudioContext;
+  if (!Ctx || !blob || !blob.arrayBuffer) return Promise.reject(new Error('pcm'));
+  var ctx;
+  try { ctx=new Ctx(); } catch (e) { return Promise.reject(e); }
+  return blob.arrayBuffer().then(function(buf){ return ctx.decodeAudioData(buf); }).then(function(audio){
+    var rate=16000;
+    var src=audio.getChannelData(0);
+    var step=audio.sampleRate/rate;
+    var out=new Float32Array(Math.max(1, Math.floor(src.length/step)));
+    for (var i=0;i<out.length;i++) out[i]=src[Math.floor(i*step)]||0;
+    var bytes=new ArrayBuffer(44+out.length*2);
+    var view=new DataView(bytes);
+    function write(o,s){ for (var n=0;n<s.length;n++) view.setUint8(o+n, s.charCodeAt(n)); }
+    write(0,'RIFF'); view.setUint32(4, 36+out.length*2, true); write(8,'WAVE'); write(12,'fmt ');
+    view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+    view.setUint32(24, rate, true); view.setUint32(28, rate*2, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true);
+    write(36,'data'); view.setUint32(40, out.length*2, true);
+    var offset=44;
+    for (var s=0;s<out.length;s++, offset+=2){
+      var sample=Math.max(-1, Math.min(1, out[s]));
+      view.setInt16(offset, sample<0 ? sample*0x8000 : sample*0x7FFF, true);
+    }
+    try { ctx.close(); } catch (e) {}
+    return new Blob([bytes], { type:'audio/wav' });
+  }).catch(function(err){ try { ctx.close(); } catch (e) {} throw err; });
+}
+function releaseVoiceSession(session){
+  if (!session) return;
+  clearTimeout(session.timer);
+  clearTimeout(session.watch);
+  clearInterval(session.levelTimer);
+  stopVoiceTracks(session.stream);
+  if (session.audioCtx) { try { session.audioCtx.close(); } catch (e) {} }
+}
+function finishVoiceClip(){
+  var session=STATE._voiceRec;
+  if (!session || session.done) return;
+  session.done=true;
+  var cancelled=!!session.cancelled;
+  var heard=!!session.heard;
+  var monitored=!!session.monitored;
+  var token=session.token;
+  var chunks=session.chunks||[];
+  var mime=session.mime||'audio/mp4';
+  releaseVoiceSession(session);
+  STATE._voiceRec=null;
+  if (STATE.activeTab==='order') renderOrder();
+  if (cancelled) return;
+  if (monitored && !heard) { toast('No speech heard'); return; }
+  var blob;
+  try { blob=new Blob(chunks, { type:mime }); } catch (e) { blob=new Blob(chunks); }
+  if (!blob || !blob.size) { toast('No speech heard'); return; }
+  var pending;
+  if (window.EPICUREAN_VOICE_TRANSCRIBE) pending=Promise.resolve().then(function(){ return window.EPICUREAN_VOICE_TRANSCRIBE(blob); });
+  else pending=voicePcmBlob(blob).catch(function(){ return blob; }).then(function(out){ return postVoiceClip(window.EPICUREAN_VOICE_TRANSCRIBE_URL, out||blob); });
+  pending.then(function(text){
+    if (token!==STATE._voiceToken) return;
+    if (!String(text||'').trim()) { toast('No speech heard'); return; }
+    applyVoiceCommand(String(text));
+  }).catch(function(){
+    if (token!==STATE._voiceToken) return;
+    toast('Voice did not hear that');
+  });
+}
+function stopVoiceCapture(cancel){
+  var session=STATE._voiceRec;
+  if (!session) return;
+  if (cancel) {
+    session.cancelled=true;
+    STATE._voiceToken=(STATE._voiceToken||0)+1;
+  }
+  clearTimeout(session.timer);
+  clearTimeout(session.watch);
+  clearInterval(session.levelTimer);
+  if (session.recorder && session.recorder.state!=='inactive') {
+    try { session.recorder.stop(); return; } catch (e) {}
+  }
+  finishVoiceClip();
+}
+function voiceArmAudio(session){
+  var Ctx=window.AudioContext||window.webkitAudioContext;
+  if (!Ctx) return;
+  try {
+    if (!STATE._voiceAudio) STATE._voiceAudio=new Ctx();
+    if (STATE._voiceAudio.state==='suspended' && STATE._voiceAudio.resume) STATE._voiceAudio.resume();
+  } catch (e) {}
+}
+function voiceWatchSpeech(session){
+  var ctx=STATE._voiceAudio;
+  if (!ctx || !session.stream || !ctx.createMediaStreamSource) return;
+  var source, analyser;
+  try {
+    source=ctx.createMediaStreamSource(session.stream);
+    analyser=ctx.createAnalyser();
+    analyser.fftSize=1024;
+    source.connect(analyser);
+  } catch (e) { return; }
+  session.audioCtx=null;
+  session.monitored=true;
+  var data=new Uint8Array(analyser.fftSize);
+  var noise=0, samples=0, quietSince=0;
+  session.levelTimer=setInterval(function(){
+    if (STATE._voiceRec!==session || session.done) { clearInterval(session.levelTimer); return; }
+    analyser.getByteTimeDomainData(data);
+    var sum=0;
+    for (var i=0;i<data.length;i++){ var v=(data[i]-128)/128; sum+=v*v; }
+    var rms=Math.sqrt(sum/data.length);
+    if (samples<6 && rms<0.045) { noise+=rms; samples++; return; }
+    var floor=(samples?noise/samples:0.02)+0.025;
+    var speaking=rms>Math.max(0.045, floor*2);
+    var now=Date.now();
+    if (speaking) { session.heard=true; quietSince=0; return; }
+    if (session.heard) {
+      if (!quietSince) quietSince=now;
+      if (now-quietSince>(window.VOICE_SILENCE_MS||900)) stopVoiceCapture(false);
       return;
     }
-    deliver();
-  };
-  STATE._voiceRec=rec;
-  try { rec.start(); }
-  catch (e) {
-    submitted=true;
-    finish();
-    toast('Microphone did not start');
+    if (now-(session.startedAt||now)>(window.VOICE_NOSPEECH_MS||4000)) stopVoiceCapture(false);
+  }, 80);
+}
+function startVoiceMicrophone(){
+  if (STATE._voiceRec) { stopVoiceCapture(false); return; }
+  if (!STATE.selectedTable) { toast('Open a table first'); return; }
+  if (!voiceTranscriberReady()) { toast('Voice transcription is not connected'); return; }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) {
+    toast('Microphone is not available');
     return;
   }
+  var token=(STATE._voiceToken=(STATE._voiceToken||0)+1);
+  var session={ token:token, cancelled:false, done:false, heard:false, monitored:false, chunks:[], mime:voiceMimeType(), startedAt:Date.now() };
+  STATE._voiceRec=session;
+  voiceArmAudio(session);
+  session.watch=setTimeout(function(){
+    if (STATE._voiceRec!==session) return;
+    stopVoiceCapture(true);
+    toast('Microphone timed out');
+  }, window.VOICE_WATCH_MS||12000);
   toast('Listening');
   renderOrder();
+  navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:true, noiseSuppression:true, channelCount:1 } }).then(function(stream){
+    if (STATE._voiceRec!==session || session.cancelled) { stopVoiceTracks(stream); return; }
+    var rec;
+    try { rec=session.mime ? new MediaRecorder(stream, { mimeType:session.mime }) : new MediaRecorder(stream); }
+    catch (e) {
+      stopVoiceTracks(stream);
+      session.cancelled=true;
+      finishVoiceClip();
+      toast('Microphone did not start');
+      return;
+    }
+    session.stream=stream;
+    session.recorder=rec;
+    rec.ondataavailable=function(ev){ if (ev.data && ev.data.size) session.chunks.push(ev.data); };
+    rec.onerror=function(){ stopVoiceCapture(true); toast('Microphone did not capture'); };
+    rec.onstop=function(){ finishVoiceClip(); };
+    try { rec.start(); }
+    catch (e) {
+      stopVoiceTracks(stream);
+      session.cancelled=true;
+      finishVoiceClip();
+      toast('Microphone did not start');
+      return;
+    }
+    voiceWatchSpeech(session);
+    session.timer=setTimeout(function(){ if (STATE._voiceRec===session) stopVoiceCapture(false); }, window.VOICE_CAPTURE_MS||8000);
+  }).catch(function(err){
+    if (STATE._voiceRec===session) {
+      session.cancelled=true;
+      finishVoiceClip();
+    }
+    var name=err && (err.name||err.message) || '';
+    toast(/NotAllowed|Permission|denied/i.test(name) ? 'Microphone blocked' : 'Microphone did not start');
+  });
 }
 function dismissVoiceDraft(id){
   STATE.voiceDrafts=ensureVoiceDrafts().filter(function(d){ return d.id!==id; });
@@ -8599,40 +8849,114 @@ function listTableNums(){
   return nums.sort(function(a,b){ return Number(a)-Number(b); });
 }
 function openMoveTableSheet(){
-  var html='<h2>Move table</h2><p class="sheet-sub">Transfer this check to another table. Items, seats, sent and held stay intact.</p><div class="chip-row">';
+  var html='<h2>Move table</h2><p class="sheet-sub">Move this party to an empty table. The check, seats, allergies, and fired courses go with them.</p><div class="chip-row">';
+  var any=false;
   listTableNums().forEach(function(n){
     if (String(n)===String(STATE.selectedTable)) return;
+    if (tableServiceState(n)!=='empty') return;
+    any=true;
     html+='<button class="chip" onclick="transferCheckTo('+JSON.stringify(String(n))+')">'+esc(String(n))+'</button>';
   });
+  if (!any) html+='<p class="sheet-sub">No empty table.</p>';
   html+='</div><button class="ghost-btn" onclick="closeSheet()">Cancel</button>';
   openSheet(html);
 }
+function retargetKitchenTickets(oldTable, newTable){
+  if (!fbReady || !fbDb || !fbDb.collection) return;
+  fbDb.collection('orders').where('table','==',oldTable).get().then(function(snap){
+    snap.forEach(function(doc){
+      var data=doc.data()||{};
+      if (data.status==='paid' || data.status==='cleared' || data.status==='void') return;
+      doc.ref.update({table:String(newTable)});
+    });
+  }).catch(function(){});
+  var feed=fbDb.collection('boh_shared').doc('active_orders');
+  feed.get().then(function(doc){
+    if (!doc.exists) return null;
+    var data=doc.data()||{};
+    var list=Array.isArray(data.list)?data.list.map(function(item){
+      if (!item || String(item.table)!==String(oldTable)) return item;
+      if (item.status==='paid' || item.status==='cleared' || item.status==='void') return item;
+      var copy=Object.assign({}, item);
+      copy.table=String(newTable);
+      return copy;
+    }):[];
+    return feed.set({list:list, updatedAt:Date.now()});
+  }).catch(function(){});
+}
 function transferCheckTo(newTable){
-  var old=STATE.selectedTable;
+  var old=String(STATE.selectedTable||'');
+  newTable=String(resolveTableNumber(newTable)||newTable||'');
+  if (!old || !newTable || old===newTable) return;
+  var srcState=tableServiceState(old);
+  if (srcState==='empty') { toast('Nothing to move'); return; }
+  if (srcState==='paid') { toast('This check is closed'); return; }
+  if (tableServiceState(newTable)!=='empty') { toast('Table '+newTable+' is occupied'); return; }
   var sess=sessionOf(old);
-  var seatedAt=sess.seatedAt;
-  var guestCount=sess.guestCount;
-  var checkIds=tableCheckIds(old);
-  STATE.currentOrder.forEach(function(i){ if (String(i.table)===String(old)) i.table=newTable; });
-  STATE.orders.forEach(function(o){ if (String(o.table)===String(old) && o.status==='new') o.table=newTable; });
-  checkIds.forEach(function(id){
+  var dest=sessionOf(newTable);
+  dest.guestCount=sess.guestCount||dest.guestCount||2;
+  dest.seatedAt=sess.seatedAt||Date.now();
+  dest.kitchenNote=sess.kitchenNote||'';
+  dest.kitchenNoteSent=!!sess.kitchenNoteSent;
+  dest.allergies=JSON.parse(JSON.stringify(sess.allergies||{table:[]}));
+  dest.femalePositions=Object.assign({}, sess.femalePositions||{});
+  dest.positionStates=JSON.parse(JSON.stringify(sess.positionStates||{}));
+  dest.checkId=sess.checkId||null;
+  dest.checkIds=(sess.checkIds||[]).filter(function(id){
     var ch=STATE.checks[id];
-    if (!ch) return;
-    ch.table=String(newTable);
+    return !ch || (ch.status!=='paid' && ch.status!=='closed' && ch.status!=='void');
+  });
+  var movedPrimary=dest.checkId && STATE.checks[dest.checkId];
+  if (movedPrimary && (movedPrimary.status==='paid' || movedPrimary.status==='closed' || movedPrimary.status==='void')) {
+    dest.checkId=dest.checkIds[0]||null;
+  }
+  STATE.currentOrder.forEach(function(i){ if (i && String(i.table)===old) i.table=newTable; });
+  STATE.orders.forEach(function(o){
+    if (!o || String(o.table)!==old) return;
+    if (o.status==='paid' || o.status==='cleared' || o.status==='void') return;
+    o.table=newTable;
+  });
+  (STATE.activeTastingOrders||[]).forEach(function(o){
+    if (!o || String(o.table)!==old) return;
+    if (o.status==='paid' || o.status==='closed' || o.status==='void') return;
+    o.table=newTable;
+  });
+  STATE.selectedTable=newTable;
+  var ids={};
+  if (dest.checkId) ids[dest.checkId]=1;
+  (dest.checkIds||[]).forEach(function(id){ ids[id]=1; });
+  Object.keys(ids).forEach(function(id){
+    var ch=STATE.checks[id];
+    if (!ch || ch.status==='paid' || ch.status==='closed') return;
+    ch.table=newTable;
     persistCheck(ch);
   });
-  var dest=sessionOf(newTable);
-  dest.checkId=sess.checkId;
-  dest.checkIds=checkIds.slice();
-  dest.seatedAt=seatedAt||dest.seatedAt||Date.now();
-  dest.guestCount=guestCount||dest.guestCount;
-  dest.allergies=sess.allergies||dest.allergies;
-  delete STATE.tableSessions[String(old)];
-  STATE.selectedTable=newTable;
+  delete STATE.tableSessions[old];
   STATE.viewCheckId=dest.checkId;
+  retargetKitchenTickets(old, newTable);
   closeSheet();
   renderOrder();
+  paintChrome();
   toast('Moved to table '+newTable);
+}
+function clearAccidentalTable(tNum){
+  tNum=String(tNum||STATE.selectedTable||'');
+  if (tableServiceState(tNum)!=='seated') { toast('This table has an order'); return; }
+  var sess=tableSession(tNum);
+  var ids=[];
+  if (sess && sess.checkId) ids.push(sess.checkId);
+  if (sess && sess.checkIds) sess.checkIds.forEach(function(id){ if (ids.indexOf(id)<0) ids.push(id); });
+  ids.forEach(function(id){
+    var ch=STATE.checks[id];
+    if (!ch || ch.status!=='open') return;
+    ch.status='void';
+    ch.voidedAt=Date.now();
+    ch.table=tNum;
+    persistCheck(ch);
+  });
+  delete STATE.tableSessions[tNum];
+  toast('Table '+tNum+' cleared');
+  backToFloor();
 }
 function openCombineSheet(){
   var html='<h2>Combine tables</h2><p class="sheet-sub">Put two tables together. The new number is the lower one — 4 and 5 become table 4.</p><div class="chip-row">';
@@ -8850,18 +9174,7 @@ function splitSelectedCombined(){
   if (!splitCombinedTable(STATE.selectedTable)) toast('Select a combined table first');
 }
 function openGuestsSheet(){
-  var sess=sessionOf(STATE.selectedTable);
-  var n=sess.guestCount||STATE.guestCount||2;
-  openSheet(
-    '<h2>Guests</h2><p class="sheet-sub">Change party size for this table.</p>'+
-    '<div class="qty-row">'+
-      '<button type="button" onclick="bumpGuests(-1)">−</button>'+
-      '<div id="guest-count-display" style="font-size:1.6rem;font-weight:800;min-width:2.5rem;text-align:center;">'+n+'</div>'+
-      '<button type="button" onclick="bumpGuests(1)">+</button>'+
-    '</div>'+
-    '<button class="primary-btn" onclick="applyGuestCount()">Save</button>'+
-    '<button class="ghost-btn" onclick="closeSheet()">Cancel</button>'
-  );
+  openPartySheet();
 }
 function applyGuestCount(){
   var sess=sessionOf(STATE.selectedTable);

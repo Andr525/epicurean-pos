@@ -651,24 +651,62 @@ w.applyVoiceCommand = function (text) {
   heard.push(text);
   return { text: text };
 };
-function FakeRecognition() {}
-FakeRecognition.prototype.start = function () { this.started = true; };
-FakeRecognition.prototype.stop = function () { if (this.onend) this.onend(); };
-w.webkitSpeechRecognition = FakeRecognition;
-w.STATE._voiceRec = null;
-w.startVoiceMicrophone();
-assert.equal(w.STATE._voiceRec.started, true);
-w.STATE._voiceRec.onresult({ resultIndex: 0, results: [[{ transcript: '3A VIN 2148' }]] });
-w.STATE._voiceRec.onend();
-assert.deepEqual(heard, ['3A VIN 2148']);
-assert.equal(w.STATE._voiceRec, null);
+function flush() { return new Promise((resolve) => setTimeout(resolve, 0)); }
+function FakeRecorder() { this.state = 'inactive'; }
+FakeRecorder.prototype.start = function () { this.state = 'recording'; this.started = true; };
+FakeRecorder.prototype.stop = function () {
+  this.state = 'inactive';
+  if (this.ondataavailable) this.ondataavailable({ data: { size: 32 } });
+  if (this.onstop) this.onstop();
+};
 const toasts = [];
 const originalToast = w.toast;
 w.toast = function (message) { toasts.push(message); };
-delete w.webkitSpeechRecognition;
-delete w.SpeechRecognition;
+w.MediaRecorder = FakeRecorder;
+w.navigator.mediaDevices = {
+  getUserMedia() {
+    return Promise.resolve({ getTracks() { return [{ stop() {} }]; } });
+  }
+};
+delete w.EPICUREAN_VOICE_TRANSCRIBE;
+delete w.EPICUREAN_VOICE_TRANSCRIBE_URL;
+w.STATE._voiceRec = null;
 w.startVoiceMicrophone();
-assert.ok(toasts.some((message) => /not available/i.test(message)));
+assert.equal(w.STATE._voiceRec, null);
+assert.ok(toasts.some((message) => /not connected/i.test(message)));
+w.EPICUREAN_VOICE_TRANSCRIBE = function () { return '3A VIN 2148'; };
+toasts.length = 0;
+let sends = 0;
+const originalSend = w.sendOrder;
+w.sendOrder = function () { sends += 1; };
+w.startVoiceMicrophone();
+await flush();
+assert.equal(w.STATE._voiceRec.recorder.started, true);
+w.startVoiceMicrophone();
+await flush();
+assert.deepEqual(heard, ['3A VIN 2148']);
+assert.equal(w.STATE._voiceRec, null);
+assert.equal(sends, 0);
+w.sendOrder = originalSend;
+assert.equal(src.includes('webkitSpeechRecognition'), false);
+w.EPICUREAN_VOICE_TRANSCRIBE = function () { return Promise.reject(new Error('down')); };
+w.startVoiceMicrophone();
+await flush();
+w.stopVoiceCapture(false);
+await flush();
+assert.ok(toasts.some((message) => /did not hear/i.test(message)));
+assert.equal(w.STATE._voiceRec, null);
+assert.deepEqual(heard, ['3A VIN 2148']);
+w.navigator.mediaDevices.getUserMedia = function () {
+  const err = new Error('denied');
+  err.name = 'NotAllowedError';
+  return Promise.reject(err);
+};
+toasts.length = 0;
+w.startVoiceMicrophone();
+await flush();
+assert.equal(w.STATE._voiceRec, null);
+assert.ok(toasts.some((message) => /blocked/i.test(message)));
 w.toast = originalToast;
 w.applyVoiceCommand = originalApply;
 assert.match(app.querySelector('.add-items-label').textContent, /Add items/i);
@@ -704,7 +742,7 @@ const main = execSync('git show origin/main:index.html', { cwd: root, encoding: 
   assert.equal(extractDecl(src, fn), extractDecl(main, fn), fn);
 });
 execSync('git diff --exit-code origin/main -- scalini-dining.js voice-vocab.js', { cwd: root, stdio: 'pipe' });
-assert.match(src, /pos-build: scalini-print-v61/);
+assert.match(src, /pos-build: scalini-print-v62/);
 assert.doesNotMatch(fs.readFileSync(path.join(root, 'voice-engine.js'), 'utf8'), /sendOrder|fireDining|reviewSendRapidVoice/);
 const prevTab = w.STATE.activeTab;
 w.STATE.activeTab = 'tables';

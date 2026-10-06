@@ -330,18 +330,110 @@ w.paintBeverageResults('cha');
 assert.equal(renderCalls, 0, 'paintBeverageResults must not call renderOrder');
 w.renderOrder = origRender;
 
-// 11. keypad capture click reaches guestKey; floorViewLocked while sheet shown
+// 11. one tap seats a party; cancel does not; clear and move keep the check
 seedTable(w);
-w.STATE._guestBuf = '';
-w.showGuestCountSheet('4');
+w.STATE.tableSessions = {};
+w.STATE.checks = {};
+w.STATE.currentOrder = [];
+w.STATE.orders = [];
+w.STATE.activeTastingOrders = [];
+w.STATE.selectedTable = null;
+w.FLOOR_GESTURE.source = '';
+w.FLOOR_GESTURE.startTable = '';
+w.FLOOR_GESTURE.moved = false;
+let prevented = false;
+w.floorEndTouch({
+  touches: [],
+  changedTouches: [{ clientX: 0, clientY: 0 }],
+  target: w.document.body,
+  cancelable: true,
+  preventDefault() { prevented = true; }
+});
+assert.equal(prevented, false);
+w.FLOOR_GESTURE.source = 'touch';
+w.FLOOR_GESTURE.startTable = '4';
+w.FLOOR_GESTURE.moved = false;
+w.floorEndTouch({
+  touches: [],
+  changedTouches: [{ clientX: 2, clientY: 2 }],
+  target: w.document.body,
+  cancelable: true,
+  preventDefault() {}
+});
 assert.equal(w.floorViewLocked(), true);
-const keyBtn = w.document.querySelector('.guest-keypad button');
-assert.ok(keyBtn, 'keypad button missing');
-const ev = new w.MouseEvent('click', { bubbles: true, cancelable: true });
-keyBtn.dispatchEvent(ev);
-assert.equal(w.STATE._guestBuf, '1');
-w.closeSheet();
+assert.equal(w.tableServiceState('4'), 'empty');
+w.cancelGuestCount();
 assert.equal(w.floorViewLocked(), false);
+assert.equal(w.STATE.tableSessions['4'], undefined);
+w.showGuestCountSheet('4');
+const partyBtn = [...w.document.querySelectorAll('.guest-keypad button')].find((b) => b.textContent.trim() === '3');
+assert.ok(partyBtn, 'party size 3 missing');
+partyBtn.dispatchEvent(new w.MouseEvent('click', { bubbles: true, cancelable: true }));
+assert.equal(w.STATE.guestCount, 3);
+assert.equal(w.tableServiceState('4'), 'seated');
+assert.ok(w.STATE.tableSessions['4'].seatedAt);
+w.clearAccidentalTable('4');
+assert.equal(w.STATE.tableSessions['4'], undefined);
+assert.equal(w.STATE.checks[Object.keys(w.STATE.checks)[0]].status, 'void');
+w.sessionOf('4').seatedAt = Date.now();
+w.sessionOf('4').guestCount = 4;
+w.sessionOf('4').kitchenNote = 'no onion';
+w.sessionOf('4').femalePositions = { '2': true };
+w.sessionOf('4').positionStates = { '2': { pass: true } };
+w.STATE.selectedTable = '4';
+w.STATE.currentOrder = [{ lineId: 'a', table: '4', name: 'Tuna', seat: 4, price: 16, qty: 1 }];
+w.STATE.orders = [{ id: 'o1', table: '4', status: 'new', sentAt: 10, server: 'Test', items: [{ seat: 4, name: 'Tuna' }] }];
+w.STATE.activeTastingOrders = [{ id: 't1', table: '4', status: 'active', selections: [{ fired: true }] }];
+w.clearAccidentalTable('4');
+assert.equal(w.STATE.currentOrder.length, 1);
+assert.equal(w.tableServiceState('4'), 'unsent');
+w.transferCheckTo('9');
+assert.equal(String(w.STATE.selectedTable), '9');
+assert.equal(w.STATE.currentOrder[0].table, '9');
+assert.equal(w.STATE.orders[0].table, '9');
+assert.equal(w.STATE.orders[0].server, 'Test');
+assert.equal(w.STATE.activeTastingOrders[0].table, '9');
+assert.equal(w.STATE.tableSessions['9'].kitchenNote, 'no onion');
+assert.equal(w.STATE.tableSessions['9'].femalePositions['2'], true);
+assert.equal(w.STATE.tableSessions['9'].positionStates['2'].pass, true);
+assert.equal(w.STATE.tableSessions['4'], undefined);
+w.sessionOf('8').seatedAt = Date.now();
+w.transferCheckTo('8');
+assert.equal(String(w.STATE.selectedTable), '9');
+assert.equal(w.STATE.orders[0].table, '9');
+w.STATE.orders.push({ id: 'paid1', table: '9', status: 'paid', server: 'Test' });
+w.transferCheckTo('7');
+assert.equal(String(w.STATE.selectedTable), '7');
+assert.equal(w.STATE.orders.find((o) => o.id === 'paid1').table, '9');
+assert.equal(w.STATE.orders.find((o) => o.id === 'o1').table, '7');
+w.openPartySheet();
+w.chooseGuestCount(2);
+assert.equal(w.STATE.guestCount, 2);
+assert.equal(w.STATE.currentOrder.length, 1);
+assert.equal(w.STATE.currentOrder[0].name, 'Tuna');
+w.STATE.currentOrder = [];
+w.STATE.orders = [{ id: 'sent1', table: '7', status: 'new', server: 'Test', items: [{ name: 'Bread' }] }];
+w.STATE.activeTastingOrders = [];
+assert.equal(w.tableServiceState('7'), 'sent');
+w.clearAccidentalTable('7');
+assert.equal(w.STATE.orders[0].table, '7');
+assert.equal(w.tableServiceState('7'), 'sent');
+w.FLOOR_GESTURE.source = 'touch';
+w.FLOOR_GESTURE.startTable = '5';
+w.FLOOR_GESTURE.moved = true;
+w.FLOOR_GESTURE.cloneEl = null;
+let draggedOpen = false;
+const origSelect = w.selectTable;
+w.selectTable = function () { draggedOpen = true; };
+w.floorEndTouch({
+  touches: [],
+  changedTouches: [{ clientX: 40, clientY: 40 }],
+  target: w.document.body,
+  cancelable: true,
+  preventDefault() {}
+});
+assert.equal(draggedOpen, false);
+w.selectTable = origSelect;
 
 // 12. floor clone-drag decls unchanged vs origin/main
 const mainSrc = execSync('git show origin/main:index.html', { cwd: root, encoding: 'utf8' });
