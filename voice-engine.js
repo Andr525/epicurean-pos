@@ -129,19 +129,129 @@
     };
   }
 
-  function takePosition(text) {
-    var s = String(text || '').replace(/\s+/g, ' ').trim();
-    var m = s.match(/^(back\s+to\s+)?(\d{1,2})\s*([aA])?(?:\s+([\s\S]+))?$/i);
-    if (!m) return { touched: false, seat: null, priority: false, body: s };
-    var seat = Number(m[2]);
-    if (!(seat >= 1 && seat <= 20)) return { touched: false, seat: null, priority: false, body: s };
+  function isVinMarker(token) {
+    return /^(vin|lin)[:#\-]*$/i.test(token);
+  }
+
+  function isCodeToken(token) {
+    var core = String(token || '').replace(/[:#\-]+$/g, '').toLowerCase();
+    if (/^\d+$/.test(core)) return true;
+    return Object.prototype.hasOwnProperty.call(DIGITS, core);
+  }
+
+  function gluedPosition(token) {
+    var m = String(token || '').match(/^(\d{1,2})([aA])$/);
+    if (!m) return null;
+    var seat = Number(m[1]);
+    if (!(seat >= 1 && seat <= 20)) return null;
+    return { seat: seat, priority: true };
+  }
+
+  function bareSeat(token) {
+    if (!/^\d{1,2}$/.test(token)) return null;
+    var seat = Number(token);
+    if (!(seat >= 1 && seat <= 20)) return null;
+    return { seat: seat, priority: false };
+  }
+
+  function readPositionAt(tokens, index, blocked) {
+    if (blocked[index]) return null;
+    var glued = gluedPosition(tokens[index]);
+    if (glued) return { seat: glued.seat, priority: true, span: [index, index] };
+    var bare = bareSeat(tokens[index]);
+    if (!bare) return null;
+    if (index + 1 < tokens.length && /^a$/i.test(tokens[index + 1]) && !blocked[index + 1]) {
+      return { seat: bare.seat, priority: true, span: [index, index + 1] };
+    }
+    return { seat: bare.seat, priority: false, span: [index, index] };
+  }
+
+  function phraseIsExact(text, opts) {
+    opts = opts || {};
+    var q = normKeyword(text);
+    if (!q) return false;
+    var index = opts.index;
+    if (index) {
+      if ((index.byKeyword[q] || []).length) return true;
+      if ((index.byAlias[q] || []).length) return true;
+      if ((index.inactiveKeyword[q] || []).length) return true;
+    }
+    return exactNames(text, opts.catalog || []).length > 0;
+  }
+
+  function splicePosition(tokens, pos) {
+    var keep = [];
+    var i;
+    for (i = 0; i < tokens.length; i++) {
+      if (i >= pos.span[0] && i <= pos.span[1]) continue;
+      keep.push(tokens[i]);
+    }
     return {
       touched: true,
-      seat: seat,
-      priority: !!m[3],
-      back: !!m[1],
-      body: String(m[4] || '').trim()
+      seat: pos.seat,
+      priority: !!pos.priority,
+      back: !!pos.back,
+      body: keep.join(' ').replace(/\s+/g, ' ').trim()
     };
+  }
+
+  function untouched(body) {
+    return { touched: false, seat: null, priority: false, body: body };
+  }
+
+  function takePosition(text, opts) {
+    var s = String(text || '').replace(/\s+/g, ' ').trim();
+    if (!s) return untouched('');
+    var tokens = s.split(' ');
+    var blocked = {};
+    var i;
+    for (i = 0; i < tokens.length; i++) {
+      if (!isVinMarker(tokens[i])) continue;
+      var j = i + 1;
+      while (j < tokens.length && isCodeToken(tokens[j])) {
+        blocked[j] = true;
+        j++;
+      }
+      i = Math.max(i, j - 1);
+    }
+    var consumed = {};
+    var strong = [];
+    for (i = 0; i < tokens.length; i++) {
+      if (!/^back$/i.test(tokens[i]) || i + 2 >= tokens.length || !/^to$/i.test(tokens[i + 1])) continue;
+      var backPos = readPositionAt(tokens, i + 2, blocked);
+      if (!backPos) continue;
+      backPos.back = true;
+      backPos.span = [i, backPos.span[1]];
+      strong.push(backPos);
+      var b;
+      for (b = backPos.span[0]; b <= backPos.span[1]; b++) consumed[b] = true;
+      i = backPos.span[1];
+    }
+    for (i = 0; i < tokens.length; i++) {
+      if (consumed[i] || blocked[i]) continue;
+      var marked = readPositionAt(tokens, i, blocked);
+      if (!marked || !marked.priority) continue;
+      marked.back = false;
+      strong.push(marked);
+      consumed[i] = true;
+      if (marked.span[1] !== i) consumed[marked.span[1]] = true;
+      i = marked.span[1];
+    }
+    if (strong.length > 1) return untouched(s);
+    if (strong.length === 1) return splicePosition(tokens, strong[0]);
+    var edges = [];
+    if (tokens.length && !blocked[0]) {
+      var lead = readPositionAt(tokens, 0, blocked);
+      if (lead && !lead.priority && lead.span[1] === 0) edges.push(lead);
+    }
+    var last = tokens.length - 1;
+    if (last > 0 && !blocked[last]) {
+      var tail = readPositionAt(tokens, last, blocked);
+      if (tail && !tail.priority && tail.span[0] === last) edges.push(tail);
+    }
+    if (edges.length !== 1) return untouched(s);
+    if (tokens.length > 1 && phraseIsExact(s, opts)) return untouched(s);
+    return splicePosition(tokens, edges[0]);
   }
 
   function serviceOf(body) {
@@ -399,7 +509,7 @@
   function parse(text, opts) {
     opts = opts || {};
     var raw = String(text || '').trim();
-    var pos = takePosition(raw);
+    var pos = takePosition(raw, opts);
     var base = {
       text: raw,
       seat: pos.seat,
