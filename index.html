@@ -8855,7 +8855,7 @@ function openMoveTableSheet(){
     if (String(n)===String(STATE.selectedTable)) return;
     if (tableServiceState(n)!=='empty') return;
     any=true;
-    html+='<button class="chip" onclick="transferCheckTo('+JSON.stringify(String(n))+')">'+esc(String(n))+'</button>';
+    html+='<button class="chip" onclick=\'transferCheckTo('+JSON.stringify(String(n))+')\'>'+esc(String(n))+'</button>';
   });
   if (!any) html+='<p class="sheet-sub">No empty table.</p>';
   html+='</div><button class="ghost-btn" onclick="closeSheet()">Cancel</button>';

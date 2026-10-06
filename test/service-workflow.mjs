@@ -448,6 +448,7 @@ const mainSrc = execSync('git show origin/main:index.html', { cwd: root, encodin
   assert.equal(extractDecl(src, needle), extractDecl(mainSrc, needle), needle + ' changed vs origin/main');
 });
 assert.equal(w.FLOOR_HOLD_OCCUPIED_MS, 500);
+assert.equal(src.includes('onclick="transferCheckTo('), false);
 
 if (w.STATE && w.STATE._seatTick) {
   w.clearInterval(w.STATE._seatTick);
