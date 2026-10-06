@@ -642,6 +642,35 @@ w.renderOrder();
 const app = w.document.getElementById('app-content');
 assert.ok(app.querySelector('[data-voice-test="1"]'));
 assert.match(app.textContent, /VOICE TEST/);
+assert.equal(app.querySelector('[data-voice-test="1"] button').getAttribute('onclick'), 'submitVoiceTest()');
+assert.equal(app.querySelector('[data-voice-mic="1"] button').getAttribute('onclick'), 'startVoiceMicrophone()');
+app.querySelector('#voice-test-input').value = 'SHOULD NOT USE';
+const heard = [];
+const originalApply = w.applyVoiceCommand;
+w.applyVoiceCommand = function (text) {
+  heard.push(text);
+  return { text: text };
+};
+function FakeRecognition() {}
+FakeRecognition.prototype.start = function () { this.started = true; };
+FakeRecognition.prototype.stop = function () { if (this.onend) this.onend(); };
+w.webkitSpeechRecognition = FakeRecognition;
+w.STATE._voiceRec = null;
+w.startVoiceMicrophone();
+assert.equal(w.STATE._voiceRec.started, true);
+w.STATE._voiceRec.onresult({ resultIndex: 0, results: [[{ transcript: '3A VIN 2148' }]] });
+w.STATE._voiceRec.onend();
+assert.deepEqual(heard, ['3A VIN 2148']);
+assert.equal(w.STATE._voiceRec, null);
+const toasts = [];
+const originalToast = w.toast;
+w.toast = function (message) { toasts.push(message); };
+delete w.webkitSpeechRecognition;
+delete w.SpeechRecognition;
+w.startVoiceMicrophone();
+assert.ok(toasts.some((message) => /not available/i.test(message)));
+w.toast = originalToast;
+w.applyVoiceCommand = originalApply;
 assert.match(app.querySelector('.add-items-label').textContent, /Add items/i);
 const tabs = [...app.querySelectorAll('.period-tab')].map((el) => el.textContent.trim());
 ['Food', 'Drinks', 'Prix Fixe', 'Tasting'].forEach((label) => {
@@ -675,7 +704,7 @@ const main = execSync('git show origin/main:index.html', { cwd: root, encoding: 
   assert.equal(extractDecl(src, fn), extractDecl(main, fn), fn);
 });
 execSync('git diff --exit-code origin/main -- scalini-dining.js voice-vocab.js', { cwd: root, stdio: 'pipe' });
-assert.match(src, /pos-build: scalini-print-v60/);
+assert.match(src, /pos-build: scalini-print-v61/);
 assert.doesNotMatch(fs.readFileSync(path.join(root, 'voice-engine.js'), 'utf8'), /sendOrder|fireDining|reviewSendRapidVoice/);
 const prevTab = w.STATE.activeTab;
 w.STATE.activeTab = 'tables';

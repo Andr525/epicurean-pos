@@ -11,14 +11,14 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<link rel="manifest" href="manifest.json?b=60">
-<link rel="apple-touch-icon" href="icon-192.png?b=60">
-<link rel="apple-touch-icon" sizes="180x180" href="icon-192.png?b=60">
-<link rel="apple-touch-icon" sizes="192x192" href="icon-192.png?b=60">
-<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?b=60">
-<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?b=60">
+<link rel="manifest" href="manifest.json?b=61">
+<link rel="apple-touch-icon" href="icon-192.png?b=61">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-192.png?b=61">
+<link rel="apple-touch-icon" sizes="192x192" href="icon-192.png?b=61">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?b=61">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?b=61">
 <title>Epicurean POS</title>
-<!-- pos-build: scalini-print-v60 -->
+<!-- pos-build: scalini-print-v61 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
@@ -1267,11 +1267,14 @@ body.hh-on .floor-retry { background:#fff; color:#000; border-color:#c5ced8; }
 .voice-test input { flex:1; min-height:44px; margin:0; font-size:16px; }
 .voice-test button { flex:0 0 auto; min-height:44px; padding:0 0.9rem; border-radius:12px; border:1px solid var(--primary); background:var(--primary); color:#1a1008; font-weight:800; }
 .voice-test .voice-rev { margin-top:0.35rem; font-size:0.68rem; color:var(--text-muted); }
+.voice-mic { margin:-0.2rem 0 0.7rem; }
+.voice-mic button { min-height:44px; padding:0 1rem; border-radius:12px; border:1px solid var(--primary); background:var(--surface); color:var(--text); font-weight:800; }
+.voice-mic button.on { background:var(--primary); color:#1a1008; }
 .voice-draft { margin:0 0 0.45rem; padding:0.55rem 0.65rem; border-radius:10px; border:1px solid var(--warning); background:rgba(251,146,60,0.12); color:var(--text); }
 .voice-draft b { font-size:0.72rem; letter-spacing:0.04em; }
 .voice-draft .voice-draft-acts { display:flex; gap:8px; margin-top:0.4rem; }
 .voice-draft .voice-draft-acts button { min-height:36px; padding:0.3rem 0.7rem; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-weight:700; }
-body.hh-on .voice-test, body.hh-on .voice-draft { background:#fff; color:#000; }
+body.hh-on .voice-test, body.hh-on .voice-draft, body.hh-on .voice-mic button { background:#fff; color:#000; }
 body.hh-on .voice-test label, body.hh-on .voice-rev { color:#7a4b12; }
 body.hh-on .voice-draft .voice-draft-acts button { background:#fff; color:#000; }
 </style>
@@ -1332,7 +1335,7 @@ body.hh-on .voice-draft .voice-draft-acts button { background:#fff; color:#000; 
 <div id="login-screen" class="screen active">
   <h1>Epicurean POS</h1>
   <p class="subtitle">Enter your 4-digit code</p>
-  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 60</p>
+  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 61</p>
   <div class="pin-display" id="pin-display">
     <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
   </div>
@@ -6712,11 +6715,77 @@ function applyVoiceCommand(text){
   voicePushDraft(parsed);
   return parsed;
 }
+/* Build 60 iPhone Safari: the blue VOICE TEST Enter button does not submit
+   while the field is focused. The keyboard Return key does. Both target
+   submitVoiceTest, and Return reached applyVoiceCommand, so the command
+   path is sound. Safari uses that first tap to dismiss the keyboard and
+   never fires the button click. This control is temporary. The microphone
+   calls applyVoiceCommand with the transcript and does not use this button. */
 function submitVoiceTest(){
   var el=document.getElementById('voice-test-input');
   var text=el ? el.value : '';
   if (!String(text||'').trim()) return;
   applyVoiceCommand(text);
+}
+function startVoiceMicrophone(){
+  if (STATE._voiceRec) {
+    STATE._voiceRec._cancelled=true;
+    try { STATE._voiceRec.stop(); } catch (e) {}
+    return;
+  }
+  if (!STATE.selectedTable) { toast('Open a table first'); return; }
+  var Ctor=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if (!Ctor) { toast('Microphone is not available in this browser'); return; }
+  var rec=new Ctor();
+  var latest='';
+  var submitted=false;
+  function finish(){
+    if (STATE._voiceRec===rec) STATE._voiceRec=null;
+  }
+  function deliver(){
+    if (submitted) return;
+    submitted=true;
+    finish();
+    if (String(latest||'').trim()) applyVoiceCommand(latest);
+    else { toast('No speech heard'); renderOrder(); }
+  }
+  rec.lang='en-US';
+  rec.continuous=false;
+  rec.interimResults=true;
+  rec.onresult=function(ev){
+    var i, row, alt;
+    for (i=ev.resultIndex||0;i<(ev.results||[]).length;i++){
+      row=ev.results[i];
+      alt=row && row[0];
+      if (alt && alt.transcript) latest=alt.transcript;
+    }
+  };
+  rec.onerror=function(){
+    if (submitted || rec._cancelled) return;
+    submitted=true;
+    finish();
+    toast('Microphone did not capture');
+    renderOrder();
+  };
+  rec.onend=function(){
+    if (rec._cancelled) {
+      submitted=true;
+      finish();
+      renderOrder();
+      return;
+    }
+    deliver();
+  };
+  STATE._voiceRec=rec;
+  try { rec.start(); }
+  catch (e) {
+    submitted=true;
+    finish();
+    toast('Microphone did not start');
+    return;
+  }
+  toast('Listening');
+  renderOrder();
 }
 function dismissVoiceDraft(id){
   STATE.voiceDrafts=ensureVoiceDrafts().filter(function(d){ return d.id!==id; });
@@ -6767,6 +6836,10 @@ function voiceTestHtml(){
     '<button type="button" onclick="submitVoiceTest()">Enter</button></div>'+
     '<div class="voice-rev">'+esc(voiceRevisionLabel())+'</div></div>';
 }
+function voiceMicHtml(){
+  var listening=!!STATE._voiceRec;
+  return '<div class="voice-mic" data-voice-mic="1"><button type="button" class="'+(listening?'on':'')+'" onclick="startVoiceMicrophone()">'+(listening?'Listening':'Mic')+'</button></div>';
+}
 function orderTopHtml(){
   var warn=reservationWarning(STATE.selectedTable);
   var html='<div id="order-top">';
@@ -6775,6 +6848,7 @@ function orderTopHtml(){
   html+=renderGuestAllergyStrip();
   html+=renderSeatBar();
   html+=voiceTestHtml();
+  html+=voiceMicHtml();
   return html+'</div>';
 }
 function renderOrder() {
