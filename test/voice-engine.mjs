@@ -24,10 +24,13 @@ function loadPos() {
   const scalini = fs.readFileSync(path.join(root, 'scalini-dining.js'), 'utf8');
   const voice = fs.readFileSync(path.join(root, 'voice-vocab.js'), 'utf8');
   const engine = fs.readFileSync(path.join(root, 'voice-engine.js'), 'utf8');
+  const turn = fs.readFileSync(path.join(root, 'voice-turn.js'), 'utf8');
+  const inline = (file) => () => '<script>' + file + '</script>';
   html = html.replace(/<script src="https:[^"]+"><\/script>/g, '');
-  html = html.replace(/<script src="scalini-dining\.js[^"]*"><\/script>/, '<script>' + scalini + '</script>');
-  html = html.replace(/<script src="voice-vocab\.js[^"]*"><\/script>/, '<script>' + voice + '</script>');
-  html = html.replace(/<script src="voice-engine\.js[^"]*"><\/script>/, '<script>' + engine + '</script>');
+  html = html.replace(/<script src="scalini-dining\.js[^"]*"><\/script>/, inline(scalini));
+  html = html.replace(/<script src="voice-vocab\.js[^"]*"><\/script>/, inline(voice));
+  html = html.replace(/<script src="voice-engine\.js[^"]*"><\/script>/, inline(engine));
+  html = html.replace(/<script src="voice-turn\.js[^"]*"><\/script>/, inline(turn));
   html = html.replace(/<script src="cellar\.js[^"]*"><\/script>/, '');
   const vc = new VirtualConsole();
   vc.on('jsdomError', () => {});
@@ -346,7 +349,7 @@ w.STATE.bar = [
   { id: 'sp1', name: 'Hibiki Japanese Harmony', kind: 'Spirit', price: 24, lin: '2746', stock: 4, active: true, visible: true }
 ];
 w.STATE.wines = [
-  { id: 'w2148NV750ml', vin: '2148', name: 'Krug Grande Cuvée', vintage: 'NV', bottlePrice: 275, glassPrice: 0, stock: 12, active: true, visible: true }
+  { id: 'w2148NV750ml', vin: '2148', name: 'Krug Grande Cuvée', vintage: 'NV', size: '750ml', bottlePrice: 275, glassPrice: 0, stock: 12, active: true, visible: true }
 ];
 w.rebuildPosCatalog();
 const beck = w.STATE.menuItems.find((it) => it.id === 'btg_spark_beck');
@@ -446,6 +449,37 @@ assert.equal(w.STATE.currentOrder[0].price, 275);
 assert.equal(w.STATE.currentOrder[0].voiceOrigin, true);
 assert.equal(w.STATE.orders.length, 0);
 assert.equal(sent, 0);
+const draftsBeforeConfirm = (w.STATE.voiceDrafts || []).length;
+w.applyVoiceCommand('Krug Grande Cuvée, VIN 2148, 750');
+assert.equal(w.STATE.currentOrder.length, 1);
+assert.equal((w.STATE.voiceDrafts || []).length, draftsBeforeConfirm);
+assert.equal(w.STATE.voiceTurn.last.itemId, krug.id);
+assert.equal(sent, 0);
+const salmon = {
+  id: 'voice_xqtemp',
+  name: 'XQTEMP Salmon',
+  price: 32,
+  category: 'entrees',
+  catIds: ['entrees'],
+  station: 'Grill',
+  modifiers: [{ group: 'Temperature', options: ['R', 'MR', 'M'] }],
+  active: true
+};
+w.STATE.menuItems.push(salmon);
+w.applyVoiceCommand('4 xqtemp without beets');
+assert.equal(w.STATE.currentOrder.length, 1);
+assert.equal(w.STATE.voiceTurn.pending.item.id, salmon.id);
+assert.match(w.STATE.voiceTurn.pending.notes, /without beets/);
+w.applyVoiceCommand('medium rare');
+assert.equal(w.STATE.currentOrder.length, 2);
+assert.equal(w.STATE.currentOrder[1].id, salmon.id);
+assert.equal(w.STATE.currentOrder[1].seat, 4);
+assert.equal(w.STATE.currentOrder[1].mods.Temperature, 'MR');
+assert.match(w.STATE.currentOrder[1].notes, /without beets/);
+w.applyVoiceCommand('no sauce');
+assert.equal(w.STATE.currentOrder.length, 2);
+assert.match(w.STATE.currentOrder[1].notes, /no sauce/);
+w.STATE.menuItems = w.STATE.menuItems.filter((it) => it.id !== salmon.id);
 w.filterByOpsLookup = origFilter;
 seedTable(w);
 installVocab(w, [
@@ -459,6 +493,7 @@ assert.equal(w.STATE.currentOrder[0].id, krug.id);
 assert.equal(w.STATE.currentOrder[0].seat, 3);
 assert.equal(w.STATE.currentOrder[0].price, 275);
 assert.equal(w.STATE.orders.length, 0);
+assert.equal(w.STATE.voiceStatus, '3A. Krug Grande Cuvée, 750 milliliter, VIN 2148.');
 
 seedTable(w);
 w.STATE.voiceVocab = w.STATE.voiceVocab;
@@ -643,7 +678,8 @@ const app = w.document.getElementById('app-content');
 assert.ok(app.querySelector('[data-voice-test="1"]'));
 assert.match(app.textContent, /VOICE TEST/);
 assert.equal(app.querySelector('[data-voice-test="1"] button').getAttribute('onclick'), 'submitVoiceTest()');
-assert.equal(app.querySelector('[data-voice-mic="1"] button').getAttribute('onclick'), 'startVoiceMicrophone()');
+assert.equal(app.querySelector('[data-voice-mic="1"]'), null);
+assert.equal(w.document.querySelector('#voice-dock-mount [data-voice-mic="1"] button').getAttribute('onclick'), 'startVoiceMicrophone()');
 app.querySelector('#voice-test-input').value = 'SHOULD NOT USE';
 const heard = [];
 const originalApply = w.applyVoiceCommand;
@@ -686,7 +722,7 @@ assert.equal(w.STATE._voiceRec.recorder.started, true);
 w.startVoiceMicrophone();
 await flush();
 assert.deepEqual(heard, ['3A VIN 2148']);
-assert.equal(w.STATE._voiceRec, null);
+assert.equal(w.STATE.voiceSession.on, true);
 assert.equal(sends, 0);
 w.sendOrder = originalSend;
 assert.equal(src.includes('webkitSpeechRecognition'), false);
@@ -699,8 +735,9 @@ await flush();
 w.stopVoiceCapture(false);
 await flush();
 assert.ok(toasts.some((message) => /did not hear/i.test(message)));
-assert.equal(w.STATE._voiceRec, null);
+assert.equal(w.STATE.voiceSession.on, true);
 assert.deepEqual(heard, ['3A VIN 2148']);
+w.stopVoiceSession();
 w.navigator.mediaDevices.getUserMedia = function () {
   const err = new Error('denied');
   err.name = 'NotAllowedError';
@@ -746,7 +783,8 @@ const main = execSync('git show origin/main:index.html', { cwd: root, encoding: 
   assert.equal(extractDecl(src, fn), extractDecl(main, fn), fn);
 });
 execSync('git diff --exit-code origin/main -- scalini-dining.js voice-vocab.js', { cwd: root, stdio: 'pipe' });
-assert.match(src, /pos-build: scalini-print-v63/);
+assert.match(src, /pos-build: scalini-print-v64/);
+assert.match(src, /\.voice-dock \{\s*position:fixed;/);
 assert.match(src, /window\.EPICUREAN_VOICE_TRANSCRIBE_URL='https:\/\/us-central1-epicurean-house-at-the-choc-st\.cloudfunctions\.net\/voiceTranscribe'/);
 assert.equal(src.includes('voice-engine.js?v=58'), true);
 assert.doesNotMatch(fs.readFileSync(path.join(root, 'voice-engine.js'), 'utf8'), /sendOrder|fireDining|reviewSendRapidVoice/);
@@ -796,6 +834,7 @@ w.fbReady = false;
 w.STATE.activeTab = prevTab;
 assert.equal(src.includes('fbGetDoc'), false);
 
+if (w.stopVoiceSession) w.stopVoiceSession();
 if (w.STATE._seatTick) w.clearInterval(w.STATE._seatTick);
 w.close();
 

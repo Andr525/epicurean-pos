@@ -11,14 +11,14 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<link rel="manifest" href="manifest.json?b=63">
-<link rel="apple-touch-icon" href="icon-192.png?b=63">
-<link rel="apple-touch-icon" sizes="180x180" href="icon-192.png?b=63">
-<link rel="apple-touch-icon" sizes="192x192" href="icon-192.png?b=63">
-<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?b=63">
-<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?b=63">
+<link rel="manifest" href="manifest.json?b=64">
+<link rel="apple-touch-icon" href="icon-192.png?b=64">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-192.png?b=64">
+<link rel="apple-touch-icon" sizes="192x192" href="icon-192.png?b=64">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?b=64">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?b=64">
 <title>Epicurean POS</title>
-<!-- pos-build: scalini-print-v63 -->
+<!-- pos-build: scalini-print-v64 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
@@ -28,6 +28,7 @@
 <script src="scalini-dining.js?v=menu-ai-maps-20260913"></script>
 <script src="voice-vocab.js"></script>
 <script src="voice-engine.js?v=58"></script>
+<script src="voice-turn.js?v=64"></script>
 <script async src="https://sandbox.web.squarecdn.com/v1/square.js"></script>
 <style>
 :root {
@@ -1277,14 +1278,38 @@ body.hh-on .floor-retry { background:#fff; color:#000; border-color:#c5ced8; }
 .voice-test input { flex:1; min-height:44px; margin:0; font-size:16px; }
 .voice-test button { flex:0 0 auto; min-height:44px; padding:0 0.9rem; border-radius:12px; border:1px solid var(--primary); background:var(--primary); color:#1a1008; font-weight:800; }
 .voice-test .voice-rev { margin-top:0.35rem; font-size:0.68rem; color:var(--text-muted); }
-.voice-mic { margin:-0.2rem 0 0.7rem; }
-.voice-mic button { min-height:44px; padding:0 1rem; border-radius:12px; border:1px solid var(--primary); background:var(--surface); color:var(--text); font-weight:800; }
-.voice-mic button.on { background:var(--primary); color:#1a1008; }
+.voice-dock {
+  position:fixed; left:0; right:0; bottom:0; z-index:40;
+  display:flex; align-items:center; gap:8px;
+  padding:0.45rem 0.7rem calc(0.5rem + env(safe-area-inset-bottom));
+  background:#12151c; color:#f4efe6; border-top:1px solid rgba(201,168,76,0.85);
+}
+body.tableside .app-content, body.hh-table .app-content { padding-bottom:92px; }
+@media (min-width:768px) {
+  body.tableside .voice-dock, body.hh-table .voice-dock { bottom:74px; }
+}
+@media (max-width:767px) {
+  body.hh-on.hh-table .app-content { overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  body.hh-on.hh-table .ts-console { height:auto; overflow:visible; }
+  body.hh-on.hh-table .add-items-pane { flex:1 0 auto; min-height:52vh; }
+  body.hh-on.voice-live .voice-test, body.hh-on.voice-live .allergy-strip { display:none; }
+}
+.voice-dock button {
+  flex:0 0 auto; min-width:76px; min-height:48px; border-radius:12px;
+  border:1px solid #c9a84c; background:#1c1814; color:#f4efe6; font-weight:800; font-size:1rem;
+}
+.voice-dock button.on { background:#c9a84c; color:#1a1008; }
+.voice-dock .voice-live-status {
+  flex:1; min-width:0; font-size:0.95rem; font-weight:700; line-height:1.2;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
 .voice-draft { margin:0 0 0.45rem; padding:0.55rem 0.65rem; border-radius:10px; border:1px solid var(--warning); background:rgba(251,146,60,0.12); color:var(--text); }
 .voice-draft b { font-size:0.72rem; letter-spacing:0.04em; }
 .voice-draft .voice-draft-acts { display:flex; gap:8px; margin-top:0.4rem; }
 .voice-draft .voice-draft-acts button { min-height:36px; padding:0.3rem 0.7rem; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-weight:700; }
-body.hh-on .voice-test, body.hh-on .voice-draft, body.hh-on .voice-mic button { background:#fff; color:#000; }
+body.hh-on .voice-test, body.hh-on .voice-draft { background:#fff; color:#000; }
+body.hh-on .voice-dock, body.hh-on .voice-dock button { background:#12151c; color:#f4efe6; }
+body.hh-on .voice-dock button.on { background:#c9a84c; color:#1a1008; }
 body.hh-on .voice-test label, body.hh-on .voice-rev { color:#7a4b12; }
 body.hh-on .voice-draft .voice-draft-acts button { background:#fff; color:#000; }
 </style>
@@ -1345,7 +1370,7 @@ body.hh-on .voice-draft .voice-draft-acts button { background:#fff; color:#000; 
 <div id="login-screen" class="screen active">
   <h1>Epicurean POS</h1>
   <p class="subtitle">Enter your 4-digit code</p>
-  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 63</p>
+  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 64</p>
   <div class="pin-display" id="pin-display">
     <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
   </div>
@@ -1364,6 +1389,7 @@ body.hh-on .voice-draft .voice-draft-acts button { background:#fff; color:#000; 
   </div>
   <div id="hh-top"></div>
   <div class="app-content" id="app-content"></div>
+  <div id="voice-dock-mount"></div>
   <div id="hh-bar"></div>
   <div class="app-nav">
     <button class="nav-btn active" data-tab="hub" onclick="switchTab('hub')">
@@ -2399,6 +2425,8 @@ function paintChrome(){
   document.body.classList.toggle('toast-light', hh);
   document.body.classList.toggle('hh-table', tableside);
   document.body.classList.toggle('tableside', tableside);
+  document.body.classList.toggle('voice-live', !!(STATE.voiceSession && STATE.voiceSession.on));
+  mountVoiceDock();
   var top=document.getElementById('hh-top');
   var bar=document.getElementById('hh-bar');
   if (tableside) {
@@ -2853,6 +2881,7 @@ function mapWineToPos(it, catId){
     active: it.active !== false,
     producer: it.producer || '',
     vintage: it.vintage || '',
+    size: it.size || '',
     region: it.region || '',
     country: it.country || '',
     varietal: it.varietal || it.grape || '',
@@ -6714,7 +6743,8 @@ function voicePushDraft(parsed){
   toast('Voice '+drafts[0].confidence);
   renderOrder();
 }
-function voicePlaceHigh(item, parsed){
+function voicePlaceHigh(item, parsed, preset){
+  preset=preset||{};
   var seat=parsed.seat!=null ? parsed.seat : STATE.activeSeat;
   if (!item || item.active===false || item.eightySixed) {
     voicePushDraft(Object.assign({}, parsed, {
@@ -6728,8 +6758,10 @@ function voicePlaceHigh(item, parsed){
   }
   var eng=voiceEngine();
   var groups=eng ? eng.modifierGroups(item) : [];
-  if (groups.length) {
-    voicePushDraft(Object.assign({}, parsed, { confidence:'MISSING', kind:'draft', need:groups.join(', '), itemId:item.id, name:item.name }));
+  var covered=preset.mods||{};
+  var missing=groups.filter(function(name){ return !covered[name]; });
+  if (missing.length) {
+    voicePushDraft(Object.assign({}, parsed, { confidence:'MISSING', kind:'draft', need:missing.join(', '), itemId:item.id, name:item.name }));
     return;
   }
   if (allergenHits(item, seat).length) {
@@ -6742,6 +6774,11 @@ function voicePlaceHigh(item, parsed){
   try {
     beginAddItem(item.id);
     if (STATE.pendingItem && STATE.pendingItem.id===item.id) {
+      if (preset.mods) {
+        STATE.pendingItem.mods=Object.assign({}, STATE.pendingItem.mods||{}, preset.mods);
+        STATE.pendingItem.selectedMod=Object.keys(STATE.pendingItem.mods).map(function(g){ return g+': '+STATE.pendingItem.mods[g]; }).join(', ');
+      }
+      if (preset.notes) STATE.pendingItem.notes=preset.notes;
       if (!modifiersReady(STATE.pendingItem) || allergenHits(STATE.pendingItem, STATE.pendingItem.seat).length) {
         closeSheet();
         voicePushDraft(Object.assign({}, parsed, { confidence:'MISSING', kind:'draft', need:'modifier', itemId:item.id, name:item.name }));
@@ -6758,7 +6795,45 @@ function voicePlaceHigh(item, parsed){
     voicePushDraft(Object.assign({}, parsed, { confidence:'MISSING', kind:'draft', need:'not added', itemId:item.id, name:item.name }));
     return;
   }
+  voiceRememberPlaced(item, line, preset.notes||line.notes||'');
   renderOrder();
+}
+function voiceTurnApi(){
+  return (typeof EPICUREAN_VOICE_TURN!=='undefined') ? EPICUREAN_VOICE_TURN : null;
+}
+function voiceSyncTurn(){
+  var api=voiceTurnApi();
+  if (!api) return null;
+  if (!STATE.voiceTurn) STATE.voiceTurn=api.createState();
+  var last=STATE.voiceTurn.last;
+  if (last && !(STATE.currentOrder||[]).some(function(line){ return line && line.lineId===last.lineId; })) STATE.voiceTurn.last=null;
+  return STATE.voiceTurn;
+}
+function voiceRememberPlaced(item, line, notes){
+  var api=voiceTurnApi();
+  if (!api || !line) return;
+  STATE.voiceTurn=api.remember(voiceSyncTurn(), { item:item, seat:line.seat, lineId:line.lineId, notes:notes||'' });
+  var speech=api.confirmationSpeech(positionLabel(line.seat), item, notes||'');
+  STATE.voiceStatus=speech;
+  voiceSpeak(speech);
+}
+function applyVoiceNote(decided, parsed){
+  var line=(STATE.currentOrder||[]).filter(function(entry){ return entry && entry.lineId===decided.lineId; })[0];
+  if (!line) {
+    voicePushDraft(Object.assign({}, parsed, { confidence:'MISSING', kind:'draft', need:'no open item' }));
+    return parsed;
+  }
+  if (decided.mods) {
+    line.mods=Object.assign({}, line.mods||{}, decided.mods);
+    line.selectedMod=Object.keys(line.mods).map(function(g){ return g+': '+line.mods[g]; }).join(', ');
+  }
+  if (decided.notes) line.notes=line.notes ? (line.notes+' · '+decided.notes) : decided.notes;
+  persistCheck(ensureOpenCheck(STATE.selectedTable));
+  STATE.voiceStatus=decided.status||'Noted';
+  voiceSpeak(STATE.voiceStatus);
+  toast(STATE.voiceStatus);
+  renderOrder();
+  return parsed;
 }
 function applyVoiceCommand(text){
   var eng=voiceEngine();
@@ -6771,6 +6846,40 @@ function applyVoiceCommand(text){
     activeRevision: slot.revision||'',
     catalog: STATE.menuItems||[]
   });
+  var heardItem=(parsed.confidence==='HIGH' && parsed.itemId) ? findPosMenuItem(parsed.itemId) : null;
+  var turnApi=voiceTurnApi();
+  var decided=null;
+  if (turnApi) {
+    decided=turnApi.decide(voiceSyncTurn(), {
+      text:text,
+      parsed:parsed,
+      item:heardItem,
+      catalog:STATE.menuItems||[],
+      activeSeat:STATE.activeSeat,
+      lines:STATE.currentOrder||[]
+    });
+    STATE.voiceTurn=decided.state;
+    if (decided.action==='confirm') {
+      STATE.voiceStatus=decided.status||'Confirmed';
+      toast('Confirmed');
+      renderOrder();
+      return parsed;
+    }
+    if (decided.action==='hold') {
+      STATE.voiceStatus=decided.status||'Listening';
+      toast(STATE.voiceStatus);
+      renderOrder();
+      return parsed;
+    }
+    if (decided.action==='modifier') return applyVoiceNote(decided, parsed);
+    if (decided.action==='place' && decided.food && decided.item) {
+      if (decided.seat!=null) applyVoiceSeat(decided.seat, true);
+      if (decided.replaceLineId) STATE._replaceLineId=decided.replaceLineId;
+      voicePlaceHigh(decided.item, Object.assign({}, parsed, { seat:decided.seat, itemId:decided.item.id, confidence:'HIGH', kind:'item' }), { mods:decided.mods, notes:decided.notes });
+      return parsed;
+    }
+    if (decided.replaceLineId) STATE._replaceLineId=decided.replaceLineId;
+  }
   if (parsed.positionTouched) applyVoiceSeat(parsed.seat, parsed.priority);
   if (parsed.kind==='position') {
     toast('Seat '+positionLabel(parsed.seat));
@@ -6809,7 +6918,7 @@ function applyVoiceCommand(text){
         return parsed;
       }
     }
-    voicePlaceHigh(item, parsed);
+    voicePlaceHigh(item, parsed, decided&&decided.notes ? { notes:decided.notes } : null);
     return parsed;
   }
   voicePushDraft(parsed);
@@ -6898,42 +7007,107 @@ function voicePcmBlob(blob){
     return new Blob([bytes], { type:'audio/wav' });
   }).catch(function(err){ try { ctx.close(); } catch (e) {} throw err; });
 }
-function releaseVoiceSession(session){
+var VOICE_GUEST_RECORDING = false;
+function ensureVoiceSession(){
+  if (!STATE.voiceSession) STATE.voiceSession={ on:false, stream:null, lastUseful:0, idle:null };
+  return STATE.voiceSession;
+}
+function voiceStreamLive(stream){
+  if (!stream || !stream.getTracks) return false;
+  var tracks=stream.getTracks();
+  return tracks.some(function(track){ return !track.readyState || track.readyState==='live'; });
+}
+function armVoiceIdle(){
+  var sess=ensureVoiceSession();
+  clearTimeout(sess.idle);
+  if (!sess.on) return;
+  sess.idle=setTimeout(function(){
+    if (!sess.on) return;
+    if (Date.now()-(sess.lastUseful||0)>=(window.VOICE_IDLE_MS||60000)) stopVoiceSession('quiet');
+    else armVoiceIdle();
+  }, window.VOICE_IDLE_MS||60000);
+}
+function primeVoiceSpeech(){
+  try {
+    if (!window.speechSynthesis || typeof window.SpeechSynthesisUtterance!=='function') return;
+    var prime=new window.SpeechSynthesisUtterance(' ');
+    prime.volume=0;
+    window.speechSynthesis.speak(prime);
+  } catch (e) {}
+}
+function voiceSpeak(text){
+  if (!text) return;
+  var synth=window.speechSynthesis;
+  if (!synth || typeof window.SpeechSynthesisUtterance!=='function') return;
+  try {
+    STATE._voiceHoldSpeech=true;
+    if (STATE._voiceRec && STATE._voiceRec.recorder && STATE._voiceRec.recorder.state!=='inactive') {
+      STATE._voiceRec.suppress=true;
+      try { STATE._voiceRec.recorder.stop(); } catch (err) {}
+    }
+    synth.cancel();
+    var uttered=new window.SpeechSynthesisUtterance(text);
+    uttered.rate=1.02;
+    var release=function(){
+      if (!STATE._voiceHoldSpeech) return;
+      STATE._voiceHoldSpeech=false;
+      if (ensureVoiceSession().on) startVoiceClip(ensureVoiceSession().stream);
+    };
+    uttered.onend=release;
+    uttered.onerror=release;
+    synth.speak(uttered);
+    setTimeout(release, Math.min(8000, 1200+String(text).length*70));
+  } catch (e) {
+    STATE._voiceHoldSpeech=false;
+  }
+}
+function releaseVoiceClip(session){
   if (!session) return;
   clearTimeout(session.timer);
   clearTimeout(session.watch);
   clearInterval(session.levelTimer);
-  stopVoiceTracks(session.stream);
-  if (session.audioCtx) { try { session.audioCtx.close(); } catch (e) {} }
+}
+function continueVoiceSession(){
+  var sess=ensureVoiceSession();
+  if (!sess.on || STATE._voiceHoldSpeech) return;
+  startVoiceClip(sess.stream);
 }
 function finishVoiceClip(){
   var session=STATE._voiceRec;
   if (!session || session.done) return;
   session.done=true;
   var cancelled=!!session.cancelled;
+  var suppressed=!!session.suppress;
   var heard=!!session.heard;
   var monitored=!!session.monitored;
   var token=session.token;
   var chunks=session.chunks||[];
   var mime=session.mime||'audio/mp4';
-  releaseVoiceSession(session);
+  releaseVoiceClip(session);
   STATE._voiceRec=null;
+  STATE.voicePhase=ensureVoiceSession().on ? 'listening' : '';
   if (STATE.activeTab==='order') renderOrder();
-  if (cancelled) return;
-  if (monitored && !heard) { toast('No speech heard'); return; }
+  if (cancelled || suppressed) return;
+  if (monitored && !heard) { continueVoiceSession(); return; }
   var blob;
   try { blob=new Blob(chunks, { type:mime }); } catch (e) { blob=new Blob(chunks); }
-  if (!blob || !blob.size) { toast('No speech heard'); return; }
+  if (!blob || !blob.size) { continueVoiceSession(); return; }
   var pending;
   if (window.EPICUREAN_VOICE_TRANSCRIBE) pending=Promise.resolve().then(function(){ return window.EPICUREAN_VOICE_TRANSCRIBE(blob); });
   else pending=voicePcmBlob(blob).catch(function(){ return blob; }).then(function(out){ return postVoiceClip(window.EPICUREAN_VOICE_TRANSCRIBE_URL, out||blob); });
   pending.then(function(text){
     if (token!==STATE._voiceToken) return;
-    if (!String(text||'').trim()) { toast('No speech heard'); return; }
-    applyVoiceCommand(String(text));
+    var useful=String(text||'').trim();
+    if (useful) {
+      ensureVoiceSession().lastUseful=Date.now();
+      armVoiceIdle();
+      applyVoiceCommand(useful);
+    }
+    continueVoiceSession();
   }).catch(function(){
     if (token!==STATE._voiceToken) return;
     toast('Voice did not hear that');
+    continueVoiceSession();
   });
 }
 function stopVoiceCapture(cancel){
@@ -6992,58 +7166,80 @@ function voiceWatchSpeech(session){
     if (now-(session.startedAt||now)>(window.VOICE_NOSPEECH_MS||4000)) stopVoiceCapture(false);
   }, 80);
 }
+function startVoiceClip(stream){
+  var sess=ensureVoiceSession();
+  if (!sess.on || !voiceStreamLive(stream) || STATE._voiceHoldSpeech) return;
+  if (STATE._voiceRec && !STATE._voiceRec.done) return;
+  var token=(STATE._voiceToken=(STATE._voiceToken||0)+1);
+  var session={ token:token, cancelled:false, done:false, heard:false, monitored:false, chunks:[], mime:voiceMimeType(), startedAt:Date.now(), stream:stream };
+  STATE._voiceRec=session;
+  STATE.voicePhase='listening';
+  voiceArmAudio(session);
+  var rec;
+  try { rec=session.mime ? new MediaRecorder(stream, { mimeType:session.mime }) : new MediaRecorder(stream); }
+  catch (e) {
+    STATE._voiceRec=null;
+    toast('Microphone did not start');
+    return;
+  }
+  session.recorder=rec;
+  rec.ondataavailable=function(ev){ if (ev.data && ev.data.size) session.chunks.push(ev.data); };
+  rec.onerror=function(){ stopVoiceCapture(false); toast('Voice did not hear that'); };
+  rec.onstop=function(){ finishVoiceClip(); };
+  try { rec.start(); }
+  catch (e) {
+    session.cancelled=true;
+    finishVoiceClip();
+    toast('Microphone did not start');
+    return;
+  }
+  voiceWatchSpeech(session);
+  session.timer=setTimeout(function(){ if (STATE._voiceRec===session) stopVoiceCapture(false); }, window.VOICE_CAPTURE_MS||8000);
+  session.watch=setTimeout(function(){ if (STATE._voiceRec===session) stopVoiceCapture(false); }, window.VOICE_WATCH_MS||12000);
+}
+function stopVoiceSession(reason){
+  var sess=ensureVoiceSession();
+  sess.on=false;
+  clearTimeout(sess.idle);
+  STATE.voicePhase='';
+  STATE._voiceHoldSpeech=false;
+  if (STATE._voiceRec) stopVoiceCapture(true);
+  stopVoiceTracks(sess.stream);
+  sess.stream=null;
+  if (reason==='quiet') toast('Voice off');
+  if (STATE.activeTab==='order') renderOrder();
+}
 function startVoiceMicrophone(){
-  if (STATE._voiceRec) { stopVoiceCapture(false); return; }
+  if (STATE._voiceRec && STATE._voiceRec.recorder && STATE._voiceRec.recorder.state!=='inactive') {
+    stopVoiceCapture(false);
+    return;
+  }
   if (!STATE.selectedTable) { toast('Open a table first'); return; }
   if (!voiceTranscriberReady()) { toast('Voice transcription is not connected'); return; }
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) {
     toast('Microphone is not available');
     return;
   }
-  var token=(STATE._voiceToken=(STATE._voiceToken||0)+1);
-  var session={ token:token, cancelled:false, done:false, heard:false, monitored:false, chunks:[], mime:voiceMimeType(), startedAt:Date.now() };
-  STATE._voiceRec=session;
-  voiceArmAudio(session);
-  session.watch=setTimeout(function(){
-    if (STATE._voiceRec!==session) return;
-    stopVoiceCapture(true);
-    toast('Microphone timed out');
-  }, window.VOICE_WATCH_MS||12000);
+  var sess=ensureVoiceSession();
+  sess.on=true;
+  if (!sess.lastUseful) sess.lastUseful=Date.now();
+  armVoiceIdle();
+  primeVoiceSpeech();
+  STATE.voicePhase='listening';
   toast('Listening');
   renderOrder();
-  navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:true, noiseSuppression:true, channelCount:1 } }).then(function(stream){
-    if (STATE._voiceRec!==session || session.cancelled) { stopVoiceTracks(stream); return; }
-    var rec;
-    try { rec=session.mime ? new MediaRecorder(stream, { mimeType:session.mime }) : new MediaRecorder(stream); }
-    catch (e) {
-      stopVoiceTracks(stream);
-      session.cancelled=true;
-      finishVoiceClip();
-      toast('Microphone did not start');
-      return;
-    }
-    session.stream=stream;
-    session.recorder=rec;
-    rec.ondataavailable=function(ev){ if (ev.data && ev.data.size) session.chunks.push(ev.data); };
-    rec.onerror=function(){ stopVoiceCapture(true); toast('Microphone did not capture'); };
-    rec.onstop=function(){ finishVoiceClip(); };
-    try { rec.start(); }
-    catch (e) {
-      stopVoiceTracks(stream);
-      session.cancelled=true;
-      finishVoiceClip();
-      toast('Microphone did not start');
-      return;
-    }
-    voiceWatchSpeech(session);
-    session.timer=setTimeout(function(){ if (STATE._voiceRec===session) stopVoiceCapture(false); }, window.VOICE_CAPTURE_MS||8000);
+  var ready=voiceStreamLive(sess.stream) ? Promise.resolve(sess.stream) : navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:true, noiseSuppression:true, channelCount:1 } });
+  ready.then(function(stream){
+    sess.stream=stream;
+    if (!sess.on) { stopVoiceTracks(stream); sess.stream=null; return; }
+    startVoiceClip(stream);
   }).catch(function(err){
-    if (STATE._voiceRec===session) {
-      session.cancelled=true;
-      finishVoiceClip();
-    }
+    sess.on=false;
+    STATE.voicePhase='';
+    STATE._voiceRec=null;
     var name=err && (err.name||err.message) || '';
     toast(/NotAllowed|Permission|denied/i.test(name) ? 'Microphone blocked' : 'Microphone did not start');
+    if (STATE.activeTab==='order') renderOrder();
   });
 }
 function dismissVoiceDraft(id){
@@ -7096,8 +7292,14 @@ function voiceTestHtml(){
     '<div class="voice-rev">'+esc(voiceRevisionLabel())+'</div></div>';
 }
 function voiceMicHtml(){
-  var listening=!!STATE._voiceRec;
-  return '<div class="voice-mic" data-voice-mic="1"><button type="button" class="'+(listening?'on':'')+'" onclick="startVoiceMicrophone()">'+(listening?'Listening':'Mic')+'</button></div>';
+  var on=!!(STATE.voiceSession && STATE.voiceSession.on);
+  var label=on ? (STATE.voicePhase==='hearing' ? 'Hearing' : 'Listening') : 'Mic';
+  var status=STATE.voiceStatus || (on ? 'Listening' : 'Tap Mic, then speak');
+  var html='<div class="voice-dock" data-voice-mic="1">';
+  html+='<button type="button" class="'+(on?'on':'')+'" onclick="startVoiceMicrophone()">'+label+'</button>';
+  html+='<div class="voice-live-status">'+esc(status)+'</div>';
+  if (on) html+='<button type="button" onclick="stopVoiceSession()">Off</button>';
+  return html+'</div>';
 }
 function orderTopHtml(){
   var warn=reservationWarning(STATE.selectedTable);
@@ -7107,8 +7309,13 @@ function orderTopHtml(){
   html+=renderGuestAllergyStrip();
   html+=renderSeatBar();
   html+=voiceTestHtml();
-  html+=voiceMicHtml();
   return html+'</div>';
+}
+function mountVoiceDock(){
+  var mount=document.getElementById('voice-dock-mount');
+  if (!mount) return;
+  var ordering=STATE.activeTab==='order' || !!document.getElementById('order-top');
+  mount.innerHTML=ordering ? voiceMicHtml() : '';
 }
 function renderOrder() {
   ensureOpenCheck(STATE.selectedTable);

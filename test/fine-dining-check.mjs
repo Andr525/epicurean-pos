@@ -404,8 +404,8 @@ const mainSrc = execSync('git show origin/main:index.html', { cwd: root, encodin
 ['var FLOOR_GESTURE =', 'function finishFloorTableDrag(', 'function ensureDragClone('].forEach((needle) => {
   assert.equal(extractDecl(src, needle), extractDecl(mainSrc, needle), needle + ' changed vs origin/main');
 });
-assert.equal(src.includes('<!-- pos-build: scalini-print-v63 -->'), true);
-assert.equal(src.includes('Table Service · build 63'), true);
+assert.equal(src.includes('<!-- pos-build: scalini-print-v64 -->'), true);
+assert.equal(src.includes('Table Service · build 64'), true);
 
 if (w.STATE && w.STATE._seatTick) {
   w.clearInterval(w.STATE._seatTick);
