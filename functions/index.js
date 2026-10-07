@@ -1,15 +1,12 @@
 /* Restaurant Voice endpoint.
-   DEEPGRAM_API_KEY is read from Secret Manager at runtime.
-   The value is never logged and never returned to the phone. */
+   DEEPGRAM_API_KEY is injected from Secret Manager. It is never logged. */
 
-import { onRequest } from 'firebase-functions/v2/https';
-import { defineSecret } from 'firebase-functions/params';
+import { http } from '@google-cloud/functions-framework';
 import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { voiceHttp, voiceRequestFromParts } from './http.js';
+import { createVoiceHandler } from './handler.js';
 
 initializeApp();
-const deepgramKey = defineSecret('DEEPGRAM_API_KEY');
 const PROJECT = 'epicurean-house-at-the-choc-st';
 
 async function verifyProjectToken(header) {
@@ -23,28 +20,8 @@ async function verifyProjectToken(header) {
   }
 }
 
-export const voiceTranscribe = onRequest({
-  region: 'us-central1',
-  timeoutSeconds: 30,
-  memory: '256MiB',
-  maxInstances: 5,
-  secrets: [deepgramKey],
-  invoker: 'public',
-  cors: false
-}, async (req, res) => {
-  const raw = req.rawBody || Buffer.alloc(0);
-  const request = voiceRequestFromParts({
-    method: req.method,
-    origin: req.get('origin') || '',
-    contentType: req.get('content-type') || '',
-    authorization: req.get('authorization') || '',
-    body: req.method === 'GET' || req.method === 'HEAD' ? undefined : raw
-  });
-  const response = await voiceHttp(request, {
-    apiKey: deepgramKey.value(),
-    fetchImpl: fetch,
-    verifyToken: verifyProjectToken
-  });
-  response.headers.forEach((value, key) => res.set(key, value));
-  res.status(response.status).send(await response.text());
-});
+http('voiceTranscribe', createVoiceHandler({
+  apiKey: function () { return process.env.DEEPGRAM_API_KEY || ''; },
+  fetchImpl: fetch,
+  verifyToken: verifyProjectToken
+}));

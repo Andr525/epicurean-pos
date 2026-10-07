@@ -3,16 +3,19 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { voiceHttp, voiceRequestFromParts, VOICE_MAX_BYTES } from '../functions/http.js';
+import { createVoiceHandler } from '../functions/handler.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const server = fs.readFileSync(path.join(root, 'server/voice-transcribe.mjs'), 'utf8');
 const deployed = fs.readFileSync(path.join(root, 'functions/voice-transcribe.mjs'), 'utf8');
 assert.equal(server, deployed);
 const index = fs.readFileSync(path.join(root, 'functions/index.js'), 'utf8');
-assert.match(index, /defineSecret\('DEEPGRAM_API_KEY'\)/);
-assert.match(index, /deepgramKey\.value\(\)/);
-assert.equal(index.includes('console.log'), false);
+const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+assert.match(index, /process\.env\.DEEPGRAM_API_KEY/);
+assert.equal(index.includes('console.'), false);
 assert.equal(index.includes('api.deepgram.com'), false);
+assert.equal(html.includes('DEEPGRAM_API_KEY'), false);
+assert.equal(html.includes('api.deepgram.com'), false);
 
 const preflight = await voiceHttp(new Request('https://voice.internal/transcribe', {
   method: 'OPTIONS',
@@ -100,5 +103,42 @@ const rebuiltOk = await voiceHttp(rebuilt, {
 });
 assert.equal(rebuiltOk.status, 200);
 assert.deepEqual(await rebuiltOk.json(), { transcript: '3A VIN 2148' });
+
+const handler = createVoiceHandler({
+  apiKey: function () { return 'secret-key'; },
+  verifyToken: async () => true,
+  fetchImpl: async (url) => {
+    assert.equal(String(url).includes('secret-key'), false);
+    return new Response(JSON.stringify({
+      results: { channels: [{ alternatives: [{ transcript: '3A VIN 2148' }] }] }
+    }), { status: 200 });
+  }
+});
+const posted = new FormData();
+posted.append('audio', new Blob([new Uint8Array([1, 2])], { type: 'audio/mp4' }), 'utterance.m4a');
+posted.append('keyterms', JSON.stringify(['VIN']));
+const postedReq = new Request('https://voice.internal/transcribe', { method: 'POST', body: posted });
+const postedType = postedReq.headers.get('content-type');
+const postedBody = Buffer.from(await postedReq.arrayBuffer());
+const sent = {};
+await handler({
+  method: 'POST',
+  rawBody: postedBody,
+  get: function (name) {
+    const headers = {
+      origin: 'https://andr525.github.io',
+      'content-type': postedType,
+      authorization: 'Bearer firebase-token'
+    };
+    return headers[String(name).toLowerCase()] || '';
+  }
+}, {
+  set: function (key, value) { sent[key] = value; },
+  status: function (code) { sent.status = code; return this; },
+  send: function (body) { sent.body = body; }
+});
+assert.equal(sent.status, 200);
+assert.equal(sent.body.includes('secret-key'), false);
+assert.equal(JSON.parse(sent.body).transcript, '3A VIN 2148');
 
 console.log('voice-http tests passed');
