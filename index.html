@@ -6842,11 +6842,14 @@ function stopVoiceTracks(stream){
 }
 function voiceAuthToken(){
   try {
-    if (typeof fbAuth!=='undefined' && fbAuth && fbAuth.currentUser && fbAuth.currentUser.getIdToken) {
-      return fbAuth.currentUser.getIdToken();
-    }
-  } catch (e) {}
-  return Promise.resolve('');
+    if (typeof fbAuth==='undefined' || !fbAuth) return Promise.resolve('');
+    var ready=fbAuth.currentUser ? Promise.resolve(fbAuth.currentUser) : (fbAuth.signInAnonymously ? fbAuth.signInAnonymously().then(function(result){ return result.user; }) : Promise.resolve(null));
+    return ready.then(function(user){
+      return user && user.getIdToken ? user.getIdToken() : '';
+    }).catch(function(){ return ''; });
+  } catch (e) {
+    return Promise.resolve('');
+  }
 }
 function voiceKeywordHints(){
   var index=STATE.voiceVocab && STATE.voiceVocab.index;

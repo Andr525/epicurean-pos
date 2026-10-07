@@ -691,6 +691,7 @@ w.sendOrder = originalSend;
 assert.equal(src.includes('webkitSpeechRecognition'), false);
 assert.match(src, /body\.append\('keyterms'/);
 assert.equal(src.includes('api.deepgram.com'), false);
+assert.match(extractDecl(src, 'function voiceAuthToken'), /signInAnonymously/);
 w.EPICUREAN_VOICE_TRANSCRIBE = function () { return Promise.reject(new Error('down')); };
 w.startVoiceMicrophone();
 await flush();
