@@ -30,7 +30,11 @@ function loadPos() {
   html = html.replace(/<script src="scalini-dining\.js[^"]*"><\/script>/, inline(scalini));
   html = html.replace(/<script src="voice-vocab\.js[^"]*"><\/script>/, inline(voice));
   html = html.replace(/<script src="voice-engine\.js[^"]*"><\/script>/, inline(engine));
+  const catalog = fs.readFileSync(path.join(root, 'voice-catalog.js'), 'utf8');
+  const cocktails = fs.readFileSync(path.join(root, 'voice-cocktails.js'), 'utf8');
   html = html.replace(/<script src="voice-turn\.js[^"]*"><\/script>/, inline(turn));
+  html = html.replace(/<script src="voice-catalog\.js[^"]*"><\/script>/, inline(catalog));
+  html = html.replace(/<script src="voice-cocktails\.js[^"]*"><\/script>/, inline(cocktails));
   html = html.replace(/<script src="cellar\.js[^"]*"><\/script>/, '');
   const vc = new VirtualConsole();
   vc.on('jsdomError', () => {});
@@ -783,7 +787,7 @@ const main = execSync('git show origin/main:index.html', { cwd: root, encoding: 
   assert.equal(extractDecl(src, fn), extractDecl(main, fn), fn);
 });
 execSync('git diff --exit-code origin/main -- scalini-dining.js voice-vocab.js', { cwd: root, stdio: 'pipe' });
-assert.match(src, /pos-build: scalini-print-v64/);
+assert.match(src, /pos-build: scalini-print-v65/);
 assert.match(src, /\.voice-dock \{\s*position:fixed;/);
 assert.match(src, /window\.EPICUREAN_VOICE_TRANSCRIBE_URL='https:\/\/us-central1-epicurean-house-at-the-choc-st\.cloudfunctions\.net\/voiceTranscribe'/);
 assert.equal(src.includes('voice-engine.js?v=58'), true);

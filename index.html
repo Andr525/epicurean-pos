@@ -11,14 +11,14 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<link rel="manifest" href="manifest.json?b=64">
-<link rel="apple-touch-icon" href="icon-192.png?b=64">
-<link rel="apple-touch-icon" sizes="180x180" href="icon-192.png?b=64">
-<link rel="apple-touch-icon" sizes="192x192" href="icon-192.png?b=64">
-<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?b=64">
-<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?b=64">
+<link rel="manifest" href="manifest.json?b=65">
+<link rel="apple-touch-icon" href="icon-192.png?b=65">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-192.png?b=65">
+<link rel="apple-touch-icon" sizes="192x192" href="icon-192.png?b=65">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?b=65">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?b=65">
 <title>Epicurean POS</title>
-<!-- pos-build: scalini-print-v64 -->
+<!-- pos-build: scalini-print-v65 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
@@ -29,6 +29,8 @@
 <script src="voice-vocab.js"></script>
 <script src="voice-engine.js?v=58"></script>
 <script src="voice-turn.js?v=64"></script>
+<script src="voice-catalog.js?v=65"></script>
+<script src="voice-cocktails.js?v=65"></script>
 <script async src="https://sandbox.web.squarecdn.com/v1/square.js"></script>
 <style>
 :root {
@@ -1370,7 +1372,7 @@ body.hh-on .voice-draft .voice-draft-acts button { background:#fff; color:#000; 
 <div id="login-screen" class="screen active">
   <h1>Epicurean POS</h1>
   <p class="subtitle">Enter your 4-digit code</p>
-  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 64</p>
+  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 65</p>
   <div class="pin-display" id="pin-display">
     <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
   </div>
@@ -6703,7 +6705,13 @@ function loadVoiceRevision(ctrl){
   var seq=(STATE._voiceLoadSeq=(STATE._voiceLoadSeq||0)+1);
   return Promise.all(ids.map(readSharedDoc)).then(function(docs){
     if (seq!==STATE._voiceLoadSeq) return;
-    STATE.voiceVocab=eng ? eng.assemble(ctrl, docs) : { revision:rev, stale:true, index:null, reason:'engine' };
+    var extra=voiceChunkPayload(docs);
+    var slot=eng ? eng.assemble(ctrl, docs) : { revision:rev, stale:true, index:null, reason:'engine' };
+    if (slot && !slot.stale) {
+      slot.entries=extra.entries;
+      slot.modifierGroups=extra.modifiers;
+    }
+    STATE.voiceVocab=slot;
     if (STATE.activeTab==='order' && STATE.currentServer) renderOrder();
   }).catch(function(){
     if (seq!==STATE._voiceLoadSeq) return;
@@ -6835,6 +6843,301 @@ function applyVoiceNote(decided, parsed){
   renderOrder();
   return parsed;
 }
+function voiceCatalogApi(){
+  return (typeof EPICUREAN_VOICE_CATALOG!=='undefined') ? EPICUREAN_VOICE_CATALOG : null;
+}
+function voiceCocktailApi(){
+  return (typeof EPICUREAN_VOICE_COCKTAILS!=='undefined') ? EPICUREAN_VOICE_COCKTAILS : null;
+}
+function voiceChunkPayload(docs){
+  var entries=[];
+  var modifiers=[];
+  (docs||[]).forEach(function(doc){
+    if (!doc) return;
+    if (doc.entries) entries=entries.concat(doc.entries);
+    if (doc.modifiers && doc.modifiers.length && !modifiers.length) modifiers=doc.modifiers;
+  });
+  return {entries:entries, modifiers:modifiers};
+}
+function voiceBundledEntries(){
+  var sc=(typeof EPICUREAN_SCALINI!=='undefined') ? EPICUREAN_SCALINI : null;
+  if (!sc) return [];
+  var out=[];
+  var seen={};
+  function push(item, scope, sourceType){
+    if (!item) return;
+    var id=String(item.id||item.dishId||'');
+    if (!id || seen[scope+':'+id]) return;
+    var copy=Object.assign({}, item, {id:id});
+    if (typeof EPICUREAN_VOICE!=='undefined') EPICUREAN_VOICE.applyApprovedKeywords(copy);
+    if (!copy.voiceKeyword) return;
+    seen[scope+':'+id]=1;
+    out.push({
+      sourceId:id,
+      scope:scope,
+      sourceType:sourceType,
+      voiceKeyword:copy.voiceKeyword,
+      voiceAliases:copy.voiceAliases||[],
+      active:copy.active!==false,
+      name:copy.name||''
+    });
+  }
+  var pf=sc.prixFixe||{};
+  (pf.dishes||[]).forEach(function(d){ push(d,'pf','pf'); });
+  (pf.courses||[]).forEach(function(c){ (c.options||[]).forEach(function(o){ push(o,'pf','pf'); }); });
+  (sc.gelatoScoops||[]).forEach(function(s){ push(s,'scoop','scoop'); });
+  (sc.winesByGlass||[]).forEach(function(w){ push(w,'beverage','btg'); });
+  ((sc.tasting&&sc.tasting.courses)||[]).forEach(function(c){
+    if (c && !c.headingOnly) push(Object.assign({}, c, {id:c.id||c.dishId}), 'tasting', 'tasting');
+  });
+  return out;
+}
+function voiceVocabEntries(){
+  var slot=STATE.voiceVocab||{};
+  if (slot.stale) return [];
+  if (slot.entries && slot.entries.length) return slot.entries;
+  if (slot.index) return [];
+  return voiceBundledEntries();
+}
+function voicePhraseBody(text, parsed){
+  var s=String(text||'');
+  s=s.replace(/^\s*back\s+to\s+/i,' ');
+  if (parsed && parsed.positionTouched && parsed.seat!=null) {
+    var n=String(parsed.seat);
+    s=s.replace(new RegExp('\\b'+n+'\\s*a\\b','ig'),' ');
+    s=s.replace(new RegExp('^\\s*'+n+'\\b'),' ');
+    s=s.replace(new RegExp('\\b'+n+'\\s*$'),' ');
+  }
+  return s.replace(/\s+/g,' ').trim();
+}
+function voiceSourceRecord(id){
+  id=String(id||'');
+  var onMenu=findPosMenuItem(id);
+  if (onMenu) return onMenu;
+  var sc=(typeof EPICUREAN_SCALINI!=='undefined') ? EPICUREAN_SCALINI : null;
+  if (!sc) return null;
+  var lists=[];
+  var pf=sc.prixFixe||{};
+  lists=lists.concat(pf.dishes||[]);
+  (pf.courses||[]).forEach(function(c){ lists=lists.concat(c.options||[]); });
+  lists=lists.concat(sc.gelatoScoops||[]);
+  lists=lists.concat(sc.winesByGlass||[]);
+  ((sc.tasting&&sc.tasting.courses)||[]).forEach(function(c){ lists.push(c); });
+  var i;
+  for (i=0;i<lists.length;i++) {
+    var row=lists[i];
+    if (row && String(row.id||row.dishId||'')===id) return row;
+  }
+  return null;
+}
+function voiceSourceName(id){
+  var rec=voiceSourceRecord(id);
+  return (rec && rec.name) || '';
+}
+function voiceProjectDish(dish){
+  if (!dish) return null;
+  var id=String(dish.id||dish.dishId||'');
+  var existing=findPosMenuItem(id);
+  if (existing) return existing;
+  if (String(id).indexOf('btg_')===0 || dish.byTheGlass || dish.glassPrice!=null) {
+    return mapWineToPos(Object.assign({}, dish, {byTheGlass:true, scaliniOnly:true}), 'wine-glass');
+  }
+  var kind=pfCourseKind(dish.course||dish.courseLabel||dish.pfCourseKind||'');
+  var temps=prixFixeTempOptions(dish.askTemp, dish);
+  var surcharge=0;
+  try { surcharge=Number(extraPlateSurchargeForDish(dish, kind))||0; } catch (e) { surcharge=Number(dish.upcharge)||0; }
+  var cat=kind==='des'?'desserts':(kind==='app'?'small-plates':'entrees');
+  return {
+    id:id,
+    name:dish.name||'',
+    price:Number(dish.price)||0,
+    upcharge:surcharge,
+    category:cat,
+    catIds:[cat],
+    station:dish.station||'Expo',
+    cookTime:dish.cookTime||0,
+    modifiers:temps.length?[{group:'Temperature', options:temps}]:[],
+    allergens:dish.allergens||[],
+    dietaryFlags:dish.dietary||dish.dietaryFlags||[],
+    description:dish.desc||dish.description||'',
+    source:'prix-fixe',
+    askTemp:dish.askTemp||'',
+    chooseCount:Number(dish.chooseCount)||0,
+    scoops:dish.scoops||null,
+    voiceKeyword:dish.voiceKeyword||'',
+    voiceAliases:dish.voiceAliases||[],
+    active:dish.active!==false,
+    pfCourseKind:kind
+  };
+}
+function voiceComposeComponents(result){
+  if (!result || result.action!=='draft' || result.reason!=='ambiguous') return result;
+  var ids=result.sourceIds||[];
+  var sc=(typeof EPICUREAN_SCALINI!=='undefined') ? EPICUREAN_SCALINI : null;
+  var dishes=(sc && sc.prixFixe && sc.prixFixe.dishes)||[];
+  var parent=null;
+  dishes.forEach(function(dish){
+    var scoopIds=(dish.scoops||[]).map(function(s){ return String(s.id||s); });
+    if (!scoopIds.length || !(Number(dish.chooseCount)>0)) return;
+    var foreign=ids.filter(function(sid){ return sid!==String(dish.id) && scoopIds.indexOf(sid)<0; });
+    var used=ids.filter(function(sid){ return scoopIds.indexOf(sid)>=0; });
+    if (!foreign.length && used.length) parent={dish:dish, flavors:used};
+  });
+  if (!parent) return result;
+  var entry=(result.entries||[]).filter(function(e){ return String(e.sourceId)===String(parent.dish.id); })[0];
+  if (!entry) entry={sourceId:String(parent.dish.id), voiceKeyword:parent.dish.voiceKeyword||'GELATO', voiceAliases:parent.dish.voiceAliases||[]};
+  return {action:'match', entry:entry, sourceId:String(parent.dish.id), keyword:entry.voiceKeyword, leftover:[], flavors:parent.flavors};
+}
+function voiceTempOptions(item){
+  var out=[];
+  ((item&&item.modifiers)||[]).forEach(function(group){
+    if (!group || !/temp/i.test(String(group.group||''))) return;
+    (group.options||[]).forEach(function(opt){ out.push(opt.name||opt); });
+  });
+  return out;
+}
+function voiceTempGroup(item){
+  var group=((item&&item.modifiers)||[]).filter(function(mod){ return mod && /temp/i.test(String(mod.group||'')); })[0];
+  return group ? group.group : 'Temperature';
+}
+function voiceCanPrice(item){
+  if (!item || item.active===false) return false;
+  if (Number(item.price)>0) return true;
+  return !!(tableHasDining() && !isDrinkItem(item));
+}
+function voiceBarStock(){
+  var out=[];
+  (STATE.menuItems||[]).forEach(function(it){ if (it) out.push(it); });
+  (STATE.bar||[]).forEach(function(it){ if (it) out.push(it); });
+  return out;
+}
+function voiceSeatOf(parsed){
+  if (parsed && parsed.positionTouched && parsed.seat!=null) return parsed.seat;
+  return STATE.activeSeat;
+}
+function voiceResolveVocab(body){
+  var catalog=voiceCatalogApi();
+  if (!catalog) return {action:'none'};
+  var resolved=catalog.resolvePhrase(body, voiceVocabEntries());
+  resolved=catalog.narrowByName(resolved, catalog.tokens(body), function(id, entry){
+    return voiceSourceName(id) || (entry && entry.name) || '';
+  });
+  resolved=voiceComposeComponents(resolved);
+  if (resolved.action==='draft') {
+    return {action:'draft', draft:{
+      confidence:'AMBIGUOUS',
+      kind:'draft',
+      need:'ambiguous',
+      name:(resolved.names||[]).join(' / '),
+      candidates:(resolved.sourceIds||[]).map(function(id){ return {id:id, name:voiceSourceName(id)||id, keyword:''}; })
+    }};
+  }
+  if (resolved.action!=='match') return {action:'none'};
+  var item=voiceProjectDish(voiceSourceRecord(resolved.sourceId));
+  if (!item) {
+    return {action:'draft', draft:{confidence:'MISSING', kind:'draft', need:'not on the menu', name:resolved.keyword||'', itemId:resolved.sourceId}};
+  }
+  var left=catalog.classifyLeftover(resolved.leftover||[], {temps:voiceTempOptions(item)});
+  if (left.unknown && left.unknown.length) {
+    return {action:'draft', draft:{confidence:'MISSING', kind:'draft', need:'unparsed: '+left.unknown.join(' ').toLowerCase(), name:item.name, itemId:item.id}};
+  }
+  var flavors=resolved.flavors||[];
+  if (Number(item.chooseCount)>0 && flavors.length<Number(item.chooseCount)) {
+    var labelApi=voiceApi();
+    var need=labelApi ? labelApi.gelatoNeedLabel(flavors, item.chooseCount) : ('needs '+item.chooseCount+' flavors');
+    return {action:'draft', draft:{confidence:'MISSING', kind:'draft', need:need, name:item.name, itemId:item.id}};
+  }
+  var mods={};
+  var notes=[];
+  if (left.notes) notes.push(left.notes);
+  if (flavors.length) {
+    notes.push(flavors.map(function(fid){ var rec=voiceSourceRecord(fid); return (rec && rec.name) || fid; }).join(', '));
+  }
+  if (left.pour) {
+    var pourGroup=(item.modifiers||[]).filter(function(g){ return g && String(g.group)==='Pour'; })[0];
+    var hits=((pourGroup&&pourGroup.options)||[]).filter(function(opt){ return catalog.norm(opt).indexOf(left.pour)===0; });
+    if (hits.length!==1) {
+      return {action:'draft', draft:{confidence:'MISSING', kind:'draft', need:'Pour', name:item.name, itemId:item.id}};
+    }
+    mods.Pour=hits[0];
+  }
+  if (left.temp) mods[voiceTempGroup(item)]=left.temp;
+  var preset={mods:mods, notes:notes.filter(Boolean).join(' · ')};
+  if (!voiceCanPrice(item)) {
+    var why='no à la carte price';
+    if (preset.notes) why+=' · '+preset.notes;
+    return {action:'draft', draft:{confidence:'MISSING', kind:'draft', need:why, name:item.name, itemId:item.id}};
+  }
+  var required=voiceEngine() ? voiceEngine().modifierGroups(item) : [];
+  var missingTemp=required.some(function(name){ return /temp/i.test(name) && !mods[name]; });
+  if (missingTemp) return {action:'hold', item:item, notes:preset.notes, mods:mods};
+  return {action:'place', item:item, preset:preset};
+}
+function voiceInterpret(text, parsed){
+  if (STATE.voiceVocab && STATE.voiceVocab.stale) return {action:'none'};
+  if (parsed && (parsed.kind==='position' || parsed.kind==='pass' || parsed.kind==='noDrink')) return {action:'none'};
+  if (parsed && parsed.code && parsed.confidence==='HIGH') return {action:'none'};
+  var body=voicePhraseBody(text, parsed);
+  if (!body) return {action:'none'};
+  var vocab=voiceResolveVocab(body);
+  var drinks=voiceCocktailApi();
+  var cocktail=drinks ? drinks.interpret(body, voiceBarStock()) : {action:'none'};
+  var vocabClaims=vocab.action==='place' || vocab.action==='hold';
+  var drinkClaims=cocktail.action==='place' || cocktail.action==='draft';
+  if (vocabClaims && drinkClaims && !(cocktail.item && vocab.item && String(cocktail.item.id)===String(vocab.item.id))) {
+    return {action:'draft', draft:{confidence:'AMBIGUOUS', kind:'draft', need:'ambiguous', name:(vocab.item&&vocab.item.name)||cocktail.name||''}};
+  }
+  if (vocab.action==='draft' && drinkClaims) {
+    return {action:'draft', draft:{confidence:'AMBIGUOUS', kind:'draft', need:'ambiguous', name:(vocab.draft&&vocab.draft.name)||cocktail.name||''}};
+  }
+  if (vocab.action==='place' || vocab.action==='hold' || (vocab.action==='draft' && cocktail.action==='none')) return vocab;
+  if (cocktail.action==='place') {
+    return {action:'place', item:cocktail.item, preset:{mods:cocktail.mods||{}, notes:cocktail.notes||''}};
+  }
+  if (cocktail.action==='draft') {
+    var need=cocktail.need||'';
+    if (cocktail.notes) need=need ? (need+' · '+cocktail.notes) : cocktail.notes;
+    return {action:'draft', draft:{confidence:cocktail.confidence||'UNPRICED', kind:'draft', need:need, name:cocktail.name||'', itemId:''}};
+  }
+  if (vocab.action==='draft') return vocab;
+  return {action:'none'};
+}
+function voicePlaceResolved(item, parsed, preset){
+  var items=STATE.menuItems;
+  var staged=false;
+  if (item && items && !findPosMenuItem(item.id)) {
+    items.push(item);
+    staged=true;
+  }
+  try {
+    voicePlaceHigh(item, parsed, preset||{});
+  } finally {
+    if (staged) {
+      var at=items.indexOf(item);
+      if (at>=0) items.splice(at, 1);
+    }
+  }
+  var note=preset && preset.notes;
+  if (!note || !item) return;
+  var placed=(STATE.currentOrder||[]).filter(function(line){ return line && line.voiceOrigin && line.id===item.id; }).pop();
+  if (!placed || String(placed.notes||'').indexOf(note)>=0) return;
+  placed.notes=placed.notes ? (placed.notes+' · '+note) : note;
+  persistCheck(ensureOpenCheck(STATE.selectedTable));
+}
+function voiceHoldResolved(heard, parsed){
+  var seat=voiceSeatOf(parsed);
+  if (parsed && parsed.positionTouched) applyVoiceSeat(seat, !!parsed.priority);
+  var prior=voiceSyncTurn()||{};
+  STATE.voiceTurn={
+    activeSeat:seat,
+    last:prior.last||null,
+    pending:{item:heard.item, seat:seat, notes:heard.notes||'', mods:heard.mods||{}}
+  };
+  var label=seat!=null ? positionLabel(seat) : 'Seat';
+  STATE.voiceStatus=label+'. '+(heard.item&&heard.item.name||'Item');
+  toast(STATE.voiceStatus);
+  renderOrder();
+}
 function applyVoiceCommand(text){
   var eng=voiceEngine();
   if (!eng) { toast('Voice engine unavailable'); return null; }
@@ -6849,8 +7152,11 @@ function applyVoiceCommand(text){
   var heardItem=(parsed.confidence==='HIGH' && parsed.itemId) ? findPosMenuItem(parsed.itemId) : null;
   var turnApi=voiceTurnApi();
   var decided=null;
+  var hadPending=false;
   if (turnApi) {
-    decided=turnApi.decide(voiceSyncTurn(), {
+    var priorTurn=voiceSyncTurn();
+    hadPending=!!(priorTurn && priorTurn.pending);
+    decided=turnApi.decide(priorTurn, {
       text:text,
       parsed:parsed,
       item:heardItem,
@@ -6865,20 +7171,19 @@ function applyVoiceCommand(text){
       renderOrder();
       return parsed;
     }
-    if (decided.action==='hold') {
+    if (decided.action==='modifier') return applyVoiceNote(decided, parsed);
+    if (hadPending && decided.action==='hold') {
       STATE.voiceStatus=decided.status||'Listening';
       toast(STATE.voiceStatus);
       renderOrder();
       return parsed;
     }
-    if (decided.action==='modifier') return applyVoiceNote(decided, parsed);
-    if (decided.action==='place' && decided.food && decided.item) {
+    if (hadPending && decided.action==='place' && decided.food && decided.item) {
       if (decided.seat!=null) applyVoiceSeat(decided.seat, true);
       if (decided.replaceLineId) STATE._replaceLineId=decided.replaceLineId;
-      voicePlaceHigh(decided.item, Object.assign({}, parsed, { seat:decided.seat, itemId:decided.item.id, confidence:'HIGH', kind:'item' }), { mods:decided.mods, notes:decided.notes });
+      voicePlaceResolved(decided.item, Object.assign({}, parsed, { seat:decided.seat, itemId:decided.item.id, confidence:'HIGH', kind:'item' }), { mods:decided.mods, notes:decided.notes });
       return parsed;
     }
-    if (decided.replaceLineId) STATE._replaceLineId=decided.replaceLineId;
   }
   if (parsed.positionTouched) applyVoiceSeat(parsed.seat, parsed.priority);
   if (parsed.kind==='position') {
@@ -6897,6 +7202,36 @@ function applyVoiceCommand(text){
     else st.noDrink=true;
     toast(positionLabel(seat)+(parsed.kind==='pass'?' PASS':' NO DRINK'));
     renderOrder();
+    return parsed;
+  }
+  var coded=parsed.confidence==='HIGH' && parsed.code && parsed.code.code;
+  if (!coded) {
+    var heard=voiceInterpret(text, parsed);
+    if (heard && heard.action==='draft') {
+      STATE._replaceLineId=null;
+      voicePushDraft(Object.assign({}, parsed, heard.draft||{}));
+      return parsed;
+    }
+    if (heard && heard.action==='hold') {
+      voiceHoldResolved(heard, parsed);
+      return parsed;
+    }
+    if (heard && heard.action==='place' && heard.item) {
+      if (decided && decided.replaceLineId) STATE._replaceLineId=decided.replaceLineId;
+      voicePlaceResolved(heard.item, Object.assign({}, parsed, { itemId:heard.item.id, confidence:'HIGH', kind:'item' }), heard.preset||{});
+      return parsed;
+    }
+  }
+  if (!hadPending && decided && decided.action==='hold') {
+    STATE.voiceStatus=decided.status||'Listening';
+    toast(STATE.voiceStatus);
+    renderOrder();
+    return parsed;
+  }
+  if (!hadPending && decided && decided.action==='place' && decided.food && decided.item) {
+    if (decided.seat!=null) applyVoiceSeat(decided.seat, true);
+    if (decided.replaceLineId) STATE._replaceLineId=decided.replaceLineId;
+    voicePlaceResolved(decided.item, Object.assign({}, parsed, { seat:decided.seat, itemId:decided.item.id, confidence:'HIGH', kind:'item' }), { mods:decided.mods, notes:decided.notes });
     return parsed;
   }
   if (parsed.confidence==='HIGH' && parsed.itemId) {
@@ -6918,6 +7253,7 @@ function applyVoiceCommand(text){
         return parsed;
       }
     }
+    if (decided && decided.replaceLineId) STATE._replaceLineId=decided.replaceLineId;
     voicePlaceHigh(item, parsed, decided&&decided.notes ? { notes:decided.notes } : null);
     return parsed;
   }
