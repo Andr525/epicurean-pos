@@ -1,0 +1,1 @@
+{"name":"epicurean-master-pos-test-lab","private":true,"type":"module","engines":{"node":"22.x"},"scripts":{"start":"node server.mjs","test":"node test/security.mjs && node test/screens.mjs","test:screens":"node test/screens.mjs"},"dependencies":{"playwright":"1.62.1"}}

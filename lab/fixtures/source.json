@@ -1,0 +1,7 @@
+{
+  "sourceRepository": "Andr525/epicurean-boh",
+  "sourceCommit": "7bf4066c717d2b0aaf54731951ecf4ecd86738a8",
+  "sourcePath": "scalini-dining.js",
+  "sha256": "4073c2157582157c0cfc1f817b83decf5641aee969d9afb61d1520acbc83a9dc",
+  "purpose": "Read-only tracked BOH snapshot for isolated tests; not production pricing configuration"
+}

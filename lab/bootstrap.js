@@ -1,0 +1,35 @@
+(function(){
+ 'use strict';let fixture,runEpoch=0;const violations=[],events=[];const clone=v=>JSON.parse(JSON.stringify(v));
+ const fetchLocal=async(path,body)=>{const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json','X-Lab-Token':window.EPICUREAN_LAB_TOKEN},body:JSON.stringify(body)});const result=await r.json();if(!r.ok)throw Error(result.error);return result;};
+ const block=name=>function(){violations.push({kind:'blocked-operation',name,step:window.EpicureanLab?.currentCase?.steps.at(-1)?.selector||null});throw Error(name+' is disabled: local unsent tests only');};
+ function reset(){
+  runEpoch++;violations.length=0;events.length=0;stopVoiceSession();EPICUREAN_ORDER_SESSION.reset();fbReady=false;fbDb=null;fbAuth={currentUser:{getIdToken:async()=> 'local-fixture-token'}};
+  STATE.currentServer=null;STATE.selectedTable='14';STATE.activeSeat=1;STATE.currentOrder=[];STATE.orders=[];STATE.activeTastingOrders=[];STATE.checks={};STATE.tableSessions={};STATE.viewCheckId=null;STATE.voicePrixFixeId=null;STATE.voiceStatus='';STATE.voiceLastTranscript='';STATE.voiceDrafts=[];STATE.voiceTurn=null;STATE.voiceBatch=null;STATE.voiceSession.on=false;STATE._loginBusy=false;
+  STATE.staff=[{name:'LAB Foodmaster',role:'manager',code:'5000',status:'active'}];STATE._staffFetched=true;
+  STATE.rooms=[{id:'lab-room',name:'ISOLATED TEST ROOM',w:500,h:400}];STATE.roomObjs=[{id:'lab-table-14',room:'lab-room',roomId:'lab-room',type:'table',num:14,seats:3,x:50,y:50,w:90,h:90},{id:'lab-table-15',room:'lab-room',roomId:'lab-room',type:'table',num:15,seats:3,x:220,y:50,w:90,h:90}];STATE.stations=[];STATE.floorUserPicked=false;STATE.floorFilter='room:lab-room';STATE.floorFitDone=false;
+  STATE.menuItems=[];STATE.menuCategories=[];STATE.bar=[];STATE.wines=[];STATE.dailySpecials=[];STATE.prixFixeMenus=[hydratePrixFixeMenu(clone(fixture.menu))];STATE.tastingMenus=[];STATE.menuLive=true;rebuildPosCatalog();
+  STATE.voiceVocab={revision:fixture.revision,stale:false,entries:clone(fixture.entries),index:EPICUREAN_VOICE_ENGINE.buildIndex(fixture.entries)};
+  ['14','15'].forEach(t=>{const sess=sessionOf(t);sess.guestCount=3;sess.femalePositions={'2':true};sess.seatedAt=Date.now();const check=ensureOpenCheck(t);check.positionIdentities=clone(fixture.check.positionIdentities);});
+  STATE.voiceStatus='LOCAL MOCK · no paid providers';STATE.activeTab='hub';STATE.menuOpen=true;STATE.menuSearch='';STATE.menuNav={level:'cats',family:'food'};STATE.menuFamily='food';STATE.orderCat=null;STATE._menuPaneFp=null;
+  pin='';updateDots();closeSheet();closePfSelector();showScreen('login-screen');document.body.classList.remove('hh-on','hh-table');
+ }
+ function snapshot(){return {table:String(STATE.selectedTable),positions:clone(STATE.checks[activeCheckId()]?.positionIdentities||[]),activeSeat:positionLabel(STATE.activeSeat),pricing:STATE.voicePrixFixeId||'a-la-carte',status:STATE.voiceStatus,phase:EPICUREAN_ORDER_SESSION.state().phase,proposal:clone(EPICUREAN_ORDER_SESSION.state().proposal),lines:clone(STATE.currentOrder),orders:clone(STATE.orders),dining:clone(STATE.activeTastingOrders),loggedIn:!!STATE.currentServer,micOn:!!STATE.voiceSession.on,fbReady,violations:clone(violations),blockedNetwork:clone(window.EPICUREAN_LAB_BLOCKED)};}
+ async function boot(){
+  const r=await fetch('/lab/fixture');fixture=await r.json();
+  ['sendOrder','fireDiningCourse','fireTastingCourse','fireAllCourses','openPayment','processPayment','printCheck','initSquare'].forEach(name=>{if(typeof window[name]==='function')window[name]=block(name);});
+  // finishLogin calls initSquare unconditionally. The test adapter deliberately has no payment SDK.
+  window.initSquare=function(){};window.voiceSpeak=function(text){events.push({kind:'readback',text:String(text).slice(0,1000)});};
+  window.EPICUREAN_VOICE_INTERPRET=async(text,meta)=>fetchLocal('/lab/interpret',{text,pricing:meta.context.pricing,proposal:meta.proposal});
+  window.EPICUREAN_VOICE_TRANSCRIBE_URL='/lab/transcribe';
+  window.EPICUREAN_VOICE_TRANSCRIBE=async blob=>{
+   const epoch=runEpoch,prepared=await voicePcmBlob(blob);const r=await fetch('/lab/transcribe',{method:'POST',headers:{'Content-Type':prepared.type,'X-Lab-Token':window.EPICUREAN_LAB_TOKEN,'X-Lab-Transcript':window.EpicureanLab.audioFixture},body:prepared});const out=await r.json();if(!r.ok)throw Error(out.error);if(epoch!==runEpoch)throw Error('Stale test capture');return out.transcript;
+  };
+  window.EpicureanLab={reset,snapshot,fixture,events,fetchLocal,audioFixture:'two-course',currentCase:null,failures:[],ready:true};
+  reset();const controls=document.createElement('section');controls.id='lab-controls';controls.innerHTML='<style>#lab-controls{position:fixed;z-index:20000;top:4px;right:4px;background:#fff;color:#111;border:2px solid #a00;padding:4px;font:12px sans-serif;max-width:230px}#lab-controls button{padding:8px;margin:2px}#lab-mark{position:fixed;top:0;left:0;font:10px sans-serif;background:#a00;color:white;z-index:19000;pointer-events:none}</style><b>ISOLATED MOCK · $0 · NO SEND/FIRE</b><br><button id="lab-run">Run screen suite</button><button id="lab-stop">Stop</button><button id="lab-capture">Arm physical microphone</button><p id="lab-progress">Ready. Fixture PIN 5000.</p>';
+  document.body.appendChild(controls);const stop=document.createElement('button');stop.id='lab-stop-always';stop.textContent='STOP';stop.setAttribute('style','position:fixed;top:0;right:0;z-index:25000;font:10px sans-serif;padding:5px;background:#a00;color:white');stop.onclick=()=>{window.EpicureanLab.abort=true;runEpoch++;stopVoiceSession();};document.body.appendChild(stop);const mark=document.createElement('div');mark.id='lab-mark';mark.textContent='LOCAL TEST ONLY';document.body.appendChild(mark);
+  document.getElementById('lab-run').onclick=()=>window.EpicureanLab.run().catch(e=>{document.getElementById('lab-progress').textContent=e.message;});
+  document.getElementById('lab-stop').onclick=()=>{window.EpicureanLab.abort=true;runEpoch++;stopVoiceSession();};
+  document.getElementById('lab-capture').onclick=()=>{if(!STATE.currentServer){alert('Run/login to the local fixture first. Physical microphone requires owner approval and an HTTPS origin.');return;}startVoiceMicrophone();};
+ }
+ document.addEventListener('DOMContentLoaded',()=>boot().catch(e=>{document.body.innerHTML='<h1>LAB FAILED CLOSED</h1><pre></pre>';document.querySelector('pre').textContent=e.message;}));
+})();

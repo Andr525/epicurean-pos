@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';import {mkdtempSync,readFileSync,rmSync} from 'node:fs';import {tmpdir} from 'node:os';import {join} from 'node:path';import {startLab} from '../server.mjs';
+const dir=mkdtempSync(join(tmpdir(),'epicurean-lab-security-'));const lab=await startLab({artifactDir:dir});
+async function post(path,body,{token=lab.token,origin=lab.url,type='application/json'}={}){return fetch(lab.url+path,{method:'POST',headers:{'X-Lab-Token':token,Origin:origin,'Content-Type':type},body:typeof body==='string'?body:JSON.stringify(body)});}
+try{
+ const r=await fetch(lab.url);const html=await r.text();assert.ok(r.headers.get('content-security-policy').includes("connect-src 'self'"));assert.ok(r.headers.get('content-security-policy').includes("worker-src 'none'"));assert.ok(!/<script[^>]*src=["']https?:/.test(html));assert.ok(!html.includes("window.EPICUREAN_VOICE_TRANSCRIBE_URL='https://"));assert.ok(html.includes('demo-epicurean-lab'));assert.ok(!html.includes('sandbox.web.squarecdn.com'));
+ assert.equal((await fetch(lab.url+'/functions/index.js')).status,404);assert.equal((await fetch(lab.url+'/lab/fixtures/source.json')).status,404);assert.equal((await fetch(lab.url+'/../.git/config')).status,404);
+ assert.equal((await post('/lab/interpret',{}, {token:'wrong'})).status,409);assert.equal((await post('/lab/interpret',{}, {origin:'https://evil.invalid'})).status,409);
+ assert.equal((await post('/lab/interpret',{text:'arbitrary live fallback',proposal:[],pricing:'pf_scalini_89'})).status,409);
+ const valid={text:'position 2A appetizer pescatore and main course pork chop medium',proposal:[],pricing:'pf_scalini_89'};const interpretation=await post('/lab/interpret',valid);assert.equal(interpretation.status,200);assert.equal((await interpretation.json()).operations.length,2);
+ assert.equal((await post('/lab/interpret',{...valid,pricing:'a-la-carte'})).status,409);assert.equal((await post('/lab/evidence',{schemaVersion:1,runId:'../../escape',cases:[]})).status,409);
+ assert.equal((await post('/lab/evidence',{schemaVersion:1,runId:'safe',cases:[],privateData:'forbidden'})).status,409);assert.equal((await post('/lab/interpret','x'.repeat(500001))).status,409);
+ assert.equal((await post('/lab/transcribe','none',{type:'audio/wav'})).status,409);
+ await assert.rejects(()=>startLab({host:'0.0.0.0'}),/approval/);await assert.rejects(()=>startLab({host:'192.168.1.2',tls:{},ownerApproval:{deviceAccessApproved:true,scope:'isolated-pos-fixture-only',host:'192.168.1.2',additionalSpendingLimitMicroUsd:0,expiresAt:new Date(Date.now()-1).toISOString()}}),/approval/);
+ assert.equal(lab.reports.length,0);console.log('PASS: local-only assets/CSP, fixture provenance, no SDK/provider fallback, exact origin/token, payload limits, evidence rejection and unauthorized/expired LAN guards. No device or provider accessed.');
+}finally{await lab.close();rmSync(dir,{recursive:true,force:true});}
