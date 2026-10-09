@@ -4,7 +4,7 @@ This review-only package runs the existing POS UI, client bridge and server inte
 
 ## Start and reproduce in development
 
-Use Node 22. From `lab`, run `npm ci --ignore-scripts --no-audit --no-fund`, then `npm test`. Chromium must be installed; set `CHROMIUM_PATH` if it is not `/usr/bin/chromium`. The browser uses the iPhone viewport descriptor, Chromium mouse clicks, actual visible controls, hit testing and screen screenshots. This is neither Safari nor trusted iPhone touch. The suite deliberately exits nonzero for product failures. `node server.mjs` starts a loopback-only UI at http://127.0.0.1:9443; phone hosting does not need npm dependencies.
+Use Node 22. From `lab`, run `npm ci --ignore-scripts --no-audit --no-fund`, then `npm test`. Chromium must be installed; set `CHROMIUM_PATH` if it is not `/usr/bin/chromium`. The browser uses the iPhone viewport descriptor, Chromium mouse clicks, actual visible controls, hit testing and screen screenshots. This is neither Safari nor trusted iPhone touch. The suite deliberately exits nonzero for product failures. `LAB_DOM_ONLY=1 npm run test:screens` verifies the phone-facing Run button with no external control driver (seven cases, microphone excluded). This was verified in cloud Chromium: four passes and the same three POS failures. `node server.mjs` starts a loopback-only UI at http://127.0.0.1:9443; phone hosting does not need npm dependencies.
 
 Reports and per-case screenshots go into ignored `lab/artifacts`. Reports contain selectors, actions, rendered status/check text, structured draft/check state, catalog provenance and failures. `node report.mjs PATH_TO_RESULTS_JSON` writes a developer-readable reproducer beside the JSON. Submit only these controlled fixture reports and POS-only screenshots; inspect them before sharing. No automatic GitHub issue, message or upload is performed.
 
@@ -17,6 +17,10 @@ Eight scenarios: five pass, three fail. Manual BOH menu selection, multi-course 
 The owner opens this isolated site and taps **Run screen suite** once. The page can automate its own DOM controls, inspect visible order details, positions, prices/errors, corrections and login recovery, then return JSON evidence to the Mac. These are synthetic page events; they cannot establish native touch fidelity. Safari Web Inspector provides console/DOM/network diagnostics for this tab, not arbitrary phone control or an automatic pixel screenshot API.
 
 The owner must approve access, unlock/pair the phone, choose the test tab, establish certificate trust, grant microphone permission with a real gesture, and handle lock/background/system prompts. Pixel evidence initially requires an owner screenshot of the POS tab. Do not automate or capture personal applications. Appium/XCUITest is a later candidate for native taps and screenshots; it requires separately approved installation, Xcode, signed WebDriverAgent, Developer Mode and device automation settings. None is installed or activated here. A free Apple account may permit manual signing; feasibility depends on the owner's Mac/iOS/Xcode versions. USB alone does not serve the Mac website to Safari; the proposed first connection uses same-Wi-Fi HTTPS for the site and USB for Inspector.
+
+## Quick owner launch
+
+With Node 22 already available, from `lab` run `bash mac/start-session.sh --owner-approved PRIVATE_MAC_IP`. This checks Mac prerequisites, generates certificates if absent, writes a $0/60-minute scoped authorization and starts HTTPS. Use this only when you authorize the temporary local phone session. It installs nothing or inspects any device. The terminal prints the exact private phone URL. Then follow certificate trust and USB Inspector steps below; skip the manual approval-JSON/server commands because the launcher handles them.
 
 ## Owner instructions — execute physical steps only after explicit approval
 
