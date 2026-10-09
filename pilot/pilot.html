@@ -1,0 +1,35 @@
+<!doctype html><meta name="viewport" content="width=device-width"><title>Voice conversation review</title>
+<h1>Isolated conversation pilot</h1><p>Mock interpretation only. Confirmation creates a kitchen draft; nothing is sent or fired.</p>
+<button id="login">Start / restart staff session</button><button id="logout">Logout</button>
+<form><input id="text" aria-label="Foodmaster instruction" size="65" placeholder="Foodmaster, position 2…"><button>Interpret</button></form>
+<button id="mic">Record command</button><button id="stop">Finish command</button><button id="confirm">Confirm unsent draft</button><button id="interrupt">Interrupt</button><pre id="state"></pre>
+<script>
+let session=null,epoch=0,n=0,logged=false,capture=null,captureSeq=0;const view=document.querySelector('#state');
+async function call(action,text){const generation=epoch;if(!logged)throw Error('Login required');const body=action==='open'?{action,table:'14',checkId:'pilot-check',pricing:'pf_scalini_89'}:{action,sessionId:session.sessionId,revision:session.revision,requestId:'web-'+(++n),...(text?{text}:{})};const res=await fetch('/session',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer mock-foodmaster'},body:JSON.stringify(body)});const result=await res.json();if(generation!==epoch)return;if(!res.ok)throw Error(result.error);session=result;view.textContent=JSON.stringify(result,null,2);return result;}
+function stopAudio(discard){const clip=capture;if(!clip)return;clip.discard=!!discard||!clip.recorder;clearTimeout(clip.timer);if(clip.recorder&&clip.recorder.state!=='inactive')clip.recorder.stop();if(clip.stream)clip.stream.getTracks().forEach(t=>t.stop());if(clip.discard)capture=null;}
+document.querySelector('#mic').onclick=()=>run((async()=>{
+ if(!logged||!session)throw Error('Start a staff session first');if(capture)return;
+ const clip={id:++captureSeq,epoch,discard:false,chunks:[],stream:null,recorder:null,timer:null};capture=clip;
+ try{
+  const ownStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});clip.stream=ownStream;
+  if(clip.epoch!==epoch||capture!==clip||clip.discard){ownStream.getTracks().forEach(t=>t.stop());return;}
+  const ownRecorder=new MediaRecorder(ownStream);clip.recorder=ownRecorder;
+  ownRecorder.ondataavailable=e=>{if(e.data.size)clip.chunks.push(e.data);};
+  ownRecorder.onstop=()=>run((async()=>{
+   try{
+    if(clip.discard||clip.epoch!==epoch||capture!==clip)return;
+    const blob=new Blob(clip.chunks,{type:ownRecorder.mimeType});
+    const response=await fetch('/mock-transcribe',{method:'POST',headers:{Authorization:'Bearer mock-foodmaster','Content-Type':blob.type},body:blob});const output=await response.json();
+    if(clip.discard||clip.epoch!==epoch||capture!==clip)return;
+    if(!response.ok)throw Error(output.error||'Mock audio failed');await call('turn',output.transcript);
+   }finally{clearTimeout(clip.timer);ownStream.getTracks().forEach(t=>t.stop());if(capture===clip)capture=null;}
+  })());
+  ownRecorder.start();clip.timer=setTimeout(()=>{stopAudio(true);view.textContent='Recording exceeded 30 seconds; repeat a shorter command.';},30000);view.textContent='Recording controlled mock ASR input…';
+ }catch(error){if(clip.stream)clip.stream.getTracks().forEach(t=>t.stop());if(capture===clip)capture=null;throw error;}
+})());
+document.querySelector('#stop').onclick=()=>stopAudio(false);
+document.addEventListener('visibilitychange',()=>{if(document.hidden){epoch++;stopAudio(true);if(logged&&session)run(call('interrupt'));}});
+function run(p){p.catch(e=>view.textContent=e.message);}
+document.querySelector("#login").onclick=()=>{epoch++;stopAudio(true);logged=true;session=null;run(call('open'));};document.querySelector("#logout").onclick=()=>{epoch++;stopAudio(true);logged=false;session=null;view.textContent='Signed out; unsent draft remains isolated.';};
+document.querySelector('form').onsubmit=e=>{e.preventDefault();run(call('turn',document.querySelector('#text').value));};document.querySelector("#confirm").onclick=()=>run(call('confirm'));document.querySelector("#interrupt").onclick=()=>{epoch++;stopAudio(true);run(call('interrupt'));};
+</script>
