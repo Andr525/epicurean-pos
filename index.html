@@ -33,6 +33,8 @@
 <script src="voice-cocktails.js?v=65"></script>
 <script src="voice-price.js?v=67"></script>
 <script src="voice-service.js?v=67"></script>
+<script src="voice-order.js?v=68-review"></script>
+<script src="voice-order-bridge.js?v=68-review"></script>
 <script async src="https://sandbox.web.squarecdn.com/v1/square.js"></script>
 <style>
 :root {
@@ -3693,6 +3695,9 @@ function failLogin(){
   updateDots();
 }
 function finishLogin(staff){
+  stopVoiceSession();
+  if (window.EPICUREAN_ORDER_SESSION) window.EPICUREAN_ORDER_SESSION.reset();
+  STATE.voiceTurn=null; STATE.voiceBatch=null; STATE.voiceStatus='';
   STATE._loginBusy=true;
   var err=document.getElementById('pin-error');
   if (err) err.textContent='';
@@ -3735,6 +3740,9 @@ function attemptLogin() {
   failLogin();
 }
 function logout() {
+  stopVoiceSession();
+  if (window.EPICUREAN_ORDER_SESSION) window.EPICUREAN_ORDER_SESSION.reset();
+  STATE.voiceTurn=null; STATE.voiceBatch=null; STATE.voiceDrafts=[]; STATE.voiceStatus=''; STATE.voiceLastTranscript=''; STATE.voicePrixFixeId=null;
   try { closeOverflow(); } catch (e) {}
   try { closeSheet(); } catch (e) {}
   STATE.currentServer=null;
@@ -5427,6 +5435,11 @@ function toggleStationTable(){ stationsAreBohOnly(); }
 
 function selectTable(t) {
   t = resolveTableNumber(t);
+  if (String(t)!==String(STATE.selectedTable)) {
+    stopVoiceSession();
+    if (window.EPICUREAN_ORDER_SESSION) window.EPICUREAN_ORDER_SESSION.reset();
+    STATE.voiceTurn=null; STATE.voiceBatch=null;
+  }
   var obj=findFloorTable(t);
   STATE.selectedTable = t;
   if (fbReady) {
@@ -7050,7 +7063,8 @@ function voiceSeatOf(parsed){
   if (parsed && parsed.positionTouched && parsed.seat!=null) return parsed.seat;
   return STATE.activeSeat;
 }
-function voiceResolveVocab(body){
+function voiceResolveVocab(body, options){
+  options=options||{};
   var catalog=voiceCatalogApi();
   if (!catalog) return {action:'none'};
   var entries=voiceVocabEntries();
@@ -7104,7 +7118,7 @@ function voiceResolveVocab(body){
   }
   if (left.temp) mods[voiceTempGroup(item)]=left.temp;
   var preset={mods:mods, notes:notes.filter(Boolean).join(' · ')};
-  if (!voiceCanPrice(item)) {
+  if (!options.deferPrice && !voiceCanPrice(item)) {
     var why='no à la carte price';
     if (left.temp) why+=' · '+left.temp;
     if (preset.notes) why+=' · '+preset.notes;
@@ -7525,6 +7539,7 @@ function submitVoiceTest(){
   var el=document.getElementById('voice-test-input');
   var text=el ? el.value : '';
   if (!String(text||'').trim()) return;
+  if(window.receiveVoiceTranscript) return window.receiveVoiceTranscript(text);
   applyVoiceCommand(text);
 }
 window.EPICUREAN_VOICE_TRANSCRIBE_URL='https://us-central1-epicurean-house-at-the-choc-st.cloudfunctions.net/voiceTranscribe';
@@ -7565,9 +7580,11 @@ function postVoiceClip(url, blob){
   return voiceAuthToken().catch(function(){ return ''; }).then(function(token){
     var headers={};
     if (token) headers.Authorization='Bearer '+token;
-    return fetch(url, { method:'POST', headers:headers, body:body });
+    var abort=new AbortController();
+    var timeout=setTimeout(function(){abort.abort();},20000);
+    return fetch(url, { method:'POST', headers:headers, body:body, signal:abort.signal }).finally(function(){clearTimeout(timeout);});
   }).then(function(res){
-    if (!res.ok) throw new Error('transcribe');
+    if (!res.ok) throw new Error('transcribe HTTP '+res.status);
     return res.json();
   }).then(function(data){ return data && (data.transcript||data.text) || ''; });
 }
@@ -7649,10 +7666,11 @@ function voiceSpeak(text){
       try { STATE._voiceRec.recorder.stop(); } catch (err) {}
     }
     synth.cancel();
+    var speechToken=STATE._voiceToken||0;
     var uttered=new window.SpeechSynthesisUtterance(text);
     uttered.rate=1.02;
     var release=function(){
-      if (!STATE._voiceHoldSpeech) return;
+      if (!STATE._voiceHoldSpeech || speechToken!==(STATE._voiceToken||0)) return;
       STATE._voiceHoldSpeech=false;
       if (ensureVoiceSession().on) startVoiceClip(ensureVoiceSession().stream);
     };
@@ -7669,14 +7687,15 @@ function releaseVoiceClip(session){
   clearTimeout(session.timer);
   clearTimeout(session.watch);
   clearInterval(session.levelTimer);
+  try { if(session.source) session.source.disconnect(); if(session.analyser) session.analyser.disconnect(); } catch(e) {}
 }
 function continueVoiceSession(){
   var sess=ensureVoiceSession();
   if (!sess.on || STATE._voiceHoldSpeech) return;
   startVoiceClip(sess.stream);
 }
-function finishVoiceClip(){
-  var session=STATE._voiceRec;
+function finishVoiceClip(session){
+  session=session||STATE._voiceRec;
   if (!session || session.done) return;
   session.done=true;
   var cancelled=!!session.cancelled;
@@ -7687,10 +7706,15 @@ function finishVoiceClip(){
   var chunks=session.chunks||[];
   var mime=session.mime||'audio/mp4';
   releaseVoiceClip(session);
-  STATE._voiceRec=null;
+  if (STATE._voiceRec===session) STATE._voiceRec=null;
   STATE.voicePhase=ensureVoiceSession().on ? 'listening' : '';
   if (STATE.activeTab==='order') renderOrder();
-  if (cancelled || suppressed) return;
+  if (cancelled || suppressed || token!==STATE._voiceToken || !ensureVoiceSession().on) return;
+  if (window.receiveVoiceTranscript) {
+    var commandSession=ensureVoiceSession(); commandSession.on=false; clearTimeout(commandSession.idle);
+    stopVoiceTracks(commandSession.stream); commandSession.stream=null; STATE.voicePhase='hearing';
+    if(STATE._voiceAudio) { try { STATE._voiceAudio.close(); } catch(e) {} STATE._voiceAudio=null; }
+  }
   if (monitored && !heard) { continueVoiceSession(); return; }
   var blob;
   try { blob=new Blob(chunks, { type:mime }); } catch (e) { blob=new Blob(chunks); }
@@ -7698,26 +7722,33 @@ function finishVoiceClip(){
   var pending;
   if (window.EPICUREAN_VOICE_TRANSCRIBE) pending=Promise.resolve().then(function(){ return window.EPICUREAN_VOICE_TRANSCRIBE(blob); });
   else pending=voicePcmBlob(blob).catch(function(){ return blob; }).then(function(out){ return postVoiceClip(window.EPICUREAN_VOICE_TRANSCRIBE_URL, out||blob); });
+  STATE._voiceRequestToken=token;
   pending.then(function(text){
     if (token!==STATE._voiceToken) return;
     var useful=String(text||'').trim();
     if (useful) {
       voiceNoteActivity();
+      if (session.table!==String(STATE.selectedTable) || session.staff!==String(STATE.currentServer&&STATE.currentServer.code) || session.check!==activeCheckId()) return;
+      STATE.voiceLastTranscript=useful;
+      if (window.receiveVoiceTranscript) return Promise.resolve(window.receiveVoiceTranscript(useful, 'clip-'+token)).then(continueVoiceSession);
       applyVoiceCommand(useful);
     }
     continueVoiceSession();
-  }).catch(function(){
+  }).catch(function(err){
     if (token!==STATE._voiceToken) return;
-    toast('Voice did not hear that');
+    STATE.voiceStatus=/401/.test(err&&err.message||'')?'Voice authentication expired. Log in again.':((err&&err.name==='AbortError')?'Voice request timed out. Check unchanged.':'Voice did not hear that: transcription failed. Check unchanged.');
+    toast(STATE.voiceStatus);
     continueVoiceSession();
-  });
+  }).finally(function(){if(STATE._voiceRequestToken===token) STATE._voiceRequestToken=null;});
 }
 function stopVoiceCapture(cancel){
   var session=STATE._voiceRec;
   if (!session) return;
   if (cancel) {
-    session.cancelled=true;
+    session.cancelled=true; session.done=true;
     STATE._voiceToken=(STATE._voiceToken||0)+1;
+    releaseVoiceClip(session);
+    if(STATE._voiceRec===session) STATE._voiceRec=null;
   }
   clearTimeout(session.timer);
   clearTimeout(session.watch);
@@ -7725,7 +7756,7 @@ function stopVoiceCapture(cancel){
   if (session.recorder && session.recorder.state!=='inactive') {
     try { session.recorder.stop(); return; } catch (e) {}
   }
-  finishVoiceClip();
+  finishVoiceClip(session);
 }
 function voiceArmAudio(session){
   var Ctx=window.AudioContext||window.webkitAudioContext;
@@ -7745,7 +7776,7 @@ function voiceWatchSpeech(session){
     analyser.fftSize=1024;
     source.connect(analyser);
   } catch (e) { return; }
-  session.audioCtx=null;
+  session.source=source; session.analyser=analyser;
   session.monitored=true;
   var data=new Uint8Array(analyser.fftSize);
   var noise=0, samples=0, quietSince=0;
@@ -7762,10 +7793,10 @@ function voiceWatchSpeech(session){
     if (speaking) { session.heard=true; quietSince=0; voiceNoteActivity(); return; }
     if (session.heard) {
       if (!quietSince) quietSince=now;
-      if (now-quietSince>(window.VOICE_SILENCE_MS||900)) stopVoiceCapture(false);
+      if (!window.receiveVoiceTranscript && now-quietSince>(window.VOICE_SILENCE_MS||900)) stopVoiceCapture(false);
       return;
     }
-    if (now-(session.startedAt||now)>(window.VOICE_NOSPEECH_MS||4000)) stopVoiceCapture(false);
+    if (!window.receiveVoiceTranscript && now-(session.startedAt||now)>(window.VOICE_NOSPEECH_MS||4000)) stopVoiceCapture(false);
   }, 80);
 }
 function startVoiceClip(stream){
@@ -7773,7 +7804,7 @@ function startVoiceClip(stream){
   if (!sess.on || !voiceStreamLive(stream) || STATE._voiceHoldSpeech) return;
   if (STATE._voiceRec && !STATE._voiceRec.done) return;
   var token=(STATE._voiceToken=(STATE._voiceToken||0)+1);
-  var session={ token:token, cancelled:false, done:false, heard:false, monitored:false, chunks:[], mime:voiceMimeType(), startedAt:Date.now(), stream:stream };
+  var session={ table:String(STATE.selectedTable), check:activeCheckId(), staff:String(STATE.currentServer&&STATE.currentServer.code), token:token, cancelled:false, done:false, heard:false, monitored:false, chunks:[], mime:voiceMimeType(), startedAt:Date.now(), stream:stream };
   STATE._voiceRec=session;
   STATE.voicePhase='listening';
   voiceArmAudio(session);
@@ -7786,28 +7817,35 @@ function startVoiceClip(stream){
   }
   session.recorder=rec;
   rec.ondataavailable=function(ev){ if (ev.data && ev.data.size) session.chunks.push(ev.data); };
-  rec.onerror=function(){ stopVoiceCapture(false); toast('Voice did not hear that'); };
-  rec.onstop=function(){ finishVoiceClip(); };
+  rec.onerror=function(){ if(STATE._voiceRec!==session) return; stopVoiceCapture(true); STATE.voiceStatus='Recording failed. Please repeat the command.'; toast(STATE.voiceStatus); };
+  rec.onstop=function(){ finishVoiceClip(session); };
   try { rec.start(); }
   catch (e) {
     session.cancelled=true;
-    finishVoiceClip();
+    finishVoiceClip(session);
     toast('Microphone did not start');
     return;
   }
   voiceWatchSpeech(session);
-  session.timer=setTimeout(function(){ if (STATE._voiceRec===session) stopVoiceCapture(false); }, window.VOICE_CAPTURE_MS||8000);
-  session.watch=setTimeout(function(){ if (STATE._voiceRec===session) stopVoiceCapture(false); }, window.VOICE_WATCH_MS||12000);
+  session.timer=setTimeout(function(){
+    if (STATE._voiceRec!==session) return;
+    if(window.receiveVoiceTranscript) { stopVoiceCapture(true); stopVoiceSession(); STATE.voiceStatus='Recording limit reached. Please repeat a shorter command.'; renderOrder(); }
+    else stopVoiceCapture(false);
+  }, window.VOICE_CAPTURE_MS||(window.receiveVoiceTranscript?30000:8000));
+  session.watch=setTimeout(function(){ if (STATE._voiceRec===session) stopVoiceCapture(true); }, window.VOICE_WATCH_MS||(window.receiveVoiceTranscript?35000:12000));
 }
 function stopVoiceSession(reason){
   var sess=ensureVoiceSession();
   sess.on=false;
+  STATE._voiceToken=(STATE._voiceToken||0)+1;
+  try { if(window.speechSynthesis) window.speechSynthesis.cancel(); } catch(e) {}
   clearTimeout(sess.idle);
   STATE.voicePhase='';
   STATE._voiceHoldSpeech=false;
   if (STATE._voiceRec) stopVoiceCapture(true);
   stopVoiceTracks(sess.stream);
   sess.stream=null;
+  if (STATE._voiceAudio) { try { STATE._voiceAudio.close(); } catch(e) {} STATE._voiceAudio=null; }
   if (reason==='quiet') toast('Voice off');
   if (STATE.activeTab==='order') renderOrder();
 }
@@ -7815,12 +7853,13 @@ function voiceBindRecovery(){
   if (window._voiceRecoveryBound) return;
   window._voiceRecoveryBound=true;
   document.addEventListener('visibilitychange', function(){
-    if (!document.hidden) voiceRecoverStream();
+    if (document.hidden && window.receiveVoiceTranscript) stopVoiceSession();
+    else if (!document.hidden) voiceRecoverStream();
   });
 }
 function voiceWatchTrack(stream){
   (stream&&stream.getTracks?stream.getTracks():[]).forEach(function(track){
-    track.onended=function(){ voiceRecoverStream(); };
+    track.onended=function(){ if(ensureVoiceSession().on&&ensureVoiceSession().stream===stream) voiceRecoverStream(); };
   });
 }
 function voiceRecoverStream(){
@@ -7834,8 +7873,11 @@ function voiceRecoverStream(){
     return;
   }
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+  var recoveryToken=STATE._voiceToken||0;
   navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:true, noiseSuppression:true, channelCount:1 } }).then(function(stream){
+    if(recoveryToken!==(STATE._voiceToken||0)||!STATE.currentServer) {stopVoiceTracks(stream);return;}
     if (!sess.on) { stopVoiceTracks(stream); return; }
+    if(STATE._voiceRec) { stopVoiceCapture(true); recoveryToken=STATE._voiceToken||0; }
     stopVoiceTracks(sess.stream);
     sess.stream=stream;
     voiceWatchTrack(stream);
@@ -7845,16 +7887,20 @@ function voiceRecoverStream(){
   });
 }
 function startVoiceMicrophone(){
+  if(window.receiveVoiceTranscript && STATE._voiceRequestToken===STATE._voiceToken && STATE._voiceRequestToken!=null) {toast('Finishing the previous command. Please wait.');return;}
   if (STATE._voiceRec && STATE._voiceRec.recorder && STATE._voiceRec.recorder.state!=='inactive') {
     stopVoiceCapture(false);
     return;
   }
-  if (!STATE.selectedTable) { toast('Open a table first'); return; }
+  if (!STATE.currentServer || !STATE.selectedTable) { toast('Log in and open a table first'); return; }
   if (!voiceTranscriberReady()) { toast('Voice transcription is not connected'); return; }
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) {
     toast('Microphone is not available');
     return;
   }
+  try {if(window.speechSynthesis) window.speechSynthesis.cancel();} catch(e) {}
+  STATE._voiceHoldSpeech=false;
+  STATE._voiceToken=(STATE._voiceToken||0)+1;
   var sess=ensureVoiceSession();
   sess.on=true;
   if (!sess.lastUseful) sess.lastUseful=Date.now();
@@ -7864,13 +7910,16 @@ function startVoiceMicrophone(){
   STATE.voicePhase='listening';
   toast('Listening');
   renderOrder();
+  var permissionToken=STATE._voiceToken||0;
   var ready=voiceStreamLive(sess.stream) ? Promise.resolve(sess.stream) : navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:true, noiseSuppression:true, channelCount:1 } });
   ready.then(function(stream){
+    if(permissionToken!==(STATE._voiceToken||0) || !sess.on || !STATE.currentServer) { stopVoiceTracks(stream); return; }
     sess.stream=stream;
     voiceWatchTrack(stream);
     if (!sess.on) { stopVoiceTracks(stream); sess.stream=null; return; }
     startVoiceClip(stream);
   }).catch(function(err){
+    if(permissionToken!==(STATE._voiceToken||0)) return;
     sess.on=false;
     STATE.voicePhase='';
     STATE._voiceRec=null;
@@ -7930,11 +7979,11 @@ function voiceTestHtml(){
 }
 function voiceMicHtml(){
   var on=!!(STATE.voiceSession && STATE.voiceSession.on);
-  var label=on ? (STATE.voicePhase==='hearing' ? 'Hearing' : 'Listening') : 'Mic';
-  var status=STATE.voiceStatus || (on ? 'Listening' : 'Tap Mic, then speak');
+  var label=on ? (window.receiveVoiceTranscript?'Finish command':(STATE.voicePhase==='hearing' ? 'Hearing' : 'Listening')) : 'Mic';
+  var status=STATE.voiceStatus || (on ? 'Say Foodmaster, then your command' : 'Tap Mic. Say Foodmaster to order; confirm before adding.');
   var html='<div class="voice-dock" data-voice-mic="1">';
   html+='<button type="button" class="'+(on?'on':'')+'" onclick="startVoiceMicrophone()">'+label+'</button>';
-  html+='<div class="voice-live-status">'+esc(status)+'</div>';
+  html+='<div class="voice-live-status">'+esc(status)+(window.receiveVoiceTranscript&&STATE.voiceLastTranscript?('<br>Heard: '+esc(STATE.voiceLastTranscript)):'')+'</div>';
   if (on) html+='<button type="button" onclick="stopVoiceSession()">Off</button>';
   return html+'</div>';
 }
@@ -7946,6 +7995,11 @@ function orderTopHtml(){
   html+=renderGuestAllergyStrip();
   html+=renderSeatBar();
   html+=voiceTestHtml();
+  if(window.voicePricingHtml) html+=voicePricingHtml();
+  if(window.EPICUREAN_ORDER_SESSION) {
+    var vs=window.EPICUREAN_ORDER_SESSION.state();
+    if(vs.proposal.length || vs.error) html+='<div class="voice-draft"><b>'+esc(STATE.voiceStatus||'Review voice proposal')+'</b><div class="voice-draft-acts"><button type="button" onclick="receiveVoiceTranscript(&quot;Foodmaster confirm&quot;)">Confirm unsent</button><button type="button" onclick="receiveVoiceTranscript(&quot;Foodmaster cancel&quot;)">Cancel proposal</button></div></div>';
+  }
   return html+'</div>';
 }
 function mountVoiceDock(){
