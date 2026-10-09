@@ -83,7 +83,7 @@ assert.equal(beforeById.w2148NV750ml.vin, '2148');
 
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 assert.match(html, /cellar\.js\?v=binwise-375-park-v3/);
-assert.match(html, /pos-build: scalini-print-v65/);
+assert.match(html, /pos-build: scalini-print-v66/);
 assert.match(html, /voice-engine\.js\?v=58/);
 assert.doesNotMatch(fs.readFileSync(path.join(root, 'voice-engine.js'), 'utf8'), /20007/);
 

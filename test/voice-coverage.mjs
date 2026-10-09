@@ -28,6 +28,8 @@ function loadPos() {
   html = html.replace(/<script src="voice-turn\.js[^"]*"><\/script>/, inline('voice-turn.js'));
   html = html.replace(/<script src="voice-catalog\.js[^"]*"><\/script>/, inline('voice-catalog.js'));
   html = html.replace(/<script src="voice-cocktails\.js[^"]*"><\/script>/, inline('voice-cocktails.js'));
+  html = html.replace(/<script src="voice-price\.js[^"]*"><\/script>/, inline('voice-price.js'));
+  html = html.replace(/<script src="voice-service\.js[^"]*"><\/script>/, inline('voice-service.js'));
   html = html.replace(/<script src="cellar\.js[^"]*"><\/script>/, '');
   const vc = new VirtualConsole();
   vc.on('jsdomError', () => {});
