@@ -56,4 +56,22 @@ const groups = [
 assert.equal(catalog.matchGroupOption('rare', groups).ambiguous, true);
 assert.equal(catalog.matchGroupOption('rare', [groups[1]]).option, 'Rare');
 
+const pork = [
+  { sourceId: 'sf_m_pork', voiceKeyword: 'PORKCHOP', voiceAliases: [], active: true },
+  { sourceId: 'sf_m_reggiano', voiceKeyword: 'MEDALLIONS', voiceAliases: [], active: true }
+];
+const porkNames = {
+  sf_m_pork: '14 oz. roasted pork chop San Domenico',
+  sf_m_reggiano: 'Medallions of pork Reggiano'
+};
+function byDishName(phrase) {
+  return catalog.matchByName(phrase, pork, (id) => porkNames[id] || '');
+}
+assert.equal(catalog.resolvePhrase('pork chop medium', pork).action, 'none');
+assert.equal(byDishName('pork chop medium').sourceId, 'sf_m_pork');
+assert.equal((byDishName('pork chop medium').leftover || []).join(','), 'MEDIUM');
+assert.equal(byDishName('pork').action, 'draft');
+assert.equal(byDishName('pork').reason, 'ambiguous');
+assert.equal(byDishName('chop').action, 'none');
+
 console.log('voice-catalog tests passed');

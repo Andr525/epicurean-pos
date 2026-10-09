@@ -123,6 +123,50 @@
     return stemAmbiguity(tokens(phrase), entries);
   }
 
+  function matchByName(phrase, entries, nameOf) {
+    if (typeof nameOf !== 'function') return { action: 'none' };
+    var spoken = tokens(phrase);
+    var identity = spoken.filter(function (word) {
+      return !instructionWord(word) && !/^\d+$/.test(word) && word !== 'OZ' && word !== 'OUNCE' && word !== 'OUNCES';
+    });
+    var strong = identity.length >= 2 || (identity.length === 1 && identity[0].length >= 6);
+    var hits = [];
+    var seen = {};
+    (entries || []).forEach(function (entry) {
+      if (!entry || entry.active === false || !entry.sourceId || !identity.length) return;
+      var id = String(entry.sourceId);
+      if (seen[id]) return;
+      var nameTokens = tokens(nameOf(id, entry) || '');
+      if (!nameTokens.length) return;
+      if (!identity.every(function (word) { return nameTokens.indexOf(word) >= 0; })) return;
+      seen[id] = 1;
+      hits.push({ entry: entry, nameTokens: nameTokens });
+    });
+    if (hits.length > 1) {
+      return {
+        action: 'draft',
+        reason: 'ambiguous',
+        sourceIds: hits.map(function (hit) { return String(hit.entry.sourceId); }),
+        names: hits.map(function (hit) { return hit.entry.voiceKeyword || String(hit.entry.sourceId); }),
+        entries: hits.map(function (hit) { return hit.entry; })
+      };
+    }
+    if (hits.length !== 1 || !strong) return { action: 'none' };
+    var win = hits[0];
+    var known = win.nameTokens.slice();
+    tokens(win.entry.voiceKeyword).forEach(function (word) { if (known.indexOf(word) < 0) known.push(word); });
+    (win.entry.voiceAliases || []).forEach(function (alias) {
+      tokens(alias).forEach(function (word) { if (known.indexOf(word) < 0) known.push(word); });
+    });
+    return {
+      action: 'match',
+      entry: win.entry,
+      sourceId: String(win.entry.sourceId),
+      keyword: norm(win.entry.voiceKeyword),
+      leftover: spoken.filter(function (word) { return known.indexOf(word) < 0; })
+    };
+  }
+
   function narrowByName(result, phraseTokens, nameOf) {
     if (!result || result.action !== 'draft' || result.reason !== 'ambiguous' || typeof nameOf !== 'function') return result;
     var spoken = phraseTokens || [];
@@ -263,6 +307,7 @@
     tokens: tokens,
     resolveEntries: resolveEntries,
     resolvePhrase: resolvePhrase,
+    matchByName: matchByName,
     narrowByName: narrowByName,
     classifyLeftover: classifyLeftover,
     tempChoice: tempChoice,

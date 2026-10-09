@@ -135,6 +135,7 @@ w.applyVoiceCommand('4 old fashioned with yamazaki 18');
 assert.equal(w.STATE.currentOrder.length, 0);
 assert.match((w.STATE.voiceDrafts[0] || {}).need || '', /premium spirit/);
 assert.equal((w.STATE.voiceDrafts[0] || {}).price == null, true);
+assert.equal((w.STATE.voiceDrafts[0] || {}).seat, 4);
 
 w.STATE.currentOrder = [];
 w.STATE.voiceDrafts = [];

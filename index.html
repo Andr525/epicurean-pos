@@ -11,14 +11,14 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<link rel="manifest" href="manifest.json?b=66">
-<link rel="apple-touch-icon" href="icon-192.png?b=66">
-<link rel="apple-touch-icon" sizes="180x180" href="icon-192.png?b=66">
-<link rel="apple-touch-icon" sizes="192x192" href="icon-192.png?b=66">
-<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?b=66">
-<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?b=66">
+<link rel="manifest" href="manifest.json?b=67">
+<link rel="apple-touch-icon" href="icon-192.png?b=67">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-192.png?b=67">
+<link rel="apple-touch-icon" sizes="192x192" href="icon-192.png?b=67">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?b=67">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?b=67">
 <title>Epicurean POS</title>
-<!-- pos-build: scalini-print-v66 -->
+<!-- pos-build: scalini-print-v67 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
@@ -29,10 +29,10 @@
 <script src="voice-vocab.js"></script>
 <script src="voice-engine.js?v=58"></script>
 <script src="voice-turn.js?v=64"></script>
-<script src="voice-catalog.js?v=65"></script>
+<script src="voice-catalog.js?v=67"></script>
 <script src="voice-cocktails.js?v=65"></script>
-<script src="voice-price.js?v=66"></script>
-<script src="voice-service.js?v=66"></script>
+<script src="voice-price.js?v=67"></script>
+<script src="voice-service.js?v=67"></script>
 <script async src="https://sandbox.web.squarecdn.com/v1/square.js"></script>
 <style>
 :root {
@@ -1374,7 +1374,7 @@ body.hh-on .voice-draft .voice-draft-acts button { background:#fff; color:#000; 
 <div id="login-screen" class="screen active">
   <h1>Epicurean POS</h1>
   <p class="subtitle">Enter your 4-digit code</p>
-  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 66</p>
+  <p style="font-size:0.72rem;color:var(--text-muted);margin-top:-1.4rem;margin-bottom:1.6rem;">Table Service · build 67</p>
   <div class="pin-display" id="pin-display">
     <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
   </div>
@@ -6773,13 +6773,16 @@ function voicePushDraft(parsed){
     kind:parsed.kind||'draft',
     seat:parsed.seat,
     priority:!!parsed.priority,
-    name:parsed.name||'',
+    name:parsed.name||parsed.text||'',
     itemId:parsed.itemId||'',
     need:parsed.need||'',
     suggestion:parsed.suggestion||'',
     candidates:parsed.candidates||[]
   });
   if (drafts.length>8) drafts.length=8;
+  var said=(drafts[0].name||'Item')+' needs '+(drafts[0].need||'a look');
+  STATE.voiceStatus=said;
+  voiceSpeak(said);
   toast('Voice '+drafts[0].confidence);
   renderOrder();
 }
@@ -7050,7 +7053,13 @@ function voiceSeatOf(parsed){
 function voiceResolveVocab(body){
   var catalog=voiceCatalogApi();
   if (!catalog) return {action:'none'};
-  var resolved=catalog.resolvePhrase(body, voiceVocabEntries());
+  var entries=voiceVocabEntries();
+  var resolved=catalog.resolvePhrase(body, entries);
+  if (resolved.action==='none' && catalog.matchByName) {
+    resolved=catalog.matchByName(body, entries, function(id, entry){
+      return voiceSourceName(id) || (entry && entry.name) || '';
+    });
+  }
   resolved=catalog.narrowByName(resolved, catalog.tokens(body), function(id, entry){
     return voiceSourceName(id) || (entry && entry.name) || '';
   });
@@ -7097,6 +7106,7 @@ function voiceResolveVocab(body){
   var preset={mods:mods, notes:notes.filter(Boolean).join(' · ')};
   if (!voiceCanPrice(item)) {
     var why='no à la carte price';
+    if (left.temp) why+=' · '+left.temp;
     if (preset.notes) why+=' · '+preset.notes;
     return {action:'draft', draft:{confidence:'MISSING', kind:'draft', need:why, name:item.name, itemId:item.id}};
   }
@@ -7360,7 +7370,26 @@ function voiceActOnCommand(text, parsed){
   }
   return false;
 }
+function voiceShieldAge(text){
+  var price=voicePriceApi();
+  if (!price || !text) return text;
+  var tokens=String(text).trim().split(/\s+/);
+  if (tokens.length<3) return text;
+  if (!/^\d{1,2}a?$/i.test(tokens[0])) return text;
+  if (!/^\d{1,2}$/.test(tokens[tokens.length-1])) return text;
+  var stock=voiceBarStock();
+  var width;
+  for (width=1; width<=Math.min(4, tokens.length-2); width++) {
+    var hit=price.matchSpirit(tokens.slice(tokens.length-1-width).join(' '), stock);
+    if (hit && hit.action==='one') {
+      tokens[tokens.length-1]=tokens[tokens.length-1]+'yr';
+      return tokens.join(' ');
+    }
+  }
+  return text;
+}
 function applyVoiceCommand(text){
+  text=voiceShieldAge(text);
   var eng=voiceEngine();
   if (!eng) { toast('Voice engine unavailable'); return null; }
   if (!STATE.selectedTable) { toast('Open a table first'); return null; }

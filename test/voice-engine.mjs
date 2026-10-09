@@ -791,7 +791,7 @@ const main = execSync('git show origin/main:index.html', { cwd: root, encoding: 
   assert.equal(extractDecl(src, fn), extractDecl(main, fn), fn);
 });
 execSync('git diff --exit-code origin/main -- scalini-dining.js voice-vocab.js', { cwd: root, stdio: 'pipe' });
-assert.match(src, /pos-build: scalini-print-v66/);
+assert.match(src, /pos-build: scalini-print-v67/);
 assert.match(src, /\.voice-dock \{\s*position:fixed;/);
 assert.match(src, /window\.EPICUREAN_VOICE_TRANSCRIBE_URL='https:\/\/us-central1-epicurean-house-at-the-choc-st\.cloudfunctions\.net\/voiceTranscribe'/);
 assert.equal(src.includes('voice-engine.js?v=58'), true);
