@@ -4,14 +4,14 @@
   var seq=0;
   function context(){
     var slot=STATE.voiceVocab||{}, check=STATE.checks&&STATE.checks[activeCheckId()];
-    var ready=!!(STATE.currentServer&&STATE.selectedTable&&check&&check.status==='open'&&slot.index&&!slot.stale&&slot.entries&&slot.entries.length);
-    return {table:String(STATE.selectedTable||''),check:activeCheckId(),staff:STATE.currentServer&&String(STATE.currentServer.code),catalog:slot.revision,pricing:STATE.voicePrixFixeId||'a-la-carte',ready:ready,
+    var ready=!!(STATE.currentServer&&STATE.selectedTable&&check&&check.status==='open'&&String(check.table)===String(STATE.selectedTable)&&slot.index&&!slot.stale&&slot.entries&&slot.entries.length);
+    return {table:String(STATE.selectedTable||''),check:activeCheckId(),staff:STATE.currentServer&&String(STATE.currentServer.code),catalog:slot.revision,pricing:STATE.voicePrixFixeId||'a-la-carte',ready:ready,positions:checkPositionIdentities(),
       reason:'Voice requires a logged-in server, open check and current published BOH vocabulary.'};
   }
   function position(text,fallback){
     var match=String(text).match(/\b(?:seat|position)\s+(\d{1,2})(\s*a)?\b/i);
     if(match) return match[1]+(match[2]?'A':'');
-    return fallback||String(STATE.activeSeat)+(isPriorityPosition(STATE.activeSeat)?'A':'');
+    return fallback||selectedPositionIdentity();
   }
   function seatParts(seat){var m=String(seat).match(/^([1-9]|1\d|20)(A)?$/);return m&&{seat:Number(m[1]),priority:!!m[2]};}
   function resolve(phrase){
@@ -86,7 +86,7 @@
     if(Object.keys(op).some(function(k){return !['action','itemId','seat','course','mods','notes','target','proposalId'].includes(k);})) return no('Unexpected interpretation field.');
     if(!context().ready||JSON.stringify(context())!==JSON.stringify(ctx)) return no('Table, login or BOH revision changed. Repeat the command.');
     var pos=seatParts(op.seat), sess=sessionOf(STATE.selectedTable);
-    if(pos.seat>sess.guestCount || !!isPriorityPosition(pos.seat)!==pos.priority) return no('Position '+op.seat+' is not an existing seat identity. Use the manual POS to set seats.');
+    if(!checkPositionIdentities().includes(op.seat)) return no('Position '+op.seat+' is not an existing seat identity. Use the manual POS to set seats.');
     var entry=(STATE.voiceVocab.entries||[]).filter(function(e){return String(e.sourceId)===op.itemId&&e.active!==false;});
     var item=voiceProjectDish(voiceSourceRecord(op.itemId));
     if(!entry.length||!item||item.active===false||item.eightySixed) return no('Item unavailable in BOH.');
@@ -95,7 +95,12 @@
       var pf=pricedMenu(ctx.pricing), choice=pf&&menuChoice(pf,op);
       if(!pf||!choice) return no('Dish is not an allowed choice on the selected BOH prix-fixe menu.');
       if(op.action==='replace' && !root.EPICUREAN_ORDER_SESSION.state().proposal.some(function(p){return p.proposalId===op.target;})) return no('Edit an existing prix-fixe choice through the manual POS.');
-      if(seatHasPrixFixe(pos.seat)) return no('This seat already has a prix-fixe order. Edit it manually; do not add a duplicate.');
+      if(op.course===4 && pfCourseMode(choice.course)==='later'){
+        var existing=ownedMenu(op.seat,ctx.pricing);
+        if(!existing && !root.EPICUREAN_ORDER_SESSION.state().proposal.some(function(p){return p.seat===op.seat&&p.course===2;})) return no('Choose and confirm the appetizer and main menu for this position before adding its included dessert.');
+        if(existing && fbReady) return no('Use the manual POS for live dessert updates until dining persistence is verified.');
+        if(existing && !dessertEditable(existing)) return no('Dessert is already chosen or sent. Edit it manually.');
+      } else if(seatHasPrixFixe(pos.seat,pos.priority)) return no('This seat already has a prix-fixe order. Edit it manually; do not add a duplicate.');
     }
     if(defaultCourse(item)!==op.course) return no('Requested course conflicts with the BOH item course.');
     if(allergenHits(item,pos.seat).length) return no('Allergy conflict — resolve manually.');
@@ -120,7 +125,7 @@
   function menuChoice(pf,op){
     var matches=[];
     (pf.courses||[]).forEach(function(c,ci){
-      if(!pfGuestChoiceMode(c)||pfCourseMode(c)==='later'||pfServiceCourseOf(c)!==op.course) return;
+      if(!pfGuestChoiceMode(c)||pfServiceCourseOf(c)!==op.course) return;
       (c.options||[]).forEach(function(o,oi){if(String(o.id)===op.itemId&&o.active!==false&&!o.eightySixed&&!o.chooseCount) matches.push({course:c,ci:ci,oi:oi,option:o});});
     });
     return matches.length===1?matches[0]:null;
@@ -134,6 +139,27 @@
     (STATE.prixFixeMenus||[]).filter(function(p){return p.active!==false&&Number(p.price)>0;}).forEach(function(p){html+='<option value="'+esc(p.id)+'"'+(STATE.voicePrixFixeId===p.id?' selected':'')+'>'+esc(p.name)+' — '+esc(String(p.price))+'</option>';});
     return html+'</select><div class="voice-rev">Choose the menu explicitly. Voice adds an unsent order; SEND and FIRE remain manual.</div></div>';
   };
+  function ownedMenu(seat,menuId){
+    var matches=(STATE.currentOrder||[]).filter(function(l){return l.isPrixFixe&&l.voiceOrderOwned&&l.prixFixeId===menuId&&lineBelongsToCheck(l)&&String(l.table)===String(STATE.selectedTable)&&orderPositionIdentity(l)===seat;});
+    return matches.length===1?matches[0]:null;
+  }
+  function dessertEditable(line){
+    var dessert=(line.selections||[]).filter(function(s){return s.serviceCourse===4&&!s.entremets;});
+    var dining=(STATE.activeTastingOrders||[]).find(function(d){return d._boundLine===line.lineId;});
+    return !line.sent && !(STATE.orders||[]).some(function(order){return (order.items||[]).some(function(item){return item.lineId===line.lineId;});}) && dessert.length===1 && dessert[0].pending && !dessert[0].noneChoice && !dessert[0].fired && (!dining||!diningCourses(dining).some(function(c){return c.fired;}));
+  }
+  function saveIncludedDessert(line,pf,op){
+    if(!dessertEditable(line)) throw new Error('Dessert is already chosen or sent. Edit it manually.');
+    var choice=menuChoice(pf,op),selection=selFromOption(choice.course,choice.option,{later:true,pending:false});
+    if(Object.keys(op.mods).length||op.notes) throw new Error('Edit dessert modifiers manually.');
+    line.selections=line.selections.map(function(s){return s.serviceCourse===4&&!s.entremets?selection:s;});
+    // Keep the existing BOH-priced menu; add only this catalog option's surcharge.
+    line.price=Number(line.price)+(Number(choice.option.upcharge)||0);
+    line.selectedMod=line.selections.filter(function(s){return !s.pending&&!s.noneChoice;}).map(function(s){return s.choice;}).join(', ')+(line.notes?' · '+line.notes:'');
+    var dining=(STATE.activeTastingOrders||[]).find(function(d){return d._boundLine===line.lineId;});
+    if(dining){dining.selections=dining.selections.map(function(s){return s.serviceCourse===4&&!s.entremets?JSON.parse(JSON.stringify(selection)):s;});dining.totalPrice=line.price;dining.dessertChosen=true;}
+    return line;
+  }
   function commitDining(ops,ctx){
     if(posSheetOpen()||STATE.pendingItem||document.getElementById('pf-overlay').classList.contains('show')) throw new Error('Finish the manual edit first');
     var pf=pricedMenu(ctx.pricing), grouped={};
@@ -143,17 +169,19 @@
     });
     Object.values(grouped).forEach(function(group){
       if(new Set(group.map(function(o){return o.course;})).size!==group.length) throw new Error('Only one included dish per course and position is allowed');
-      if(!group.some(function(o){return o.course===2;})||!group.some(function(o){return o.course===3;})) throw new Error('Specify both appetizer and main before adding the prix-fixe menu');
+      if(!(group.length===1&&group[0].course===4&&ownedMenu(group[0].seat,ctx.pricing))&&(!group.some(function(o){return o.course===2;})||!group.some(function(o){return o.course===3;}))) throw new Error('Specify both appetizer and main before adding the prix-fixe menu');
     });
-    var before=STATE.currentOrder, diningBefore=STATE.activeTastingOrders||[], savedSeat=STATE.activeSeat, wasReady=fbReady;
+    var before=STATE.currentOrder, diningBefore=STATE.activeTastingOrders||[], savedSeat=STATE.activeSeat, savedIdentity=STATE.activePositionIdentity, savedPositionCheck=STATE.activePositionCheck, wasReady=fbReady;
     var persist=root.persistCheck, render=root.renderOrder, toastFn=root.toast, receipts=[], success=false;
-    STATE.currentOrder=before.slice();STATE.activeTastingOrders=JSON.parse(JSON.stringify(diningBefore));fbReady=false;
+    STATE.currentOrder=JSON.parse(JSON.stringify(before));STATE.activeTastingOrders=JSON.parse(JSON.stringify(diningBefore));fbReady=false;
     root.persistCheck=function(){};root.renderOrder=function(){};root.toast=function(){};
     try{
       Object.keys(grouped).forEach(function(seat){
-        var pos=seatParts(seat);STATE.activeSeat=pos.seat;
+        var pos=seatParts(seat);STATE.activeSeat=pos.seat;STATE.activePositionIdentity=seat;STATE.activePositionCheck=ctx.check;
+        if(grouped[seat].length===1&&grouped[seat][0].course===4){receipts.push(saveIncludedDessert(ownedMenu(seat,ctx.pricing),pf,grouped[seat][0]));return;}
         openPrixFixeSelector(pf.id);
         grouped[seat].forEach(function(op){
+          if(op.course===4) return;
           var selected=menuChoice(pf,op), radio=document.querySelector('input[name="pf-course-'+selected.ci+'"][value="'+selected.oi+'"]');
           if(!radio) throw new Error('Manual menu choice unavailable');
           radio.checked=true;
@@ -165,15 +193,15 @@
         });
         var count=STATE.currentOrder.length;confirmPrixFixe(pf.id);
         if(STATE.currentOrder.length!==count+1) throw new Error('Manual prix-fixe validation did not complete');
-        var line=STATE.currentOrder[STATE.currentOrder.length-1];line.voiceOrderOwned=true;line.seatPriority=pos.priority;receipts.push(line);
+        var line=STATE.currentOrder[STATE.currentOrder.length-1];line.voiceOrderOwned=true;line.seatPriority=pos.priority;grouped[seat].filter(function(op){return op.course===4;}).forEach(function(op){saveIncludedDessert(line,pf,op);});receipts.push(line);
       });success=true;
     }finally{
-      root.persistCheck=persist;root.renderOrder=render;root.toast=toastFn;fbReady=wasReady;STATE.activeSeat=savedSeat;closePfSelector();
+      root.persistCheck=persist;root.renderOrder=render;root.toast=toastFn;fbReady=wasReady;STATE.activeSeat=savedSeat;STATE.activePositionIdentity=savedIdentity;STATE.activePositionCheck=savedPositionCheck;closePfSelector();
       if(!success){STATE.currentOrder=before;STATE.activeTastingOrders=diningBefore;}
     }
-    // Retain prior dining objects verbatim; only new unsent menus are published.
+    // Preserve unrelated dining objects and never publish a dessert update to a guessed document ID.
     var addedDining=STATE.activeTastingOrders.filter(function(d){return !diningBefore.some(function(old){return old.id===d.id;});});
-    STATE.activeTastingOrders=diningBefore.concat(addedDining);
+    STATE.activeTastingOrders=diningBefore.map(function(old){return receipts.some(function(line){return old._boundLine===line.lineId;})?STATE.activeTastingOrders.find(function(d){return d.id===old.id;}):old;}).concat(addedDining);
     if(wasReady) addedDining.forEach(function(d){fbDb.collection('tasting_orders').add(d);});
     persistCheck(STATE.checks[ctx.check]);renderOrder();return receipts;
   }

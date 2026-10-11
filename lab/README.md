@@ -18,7 +18,7 @@ Keep Mac/iPhone on the same private Wi-Fi. Open the printed URL in iPhone Safari
 
 Manual BOH menu/price, multi-course correction, confirmation without duplicates, missing-price rejection, guest conversation, logout/login, separate 2/2A and later dessert. Screen suite records selectors/actions, rendered text and structured check state in Mac `lab/artifacts`. Do not enter personal data; evidence is controlled fixtures, not a general PII scrubber. Phone screenshots/system dialogs/native touch/microphone behavior remain manual/unverified.
 
-The three genuine POS failures are explicitly isolated in the test results: obscured pricing selector after login, rejection of simultaneous 2 and 2A, and later dessert rejected. No prices/products are invented and no kitchen transactions occur. Source POS is unchanged. Tests deliberately exit 1 when those defects reproduce.
+The owner's iPhone run of baseline 044e680 reproduced the three POS failures. This review branch repairs those regressions and extends the page-run suite to ten cases, including no-menu, fired-course and live-persistence guards. See [iPhone repair evidence and next steps](docs/IPHONE-REGRESSION-FIXES.md). Existing-menu Voice dessert edits are deliberately blocked when Firebase is live until its dining persistence is verified. Historic failures remain in evidence; fresh physical acceptance is pending. No catalog or price source was changed, and no kitchen transactions occur.
 
 ## Security changes after Claude review
 

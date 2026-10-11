@@ -1290,7 +1290,9 @@ body.hh-on .floor-retry { background:#fff; color:#000; border-color:#c5ced8; }
   padding:0.45rem 0.7rem calc(0.5rem + env(safe-area-inset-bottom));
   background:#12151c; color:#f4efe6; border-top:1px solid rgba(201,168,76,0.85);
 }
-body.tableside .app-content, body.hh-table .app-content { padding-bottom:92px; }
+body.tableside .app-content, body.hh-table .app-content { padding-bottom:calc(92px + env(safe-area-inset-bottom)); scroll-padding-bottom:100px; }
+#order-top { padding-bottom:calc(100px + env(safe-area-inset-bottom)); flex:0 0 auto; }
+#voice-pricing-menu { min-height:44px; font-size:16px; scroll-margin-block:100px; }
 @media (min-width:768px) {
   body.tableside .voice-dock, body.hh-table .voice-dock { bottom:74px; }
 }
@@ -1911,7 +1913,7 @@ function guestCheckItems(checkId){
     if (!lineBelongsToCheck(i, cid, table)) return;
     rows.push({
       lineId:i.lineId, name:i.name, qty:parseInt(i.qty,10)||1, price:Number(i.price)||0,
-      seat:i.seat||'table', course:i.course||null, notes:i.notes||'', mods:i.selectedMod||'',
+      seat:i.seat||'table', seatPriority:i.seatPriority!=null?!!i.seatPriority:null, course:i.course||null, notes:i.notes||'', mods:i.selectedMod||'',
       status:i.held?'held':'unsent', checkId:i.checkId||cid,
       extraPlate:!!i.extraPlate, pfExtra:!!i.pfExtra, pfCourseKind:i.pfCourseKind||null,
       ticketPos:i.ticketPos!=null?Number(i.ticketPos):null,
@@ -1929,7 +1931,7 @@ function guestCheckItems(checkId){
         sentMap[lid]={
           lineId:lid, name:i.name, qty:0,
           price:found?Number(found.price)||Number(i.price)||0:Number(i.price)||0,
-          seat:i.seat||'table', course:i.course||null, notes:i.notes||'', mods:i.selectedMod||'',
+          seat:i.seat||'table', seatPriority:i.seatPriority!=null?!!i.seatPriority:null, course:i.course||null, notes:i.notes||'', mods:i.selectedMod||'',
           status:'sent', checkId:itemCid,
           extraPlate:!!i.extraPlate, pfExtra:!!i.pfExtra, pfCourseKind:i.pfCourseKind||null,
           ticketPos:i.ticketPos!=null?Number(i.ticketPos):null,
@@ -2319,6 +2321,7 @@ function beginAddPrixFixeExtra(key){
     lineId:genId(),
     table:STATE.selectedTable,
     seat:STATE.activeSeat,
+    seatPriority:/A$/.test(selectedPositionIdentity()),
     course:course,
     held:false,
     checkId:activeCheckId(),
@@ -2363,20 +2366,32 @@ function normSeatKey(seat){
   if (seat==='table' || seat==='TABLE' || seat==null || seat==='') return 'table';
   return String(seat);
 }
-function seatHasPrixFixe(seat){
-  var s=normSeatKey(seat==null?STATE.activeSeat:seat);
+function orderPositionIdentity(line){ return String(line.seat)+(line.seatPriority!=null?(line.seatPriority?'A':''):(isPriorityPosition(line.seat)?'A':'')); }
+function checkPositionIdentities(){
+  var check=STATE.checks[activeCheckId()];
+  if(check && Array.isArray(check.positionIdentities)) return check.positionIdentities.slice();
+  return Array.from({length:sessionOf(STATE.selectedTable).guestCount||2},function(_,i){return positionLabel(i+1);});
+}
+function selectedPositionIdentity(){ return STATE.activePositionCheck===activeCheckId() && STATE.activePositionIdentity && checkPositionIdentities().includes(STATE.activePositionIdentity) && parseInt(STATE.activePositionIdentity,10)===Number(STATE.activeSeat) ? STATE.activePositionIdentity : positionLabel(STATE.activeSeat); }
+function setActivePositionIdentity(identity){
+  if(!checkPositionIdentities().includes(identity)) return;
+  STATE.activePositionIdentity=identity;STATE.activePositionCheck=activeCheckId();STATE.activeSeat=parseInt(identity,10);STATE.allergySeat=STATE.activeSeat;STATE.allergyOpen=true;renderOrder();paintChrome();
+}
+function seatHasPrixFixe(seat, priority){
+  var base=seat==null?STATE.activeSeat:seat;
+  var s=priority!=null ? String(base)+(priority?'A':'') : (String(base)===String(STATE.activeSeat)?selectedPositionIdentity():positionLabel(base));
   var inDining=tableDiningOrders().some(function(to){
     if (!to || to.status==='void') return false;
     if (to.type==='tasting' && !to.prixFixeId) return false;
-    return normSeatKey(to.seat)===s;
+    return orderPositionIdentity(to)===s;
   });
   if (inDining) return true;
   return (STATE.currentOrder||[]).some(function(i){
-    return i && i.isPrixFixe && String(i.table)===String(STATE.selectedTable) && normSeatKey(i.seat)===s;
+    return i && i.isPrixFixe && String(i.table)===String(STATE.selectedTable) && orderPositionIdentity(i)===s;
   });
 }
 function warnPrixFixeAlreadyOnSeat(){
-  toast('This seat already has the $89 prix fixe. Extra dishes go through Add items.');
+  toast('This position already has a prix-fixe menu. Extra dishes go through Add items.');
 }
 function extraDishSearchOnly(){
   if (!tableHasDining()) return false;
@@ -5597,6 +5612,7 @@ function unsentFor(table){
   return STATE.currentOrder.filter(function(i){ return String(i.table)===String(t); });
 }
 function setActiveSeat(seat){
+  STATE.activePositionIdentity=null;
   var same=String(STATE.activeSeat)===String(seat);
   if (same && seat!=='table' && seat!=null && seat!=='') toggleFemalePosition(seat);
   STATE.activeSeat=seat;
@@ -5619,9 +5635,11 @@ function openSeatPicker(){
   var cur=STATE.activeSeat;
   var html='<h2>Seat</h2><p class="sheet-sub">Share the plate, or put it on a seat.</p><div class="seat-pick-list">';
   html+='<button type="button" class="'+(cur==='table'?'active':'')+'" onclick="setActiveSeat(\'table\');closeSheet()">Share</button>';
-  for (var i=1;i<=n;i++){
-    html+='<button type="button" class="'+(String(cur)===String(i)?'active':'')+'" onclick="setActiveSeat('+i+');closeSheet()">'+esc(positionLabel(i))+'</button>';
-  }
+  var explicit=STATE.checks[activeCheckId()]&&Array.isArray(STATE.checks[activeCheckId()].positionIdentities);
+  checkPositionIdentities().forEach(function(identity){
+    var i=parseInt(identity,10);
+    html+='<button type="button" class="'+(selectedPositionIdentity()===identity?'active':'')+'" onclick="'+esc((explicit?'setActivePositionIdentity('+JSON.stringify(identity)+')':'setActiveSeat('+i+')')+';closeSheet()')+'">'+esc(identity)+'</button>';
+  });
   html+='<button type="button" onclick="closeSheet();addGuestSeat()">+ Add seat</button></div>';
   html+='<button class="ghost-btn" onclick="closeSheet()">Cancel</button>';
   openSheet(html);
@@ -5629,13 +5647,13 @@ function openSeatPicker(){
 function renderSeatBar(){
   var n=sessionOf(STATE.selectedTable).guestCount||STATE.guestCount||2;
   var html='<div class="seat-bar">';
-  html+='<button type="button" class="seat-now" onclick="openSeatPicker()">'+esc(positionLabel(STATE.activeSeat))+' ▾</button>';
+  html+='<button type="button" class="seat-now" onclick="openSeatPicker()">'+esc(selectedPositionIdentity())+' ▾</button>';
   html+='<button type="button" class="seat-chip'+(STATE.activeSeat==='table'?' active':'')+'" onclick="setActiveSeat(\'table\')">Share</button>';
-  for (var i=1;i<=n;i++){
-    var pst=positionState(i);
-    var mark=(pst.pass?' PASS':'')+(pst.noDrink?' NO DRINK':'');
-    html+='<button type="button" class="seat-chip'+(String(STATE.activeSeat)===String(i)?' active':'')+'" data-seat="'+i+'" onclick="setActiveSeat('+i+')">'+esc(positionLabel(i)+mark)+'</button>';
-  }
+  var explicit=STATE.checks[activeCheckId()]&&Array.isArray(STATE.checks[activeCheckId()].positionIdentities);
+  checkPositionIdentities().forEach(function(identity){
+    var i=parseInt(identity,10),pst=positionState(i),mark=(pst.pass?' PASS':'')+(pst.noDrink?' NO DRINK':'');
+    html+='<button type="button" class="seat-chip'+(selectedPositionIdentity()===identity?' active':'')+'" data-seat="'+(explicit?identity:i)+'" onclick="'+esc(explicit?'setActivePositionIdentity('+JSON.stringify(identity)+')':'setActiveSeat('+i+')')+'">'+esc(identity+mark)+'</button>';
+  });
   html+='<button type="button" class="seat-chip add-seat" onclick="addGuestSeat()">+ Add</button></div>';
   return html;
 }
@@ -5941,6 +5959,7 @@ function collectWorkingCheckGroups(){
       selectKey:opts.selectKey,
       status:opts.status||'unsent',
       lineId:opts.lineId||'',
+      priority:opts.priority!=null?opts.priority:null,
       qty:opts.qty||1
     });
     if (opts.note && g.notes.indexOf(opts.note)<0) g.notes.push(opts.note);
@@ -5958,7 +5977,7 @@ function collectWorkingCheckGroups(){
     if (line && line.lineId) boundPkg[line.lineId]=1;
     addPlate({
       bucket:'pkg', opName:pkgName, pkg:true, pfComp:false,
-      unit:unit, seat:to.seat, temp:'',
+      unit:unit, seat:to.seat, priority:to.seatPriority, temp:'',
       selectKey:line&&line.lineId?line.lineId:('pkg|'+to.id),
       status:'unsent', qty:1
     });
@@ -5980,7 +5999,7 @@ function collectWorkingCheckGroups(){
         bucket:'welcome',
         opName:welcomeBits.filter(Boolean).join(' · ') || 'Welcome',
         pfComp:true, pkg:false, unit:0,
-        seat:to.seat, temp:'',
+        seat:to.seat, priority:to.seatPriority, temp:'',
         selectKey:diningLineKey(to.id, welcomeIdx),
         status:welcomeStatus, kind:'welcome',
         note:positionSubForSeat('welcome', to.seat),
@@ -5997,7 +6016,7 @@ function collectWorkingCheckGroups(){
           bucket:'entremet',
           opName:entremetName || 'Entremet',
           pfComp:true, pkg:false, unit:0,
-          seat:to.seat, temp:'',
+          seat:to.seat, priority:to.seatPriority, temp:'',
           selectKey:diningLineKey(to.id, i),
           status:c.fired?'sent':(c.skipped?'held':'unsent'),
           note:positionSubForSeat('entremet', to.seat) && entremetName!==positionSubForSeat('entremet', to.seat) ? positionSubForSeat('entremet', to.seat) : '',
@@ -6014,7 +6033,7 @@ function collectWorkingCheckGroups(){
         bucket:workingDisplayBucket(c),
         opName:operationalDishName(raw, c),
         pfComp:true, pkg:false, unit:0,
-        seat:to.seat, temp:workingPlateTemp(c),
+        seat:to.seat, priority:to.seatPriority, temp:workingPlateTemp(c),
         selectKey:diningLineKey(to.id, i),
         status:c.fired?'sent':(c.skipped?'held':'unsent'),
         note:c.modNote||'',
@@ -8465,6 +8484,7 @@ function addTastingMenu(tmId) {
     lineId:genId(),
     table:STATE.selectedTable,
     seat:STATE.activeSeat,
+    seatPriority:/A$/.test(selectedPositionIdentity()),
     course:1,
     held:false,
     qty:1,
@@ -8565,6 +8585,7 @@ function addPairing(tmId, pairingId) {
     lineId:genId(),
     table:STATE.selectedTable,
     seat:STATE.activeSeat,
+    seatPriority:/A$/.test(selectedPositionIdentity()),
     course:1,
     held:false,
     qty:1,
@@ -9157,6 +9178,7 @@ function confirmPrixFixe(pfId) {
     lineId:genId(),
     table:STATE.selectedTable,
     seat:STATE.activeSeat,
+    seatPriority:/A$/.test(selectedPositionIdentity()),
     course:1,
     held:false,
     qty:1,
@@ -9327,6 +9349,7 @@ function beginAddItem(itemId) {
     lineId:genId(),
     table:STATE.selectedTable,
     seat:STATE.activeSeat,
+    seatPriority:/A$/.test(selectedPositionIdentity()),
     course:defaultCourse(item),
     held:false,
     checkId:activeCheckId(),
@@ -10166,7 +10189,7 @@ function kitchenItemsFrom(lines){
       out.push({
         id:i.id, name:i.name, station:i.station, cookTime:i.cookTime||0,
         modifiers:i.modifiers||[], selectedMod:i.selectedMod||null,
-        seat:i.seat||'table', course:course, notes:i.notes||'',
+        seat:i.seat||'table', seatPriority:i.seatPriority!=null?!!i.seatPriority:null, course:course, notes:i.notes||'',
         qty:1, allergens:i.allergens||[], price:Number(i.price)||0,
         lineId:i.lineId, checkId:i.checkId||cid,
         extraPlate:!!i.extraPlate, pfExtra:!!i.pfExtra, pfCourseKind:i.pfCourseKind||null,
@@ -10221,6 +10244,7 @@ function startDiningFromCheckLine(ti){
       status:'active',
       seat:ti.seat||STATE.activeSeat||'table',
       sentAt:Date.now(),
+      seatPriority:ti.seatPriority!=null?ti.seatPriority:isPriorityPosition(ti.seat),
       _boundLine:ti.lineId
     };
   } else {
@@ -10245,6 +10269,7 @@ function startDiningFromCheckLine(ti){
       status:'active',
       seat:ti.seat||STATE.activeSeat||'table',
       sentAt:Date.now(),
+      seatPriority:ti.seatPriority!=null?ti.seatPriority:isPriorityPosition(ti.seat),
       _boundLine:ti.lineId
     };
     if (dessertHasBeenChosen(dining)) dining.dessertChosen=true;
@@ -10488,6 +10513,7 @@ function extraInvoiceEntries(){
       qty:parseInt(row.qty,10)||1,
       price:Number(row.price)||0,
       seat:row.seat,
+      seatPriority:line.seatPriority!=null?line.seatPriority:null,
       status:row.status,
       mods:row.mods,
       notes:row.notes,
