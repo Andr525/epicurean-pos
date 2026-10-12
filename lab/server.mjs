@@ -3,14 +3,15 @@ import {fixture} from './fixture.mjs';import {mockInterpret} from './mock-interp
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const assets=new Set(['cellar.js','scalini-dining.js','voice-vocab.js','voice-engine.js','voice-turn.js','voice-catalog.js','voice-cocktails.js','voice-price.js','voice-service.js','voice-order.js','voice-order-bridge.js','icon-192.png','icon-512.png']);
 const csp="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; font-src 'self'; media-src 'self' blob:; worker-src 'none'; frame-src 'none'; object-src 'none'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'";
-export function isolatedHtml(source,token,screenOnly=false){
+export function isolatedHtml(source,token,screenOnly=false,manual=false){
  let html=source.replace(/<script\b[^>]*src=["']https?:\/\/[^>]*>[\s\S]*?<\/script>/gi,'').replace(/<link\b[^>]*(?:href=["']https?:\/\/|rel=["']manifest)[^>]*>/gi,'');
  html=html.replace(/var firebaseConfig = \{[\s\S]*?\};/,"var firebaseConfig = {projectId:'demo-epicurean-lab',apiKey:'fixture-only'};");
  html=html.replace("window.EPICUREAN_VOICE_TRANSCRIBE_URL='https://us-central1-epicurean-house-at-the-choc-st.cloudfunctions.net/voiceTranscribe';","window.EPICUREAN_VOICE_TRANSCRIBE_URL='/lab/transcribe';");
- html=html.replace('</head>',`<script>window.EPICUREAN_LAB_SCREEN_ONLY=${screenOnly};window.EPICUREAN_LAB_TOKEN=${JSON.stringify(token)};</script><script src="/lab/containment.js"></script></head>`);
+ html=html.replace('</head>',`<script>window.EPICUREAN_LAB_MANUAL=${manual};window.EPICUREAN_LAB_SCREEN_ONLY=${screenOnly};window.EPICUREAN_LAB_TOKEN=${JSON.stringify(token)};</script><script src="/lab/containment.js"></script></head>`);
  return html.replace('</body>','<script src="/lab/bootstrap.js"></script><script src="/lab/suite.js"></script></body>');
 }
-export async function startLab({port=0,host='127.0.0.1',tls=null,ownerApproval=null,artifactDir=resolve(root,'lab/artifacts'),screenOnly=false,sessionMs=3600000}={}){
+export async function startLab({port=0,host='127.0.0.1',tls=null,ownerApproval=null,artifactDir=resolve(root,'lab/artifacts'),screenOnly=false,manual=false,sessionMs=3600000}={}){
+ if(manual)screenOnly=true;
  const loopback=['127.0.0.1','localhost','::1'].includes(host);
  if(!loopback){
   if(tls)throw Error('Physical HTTPS disabled pending independent certificate/iOS verification');
@@ -29,10 +30,10 @@ export async function startLab({port=0,host='127.0.0.1',tls=null,ownerApproval=n
     if(!(req.headers.cookie||'').split(';').some(c=>c.trim()==='lab_access='+token))throw Error('Owner test capability required');
    }
    requests.push({method:req.method,path});if(requests.length>2000)requests.shift();
-   if(req.method==='GET'&&path==='/'){res.setHeader('Content-Type','text/html; charset=utf-8');res.end(isolatedHtml(readFileSync(resolve(root,'index.html'),'utf8'),token,screenOnly));return;}
-   if(req.method==='GET'&&path==='/lab/fixture'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({manifest:data.manifest,menu:data.menu,entries:data.entries,revision:data.revision,check:data.check}));return;}
+   if(req.method==='GET'&&path==='/'){res.setHeader('Content-Type','text/html; charset=utf-8');res.end(isolatedHtml(readFileSync(resolve(root,'index.html'),'utf8'),token,screenOnly,manual));return;}
+   if(req.method==='GET'&&path==='/lab/fixture'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({manifest:data.manifest,menu:data.menu,entries:data.entries,revision:data.revision,check:data.check,...(manual?{manualCatalog:data.manualCatalog}:{})}));return;}
    if(req.method==='GET'&&(/^\/lab\/(containment|bootstrap|suite)\.js$/.test(path)||assets.has(path.slice(1)))){
-    const name=path==='/scalini-dining.js'?resolve(root,'lab/fixtures/scalini-dining.js'):path.startsWith('/lab/')?resolve(root,path.slice(1)):resolve(root,path.slice(1));
+    const name=path==='/cellar.js'&&manual?resolve(root,'lab/fixtures/cellar.js'):path==='/scalini-dining.js'?resolve(root,'lab/fixtures/scalini-dining.js'):path.startsWith('/lab/')?resolve(root,path.slice(1)):resolve(root,path.slice(1));
     res.setHeader('Content-Type',path.endsWith('.js')?'application/javascript':'image/png');res.end(readFileSync(name));return;
    }
    if(req.method!=='POST'||!['/lab/interpret','/lab/transcribe','/lab/evidence'].includes(path)){res.writeHead(404);res.end('Local test route only');return;}
@@ -48,6 +49,7 @@ export async function startLab({port=0,host='127.0.0.1',tls=null,ownerApproval=n
     audio.push({bytes:raw.length,mime:req.headers['content-type'],fixture:key});if(audio.length>100)audio.shift();result={transcript:allowed[key],mock:true};
    }else{
     if(!(req.headers['content-type']||'').startsWith('application/json'))throw Error('JSON required');const body=JSON.parse(raw.toString());
+    if(path==='/lab/interpret'&&manual)throw Error('Voice interpretation disabled for manual milestone');
     if(path==='/lab/interpret')result=await mockInterpret(body,data.authority);
     else{
      if(!body||body.schemaVersion!==1||typeof body.runId!=='string'||!/^[a-zA-Z0-9_-]{1,80}$/.test(body.runId)||!Array.isArray(body.cases)||body.cases.length>30)throw Error('Invalid evidence');
@@ -72,7 +74,7 @@ if(process.argv[1]===fileURLToPath(import.meta.url)){
  const args=Object.fromEntries(process.argv.slice(2).map(v=>{const at=v.indexOf('=');if(at<0)throw Error('Use --name=value arguments');return [v.slice(2,at),v.slice(at+1)];}));
  const tls=args.cert&&args.key?{cert:readFileSync(args.cert),key:readFileSync(args.key)}:null;
  const ownerApproval=args.approval?JSON.parse(readFileSync(args.approval,'utf8')):null;
- const lab=await startLab({port:Number(args.port)||9443,host:args.host||'127.0.0.1',tls,ownerApproval,screenOnly:args.mode==='screen-only'});
+ const lab=await startLab({port:Number(args.port)||9443,host:args.host||'127.0.0.1',tls,ownerApproval,screenOnly:['screen-only','manual-screen'].includes(args.mode),manual:args.mode==='manual-screen'});
  console.log(`LOCAL MOCK POS: ${lab.launchUrl}\nProvider spending: $0. No external services. Ctrl+C stops the test server.`);
  process.on('SIGINT',async()=>{await lab.close();process.exit(0);});
 }

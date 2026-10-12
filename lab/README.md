@@ -1,3 +1,9 @@
+# Manual POS priority milestone
+
+Voice development is paused. See [full inventory and two-cycle plan](../docs/manual-pos/INVENTORY-AND-PLAN.md), [60-test matrix](../docs/manual-pos/ACCEPTANCE-MATRIX.md), and the single [scorecard](../docs/manual-pos/SCORECARD.json). Manual profile: add `--manual` to the Mac launcher; `LAB_MANUAL=1 npm run test:screens` runs three actual-POS audit scenarios (2 pass, M30 allergy identity fails). This is not 60 completed acceptance tests. The profile includes tracked BOH beverages/PF/tasting; ordinary published food/cocktail/special exports are still missing. No price or product is invented.
+
+The remainder documents the earlier mixed Voice lab, retained as historical regression context rather than the next development priority.
+
 # Epicurean Master — certificate-free screen test
 
 Review-only isolated POS UI with synthetic accounts/checks and a hash-verified BOH catalog snapshot. No production changes, paid APIs, microphone, real kitchen orders or personal data. HTTP is unencrypted: use only your private trusted home Wi-Fi, never a guest/public network; do not enter real credentials. The capability URL is not protection against someone monitoring that Wi-Fi.

@@ -1,0 +1,7 @@
+{
+  "sourceRepository": "Andr525/epicurean-boh",
+  "sourceCommit": "7bf4066c717d2b0aaf54731951ecf4ecd86738a8",
+  "sourcePath": "cellar.js",
+  "sha256": "4185a0fc10838a4d99c086c1aae334c6b248266812269974d5c67911f1b35b13",
+  "purpose": "Tracked BOH bottle/beer/spirit snapshot; not a live inventory or published menu export"
+}
