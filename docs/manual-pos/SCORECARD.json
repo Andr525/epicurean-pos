@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "milestone": "Manual POS first 60",
-  "baselineCommit": "75ba5d8552fa415625a733e0c36a87f0e2d49abd",
-  "phase": "inventory; acceptance not certified",
+  "baselineCommit": "a529059d295902e6df4e0eaf8467cbf4564c54c2",
+  "phase": "owner-requirements revision; formal acceptance held at zero",
   "criticalTarget": 52,
   "minorTarget": 8,
   "formalAccepted": 0,
@@ -28,9 +28,9 @@
       "severity": "critical",
       "finding": "Allergy editor enumerates numeric seats, not separate explicit 2/2A",
       "code": "index.html:10133",
-      "status": "source-confirmed and independently reproduced browser failure",
-      "cyclesObserved": 0,
-      "evidence": "../../lab/docs/evidence/manual-inventory/results.json"
+      "status": "Repair automated and internal-independent checks PASS; physical/legacy-to-explicit migration/Claude review pending",
+      "cyclesObserved": 1,
+      "evidence": "../../lab/docs/evidence/manual-owner-revisions/results.json"
     },
     {
       "id": "D02",
@@ -63,6 +63,14 @@
       "code": "index.html:10284",
       "status": "unverified authorization; backend/rules not audited",
       "cyclesObserved": 0
+    },
+    {
+      "id": "D06",
+      "severity": "critical",
+      "finding": "Current tip UI defaults to18% and accepts custom below20%; NYC tax/manager adjustments/required audit not implemented",
+      "code": "index.html:10946; setCustomTip/checkTotals",
+      "status": "source-confirmed owner-requirement gap; blocked implementation",
+      "cyclesObserved": 0
     }
   ],
   "tests": [
@@ -72,11 +80,12 @@
       "name": "Owner starts isolated origin",
       "severity": "critical",
       "acceptance": "Private host/token, no public binding, no production SDK or network",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
+      "automated": "NOT_RUN",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
       "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
-      "firstCycle": 1
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN"
     },
     {
       "id": "M02",
@@ -84,11 +93,12 @@
       "name": "Session expiry and STOP",
       "severity": "critical",
       "acceptance": "Expiry closes listener/connections; STOP cancels runner",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
+      "automated": "NOT_RUN",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
       "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
-      "firstCycle": 1
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN"
     },
     {
       "id": "M03",
@@ -96,11 +106,12 @@
       "name": "Voice/provider freeze",
       "severity": "critical",
       "acceptance": "Microphone and interpretation reject in manual mode; no provider request",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
+      "automated": "NOT_RUN",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
       "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
-      "firstCycle": 1
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN"
     },
     {
       "id": "M04",
@@ -108,23 +119,26 @@
       "name": "Valid and invalid PIN",
       "severity": "critical",
       "acceptance": "Valid authorized staff enters; invalid PIN changes no orders; use synthetic staff",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
+      "automated": "NOT_RUN",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
       "gate": "Missing current BOH export or isolated durable transport/authorization verification",
-      "firstCycle": 1
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN"
     },
     {
       "id": "M05",
       "group": "Auth",
-      "name": "Staff roles",
+      "name": "Action-boundary permissions and manager audit",
       "severity": "critical",
-      "acceptance": "Server/manager permissions enforced at action boundary, not only hidden buttons",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
-      "gate": "Missing current BOH export or isolated durable transport/authorization verification",
-      "firstCycle": 1
+      "acceptance": "Server/manager SEND+FIRE; scoped kitchen FIRE only; kitchen SEND denied. Every void/comp/discount requires fresh valid manager code, immutable manager/initiator/action/time/check/item/reason/before-after audit. Direct calls and stale/revoked grants denied.",
+      "automated": "BLOCKED",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
+      "gate": "Required policy/financial/durable action-boundary implementation not built; emulator design/write approval pending",
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN",
+      "blockedBy": "implementation_or_design_approval"
     },
     {
       "id": "M06",
@@ -132,11 +146,12 @@
       "name": "Logout/login",
       "severity": "critical",
       "acceptance": "Unsent checks and exact identities survive; former session cannot mutate new session",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
+      "automated": "NOT_RUN",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
       "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
-      "firstCycle": 1
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN"
     },
     {
       "id": "M07",
@@ -144,11 +159,12 @@
       "name": "Staff/table switching",
       "severity": "critical",
       "acceptance": "Changing staff/table cannot attach edits to previous check",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
+      "automated": "NOT_RUN",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
       "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
-      "firstCycle": 1
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN"
     },
     {
       "id": "M08",
@@ -156,11 +172,12 @@
       "name": "Login usability",
       "severity": "minor",
       "acceptance": "PIN targets and readable error state usable on iPhone",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
+      "automated": "NOT_RUN",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
       "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
-      "firstCycle": 1
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN"
     },
     {
       "id": "M09",
@@ -168,11 +185,13 @@
       "name": "Catalog completeness",
       "severity": "critical",
       "acceptance": "Every current published BOH food/bar/wine/special ID is present or explicitly unavailable",
-      "automated": "partial smoke evidence; acceptance pending",
-      "physical": "not_run",
+      "automated": "BLOCKED",
+      "physical": "NOT_RUN",
       "independent": "smoke reproduced; full acceptance pending",
-      "gate": "Missing current BOH export or isolated durable transport/authorization verification",
-      "firstCycle": 1
+      "gate": "Missing authentic published BOH food/cocktail/special or current availability/taxability records; tracked snapshot smoke is not a pass",
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN",
+      "blockedBy": "authentic_catalog"
     },
     {
       "id": "M10",
@@ -180,11 +199,13 @@
       "name": "86 and availability",
       "severity": "critical",
       "acceptance": "BOH 86/inactive item cannot be added; status revision is visible",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
-      "gate": "Missing current BOH export or isolated durable transport/authorization verification",
-      "firstCycle": 1
+      "automated": "BLOCKED",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
+      "gate": "Missing authentic published BOH food/cocktail/special or current availability/taxability records; tracked snapshot smoke is not a pass",
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN",
+      "blockedBy": "authentic_catalog"
     },
     {
       "id": "M11",
@@ -192,35 +213,41 @@
       "name": "Food price authority",
       "severity": "critical",
       "acceptance": "Selected food uses exact BOH price, no seed/demo or inferred price",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
-      "gate": "Missing current BOH export or isolated durable transport/authorization verification",
-      "firstCycle": 1
+      "automated": "BLOCKED",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
+      "gate": "Missing authentic published BOH food/cocktail/special or current availability/taxability records; tracked snapshot smoke is not a pass",
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN",
+      "blockedBy": "authentic_catalog"
     },
     {
       "id": "M12",
       "group": "Price",
-      "name": "PF/tasting price authority",
+      "name": "BOH menu base prices and tax",
       "severity": "critical",
-      "acceptance": "Each menu uses its actual BOH price and selected option surcharges",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
-      "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
-      "firstCycle": 1
+      "acceptance": "PF/tasting source prices immutable; NYC8.875% applied only to approved taxable net items; display separate subtotal/tax/tip/final.",
+      "automated": "BLOCKED",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
+      "gate": "Required policy/financial/durable action-boundary implementation not built; emulator design/write approval pending",
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN",
+      "blockedBy": "implementation_or_design_approval"
     },
     {
       "id": "M13",
       "group": "Price",
-      "name": "Missing or malformed price",
+      "name": "Fail-closed price/tax/tip input",
       "severity": "critical",
-      "acceptance": "Reject unpriced/invalid item; do not turn absence into free item",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
-      "gate": "Missing current BOH export or isolated durable transport/authorization verification",
-      "firstCycle": 1
+      "acceptance": "Missing price/taxability blocks acceptance; no free item. Tips20/25/40/Custom on tax-inclusive total; Custom >=20% at boundary; reject invalid/negative/nonfinite/stale values.",
+      "automated": "BLOCKED",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
+      "gate": "Missing authentic published BOH food/cocktail/special or current availability/taxability records; tracked snapshot smoke is not a pass",
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN",
+      "blockedBy": "authentic_catalog"
     },
     {
       "id": "M14",
@@ -228,11 +255,12 @@
       "name": "Wine identity/price",
       "severity": "critical",
       "acceptance": "VIN, producer, vintage, size and glass/bottle price match exact BOH record",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
+      "automated": "NOT_RUN",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
       "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
-      "firstCycle": 1
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN"
     },
     {
       "id": "M15",
@@ -240,11 +268,12 @@
       "name": "Beer/spirit pour",
       "severity": "critical",
       "acceptance": "Actual BOH SKU and allowed pour produce exact corresponding price",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
+      "automated": "NOT_RUN",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
       "gate": "Missing current BOH export or isolated durable transport/authorization verification",
-      "firstCycle": 1
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN"
     },
     {
       "id": "M16",
@@ -252,11 +281,12 @@
       "name": "Large cellar performance",
       "severity": "minor",
       "acceptance": "Search first/last known SKU in bounded pages; proposed <=2s on owner device",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
+      "automated": "NOT_RUN",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
       "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
-      "firstCycle": 1
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN"
     },
     {
       "id": "M17",
@@ -264,23 +294,25 @@
       "name": "Food/beverage navigation",
       "severity": "minor",
       "acceptance": "Categories, search and back navigation retain current unsent check",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
+      "automated": "NOT_RUN",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
       "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
-      "firstCycle": 1
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN"
     },
     {
       "id": "M18",
       "group": "UI",
-      "name": "Long catalog readability",
+      "name": "Customer-menu policy and readability",
       "severity": "minor",
-      "acceptance": "Long names/VIN/size readable without changing selected product",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
+      "acceptance": "Top-of-menu tipping disclaimer on every actual customer-menu route; long product/VIN/size readable. Financial correctness remains critical in M13/M45.",
+      "automated": "NOT_RUN",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
       "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
-      "firstCycle": 1
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN"
     },
     {
       "id": "M19",
@@ -288,11 +320,12 @@
       "name": "Open occupied table",
       "severity": "critical",
       "acceptance": "Correct table/check and unsent lines shown; never overwrite occupied check",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
+      "automated": "NOT_RUN",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
       "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
-      "firstCycle": 1
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN"
     },
     {
       "id": "M20",
@@ -300,11 +333,12 @@
       "name": "Guest count lifecycle",
       "severity": "critical",
       "acceptance": "Increasing/decreasing guests retains existing occupied position identities",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
+      "automated": "NOT_RUN",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
       "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
-      "firstCycle": 1
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN"
     },
     {
       "id": "M21",
@@ -312,11 +346,12 @@
       "name": "2 and 2A selection",
       "severity": "critical",
       "acceptance": "Separate manual chips/picker entries; distinct ordinary food/beverage lines",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
+      "automated": "NOT_RUN",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
       "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
-      "firstCycle": 1
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN"
     },
     {
       "id": "M22",
@@ -324,11 +359,12 @@
       "name": "2 and 2A menu coexistence",
       "severity": "critical",
       "acceptance": "Two PF menus retained, displayed and totaled as distinct positions",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
+      "automated": "NOT_RUN",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
       "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
-      "firstCycle": 1
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN"
     },
     {
       "id": "M23",
@@ -336,11 +372,12 @@
       "name": "Move item position",
       "severity": "critical",
       "acceptance": "Authorized unsent move changes one exact identity without merging checks",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
+      "automated": "NOT_RUN",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
       "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
-      "firstCycle": 1
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN"
     },
     {
       "id": "M24",
@@ -348,11 +385,12 @@
       "name": "Table/shared item",
       "severity": "critical",
       "acceptance": "Shared line stays shared across editing, totals and structured payload",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
+      "automated": "NOT_RUN",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
       "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
-      "firstCycle": 1
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN"
     },
     {
       "id": "M25",
@@ -360,11 +398,12 @@
       "name": "Priority/seat labels",
       "severity": "minor",
       "acceptance": "Labels remain consistent in check, picker and review screens",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
+      "automated": "NOT_RUN",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
       "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
-      "firstCycle": 1
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN"
     },
     {
       "id": "M26",
@@ -372,11 +411,12 @@
       "name": "Viewport readability",
       "severity": "minor",
       "acceptance": "Portrait/landscape/keyboard/long-check remain readable; blocking controls tested elsewhere",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
+      "automated": "NOT_RUN",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
       "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
-      "firstCycle": 1
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN"
     },
     {
       "id": "M27",
@@ -384,11 +424,13 @@
       "name": "Add food/quantity",
       "severity": "critical",
       "acceptance": "Actual visible controls create intended item and quantity on exact check",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
-      "gate": "Missing current BOH export or isolated durable transport/authorization verification",
-      "firstCycle": 1
+      "automated": "BLOCKED",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
+      "gate": "Missing authentic published BOH food/cocktail/special or current availability/taxability records; tracked snapshot smoke is not a pass",
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN",
+      "blockedBy": "authentic_catalog"
     },
     {
       "id": "M28",
@@ -396,11 +438,12 @@
       "name": "Choose course",
       "severity": "critical",
       "acceptance": "Starter/main/dessert course assignment changes only intended unsent line",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
+      "automated": "NOT_RUN",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
       "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
-      "firstCycle": 1
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN"
     },
     {
       "id": "M29",
@@ -408,24 +451,26 @@
       "name": "Table allergy",
       "severity": "critical",
       "acceptance": "BOH allergen warning appears before food confirmation and remains attached",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
+      "automated": "NOT_RUN",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
       "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
-      "firstCycle": 1
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN"
     },
     {
       "id": "M30",
       "group": "Allergies",
-      "name": "Seat 2 vs 2A allergy",
+      "name": "Distinct 2/2A allergies and table restrictions",
       "severity": "critical",
-      "acceptance": "Distinct guest restrictions never silently merge, disappear or move",
-      "automated": "failed",
-      "physical": "not_run",
-      "independent": "independently reproduced",
-      "gate": "Confirmed numeric allergy editor lacks distinct 2A controls",
+      "acceptance": "Separate exact-identity editor/inline controls; independent toggles/removal/reopen; table-wide restrictions applied to both; legacy numeric allergy keys retained. No inference of new seats.",
+      "automated": "PASS",
+      "physical": "NOT_RUN",
+      "independent": "Internal verifier reproduced; Claude external review PENDING",
+      "gate": "Automated/independent repair checks pass; physical and durable/backend verification pending; formal0",
       "firstCycle": 1,
-      "evidence": "../../lab/docs/evidence/manual-inventory/results.json"
+      "evidence": "../../lab/docs/evidence/manual-owner-revisions/results.json",
+      "simulatedTransport": "NOT_RUN"
     },
     {
       "id": "M31",
@@ -433,11 +478,13 @@
       "name": "Explicit override policy",
       "severity": "critical",
       "acceptance": "Only authorized role can acknowledge conflict; cancellation makes no mutation",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
-      "gate": "Missing current BOH export or isolated durable transport/authorization verification",
-      "firstCycle": 1
+      "automated": "BLOCKED",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
+      "gate": "Required policy/financial/durable action-boundary implementation not built; emulator design/write approval pending",
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN",
+      "blockedBy": "implementation_or_design_approval"
     },
     {
       "id": "M32",
@@ -445,11 +492,12 @@
       "name": "Required temperature",
       "severity": "critical",
       "acceptance": "Missing/invalid BOH temperature rejected; allowed value retained",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
+      "automated": "NOT_RUN",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
       "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
-      "firstCycle": 1
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN"
     },
     {
       "id": "M33",
@@ -457,11 +505,13 @@
       "name": "Modifiers and prices",
       "severity": "critical",
       "acceptance": "Each option and repeated change uses exact BOH adjustment once; no accumulation drift",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
-      "gate": "Missing current BOH export or isolated durable transport/authorization verification",
-      "firstCycle": 1
+      "automated": "BLOCKED",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
+      "gate": "Missing authentic published BOH food/cocktail/special or current availability/taxability records; tracked snapshot smoke is not a pass",
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN",
+      "blockedBy": "authentic_catalog"
     },
     {
       "id": "M34",
@@ -469,11 +519,12 @@
       "name": "Kitchen note",
       "severity": "critical",
       "acceptance": "Preserve text and allergen note on the exact item/check through editing",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
+      "automated": "NOT_RUN",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
       "gate": "Missing current BOH export or isolated durable transport/authorization verification",
-      "firstCycle": 1
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN"
     },
     {
       "id": "M35",
@@ -481,11 +532,12 @@
       "name": "Complete PF menu",
       "severity": "critical",
       "acceptance": "Manual starter/main create one menu with exact included selections",
-      "automated": "partial smoke evidence; acceptance pending",
-      "physical": "not_run",
+      "automated": "PARTIAL",
+      "physical": "NOT_RUN",
       "independent": "smoke reproduced; full acceptance pending",
       "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
-      "firstCycle": 1
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN"
     },
     {
       "id": "M36",
@@ -493,11 +545,12 @@
       "name": "Incomplete/None PF course",
       "severity": "critical",
       "acceptance": "BOH-permitted None explicit; missing required choices cannot silently submit",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
+      "automated": "NOT_RUN",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
       "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
-      "firstCycle": 1
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN"
     },
     {
       "id": "M37",
@@ -505,11 +558,12 @@
       "name": "PF temperature",
       "severity": "critical",
       "acceptance": "Pork/main temperature remains on included choice without price inference",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
+      "automated": "NOT_RUN",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
       "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
-      "firstCycle": 1
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN"
     },
     {
       "id": "M38",
@@ -517,11 +571,12 @@
       "name": "PF upcharges",
       "severity": "critical",
       "acceptance": "Actual selected option upcharges once; replacement removes previous surcharge",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
+      "automated": "NOT_RUN",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
       "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
-      "firstCycle": 1
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN"
     },
     {
       "id": "M39",
@@ -529,11 +584,12 @@
       "name": "Choose dessert later",
       "severity": "critical",
       "acceptance": "Manual dessert updates same menu; correct price; no new menu or duplicate",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
+      "automated": "NOT_RUN",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
       "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
-      "firstCycle": 2
+      "firstCycle": 2,
+      "simulatedTransport": "NOT_RUN"
     },
     {
       "id": "M40",
@@ -541,11 +597,12 @@
       "name": "Change dessert twice",
       "severity": "critical",
       "acceptance": "Only latest selection/surcharge retained, with prior fired state protected",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
+      "automated": "NOT_RUN",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
       "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
-      "firstCycle": 2
+      "firstCycle": 2,
+      "simulatedTransport": "NOT_RUN"
     },
     {
       "id": "M41",
@@ -553,11 +610,12 @@
       "name": "Skip dessert",
       "severity": "critical",
       "acceptance": "None state remains explicit; no phantom charge or course",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
+      "automated": "NOT_RUN",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
       "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
-      "firstCycle": 2
+      "firstCycle": 2,
+      "simulatedTransport": "NOT_RUN"
     },
     {
       "id": "M42",
@@ -565,11 +623,12 @@
       "name": "Gelato scoops",
       "severity": "critical",
       "acceptance": "Exact BOH scoop count/flavors/allergens retained; incomplete choice rejected",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
+      "automated": "NOT_RUN",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
       "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
-      "firstCycle": 2
+      "firstCycle": 2,
+      "simulatedTransport": "NOT_RUN"
     },
     {
       "id": "M43",
@@ -577,11 +636,12 @@
       "name": "Tasting menu construction",
       "severity": "critical",
       "acceptance": "All BOH courses/temperature/options included, actual price, no hardcoded ID price",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
+      "automated": "NOT_RUN",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
       "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
-      "firstCycle": 2
+      "firstCycle": 2,
+      "simulatedTransport": "NOT_RUN"
     },
     {
       "id": "M44",
@@ -589,35 +649,40 @@
       "name": "Extras and pairings",
       "severity": "critical",
       "acceptance": "Actual BOH included-vs-extra rules and pairing price; no invented fee",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
+      "automated": "NOT_RUN",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
       "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
-      "firstCycle": 2
+      "firstCycle": 2,
+      "simulatedTransport": "NOT_RUN"
     },
     {
       "id": "M45",
       "group": "Editing",
-      "name": "Quantity and subtotal",
+      "name": "Totals integrity, NYC tax/tip and adjustments",
       "severity": "critical",
-      "acceptance": "Quantity changes, currency rounding and removal agree between screen/state",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
-      "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
-      "firstCycle": 2
+      "acceptance": "Recompute integer-cent subtotal, approved adjustments/net taxable basis,8.875%tax,tax-inclusive check,20/25/40/Custom tip and final after quantity/void/comp/discount/split. Reject custom <20%; no duplicate adjustment or stale tip; zero balance and rounding verified. Incorporates Claude M63.",
+      "automated": "BLOCKED",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
+      "gate": "Required policy/financial/durable action-boundary implementation not built; emulator design/write approval pending",
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN",
+      "blockedBy": "implementation_or_design_approval"
     },
     {
       "id": "M46",
       "group": "Editing",
-      "name": "Modify/replace item",
+      "name": "Owned edits plus manager comps/discounts",
       "severity": "critical",
-      "acceptance": "Exact owned unsent line changed; original removed; no duplicate or note loss",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
-      "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
-      "firstCycle": 2
+      "acceptance": "Owned unsent modify/replace retains identity/modifiers/notes; comps/percent/fixed discounts require valid manager approval (also manager initiator), reason and append-only audit; original BOH prices retained, no negative net amount; repeat requests exactly once.",
+      "automated": "BLOCKED",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
+      "gate": "Required policy/financial/durable action-boundary implementation not built; emulator design/write approval pending",
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN",
+      "blockedBy": "implementation_or_design_approval"
     },
     {
       "id": "M47",
@@ -625,23 +690,26 @@
       "name": "Move/reorder/course edit",
       "severity": "critical",
       "acceptance": "Stable line identities and seat/course maintained after sequence changes",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
+      "automated": "NOT_RUN",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
       "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
-      "firstCycle": 2
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN"
     },
     {
       "id": "M48",
       "group": "Editing",
-      "name": "Erase PF/menu",
+      "name": "Unsent erase and manager-approved sent-item void",
       "severity": "critical",
-      "acceptance": "Only selected menu/bound unsent courses removed; other positions retained",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
-      "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
-      "firstCycle": 2
+      "acceptance": "Unsent selected PF removal scoped to exact position. Sent void is separate reversal requiring manager code+reason+identity/time/item/check audit, retains original fired history and kitchen link, recalculates tax/tip totals exactly once. Incorporates Claude M61/M62.",
+      "automated": "BLOCKED",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
+      "gate": "Required policy/financial/durable action-boundary implementation not built; emulator design/write approval pending",
+      "firstCycle": 1,
+      "simulatedTransport": "NOT_RUN",
+      "blockedBy": "implementation_or_design_approval"
     },
     {
       "id": "M49",
@@ -649,11 +717,12 @@
       "name": "Split by selected lines/seat",
       "severity": "critical",
       "acceptance": "Exact 2/2A ownership and cent totals preserved across resulting checks",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
+      "automated": "NOT_RUN",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
       "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
-      "firstCycle": 2
+      "firstCycle": 2,
+      "simulatedTransport": "NOT_RUN"
     },
     {
       "id": "M50",
@@ -661,11 +730,12 @@
       "name": "Split/check lookup usability",
       "severity": "minor",
       "acceptance": "Correct check displayed and easy return; no silent editing of another check",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
+      "automated": "NOT_RUN",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
       "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
-      "firstCycle": 2
+      "firstCycle": 2,
+      "simulatedTransport": "NOT_RUN"
     },
     {
       "id": "M51",
@@ -673,11 +743,12 @@
       "name": "Table transfer/combine/split",
       "severity": "critical",
       "acceptance": "Occupied destinations protected; no item/seat/check loss or duplicated price",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
+      "automated": "NOT_RUN",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
       "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
-      "firstCycle": 2
+      "firstCycle": 2,
+      "simulatedTransport": "NOT_RUN"
     },
     {
       "id": "M52",
@@ -685,11 +756,12 @@
       "name": "Receipt/check presentation",
       "severity": "minor",
       "acceptance": "Read-only print preview lists exact names/positions/status/totals; physical print disabled",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
+      "automated": "NOT_RUN",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
       "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
-      "firstCycle": 2
+      "firstCycle": 2,
+      "simulatedTransport": "NOT_RUN"
     },
     {
       "id": "M53",
@@ -697,11 +769,13 @@
       "name": "Browser reload recovery",
       "severity": "critical",
       "acceptance": "Restore full structured unsent items, modifiers, PF selections and stable IDs",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
-      "gate": "Missing current BOH export or isolated durable transport/authorization verification",
-      "firstCycle": 2
+      "automated": "BLOCKED",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
+      "gate": "Required policy/financial/durable action-boundary implementation not built; emulator design/write approval pending",
+      "firstCycle": 2,
+      "simulatedTransport": "NOT_RUN",
+      "blockedBy": "implementation_or_design_approval"
     },
     {
       "id": "M54",
@@ -709,11 +783,13 @@
       "name": "Offline recovery/retry",
       "severity": "critical",
       "acceptance": "Clear failure state; no lost check or duplicate on approved retry",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
-      "gate": "Missing current BOH export or isolated durable transport/authorization verification",
-      "firstCycle": 2
+      "automated": "BLOCKED",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
+      "gate": "Required policy/financial/durable action-boundary implementation not built; emulator design/write approval pending",
+      "firstCycle": 2,
+      "simulatedTransport": "NOT_RUN",
+      "blockedBy": "implementation_or_design_approval"
     },
     {
       "id": "M55",
@@ -721,35 +797,41 @@
       "name": "Two-client concurrency",
       "severity": "critical",
       "acceptance": "Detect stale revision; never silently overwrite current check",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
-      "gate": "Missing current BOH export or isolated durable transport/authorization verification",
-      "firstCycle": 2
+      "automated": "BLOCKED",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
+      "gate": "Required policy/financial/durable action-boundary implementation not built; emulator design/write approval pending",
+      "firstCycle": 2,
+      "simulatedTransport": "NOT_RUN",
+      "blockedBy": "implementation_or_design_approval"
     },
     {
       "id": "M56",
       "group": "Kitchen",
-      "name": "SEND authorization/idempotency",
+      "name": "SEND action authorization and idempotency",
       "severity": "critical",
-      "acceptance": "Role/check validated; only chosen unsent items; same intent cannot duplicate",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
-      "gate": "Missing current BOH export or isolated durable transport/authorization verification",
-      "firstCycle": 2
+      "acceptance": "Active scoped server/manager may SEND; kitchen cannot. Validate check/line ownership and revisions at boundary; no caller supplied role override; retries produce one local intent.",
+      "automated": "BLOCKED",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
+      "gate": "Required policy/financial/durable action-boundary implementation not built; emulator design/write approval pending",
+      "firstCycle": 2,
+      "simulatedTransport": "NOT_RUN",
+      "blockedBy": "implementation_or_design_approval"
     },
     {
       "id": "M57",
       "group": "Kitchen",
-      "name": "FIRE/course gating",
+      "name": "FIRE permission and course/allergy gating",
       "severity": "critical",
-      "acceptance": "BOH course/choice/allergy guards; exact 2/2A/line identity in kitchen payload",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
-      "gate": "Missing current BOH export or isolated durable transport/authorization verification",
-      "firstCycle": 2
+      "acceptance": "Server/manager and explicitly authorized active kitchen may FIRE; others/revoked grants denied at boundary. No implicit allergy waiver; pending choice/fired/check/2A identity verified in exact local payload.",
+      "automated": "BLOCKED",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
+      "gate": "Required policy/financial/durable action-boundary implementation not built; emulator design/write approval pending",
+      "firstCycle": 2,
+      "simulatedTransport": "NOT_RUN",
+      "blockedBy": "implementation_or_design_approval"
     },
     {
       "id": "M58",
@@ -757,11 +839,13 @@
       "name": "Post-fire edit protection",
       "severity": "critical",
       "acceptance": "Fired/sent courses cannot be reset, repriced, erased or re-FIREd by edit",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
-      "gate": "Missing current BOH export or isolated durable transport/authorization verification",
-      "firstCycle": 2
+      "automated": "BLOCKED",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
+      "gate": "Required policy/financial/durable action-boundary implementation not built; emulator design/write approval pending",
+      "firstCycle": 2,
+      "simulatedTransport": "NOT_RUN",
+      "blockedBy": "implementation_or_design_approval"
     },
     {
       "id": "M59",
@@ -769,32 +853,38 @@
       "name": "Failure/acknowledgment recovery",
       "severity": "critical",
       "acceptance": "No false sent/fired flag before acknowledgment; retry exactly once",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
-      "gate": "Missing current BOH export or isolated durable transport/authorization verification",
-      "firstCycle": 2
+      "automated": "BLOCKED",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
+      "gate": "Required policy/financial/durable action-boundary implementation not built; emulator design/write approval pending",
+      "firstCycle": 2,
+      "simulatedTransport": "NOT_RUN",
+      "blockedBy": "implementation_or_design_approval"
     },
     {
       "id": "M60",
       "group": "End-to-end",
-      "name": "Complete multi-guest manual service",
+      "name": "Complete authorized manual service with final totals",
       "severity": "critical",
-      "acceptance": "Food, beverages, 2/2A, PF, allergies, editing, recovery and local approved kitchen intent all agree",
-      "automated": "not_run",
-      "physical": "not_run",
-      "independent": "not_reviewed",
-      "gate": "Missing current BOH export or isolated durable transport/authorization verification",
-      "firstCycle": 2
+      "acceptance": "Food/beverages/exact2/2A/PF/allergies/edits/recovery/local approved kitchen intent agree, then manager-approved void/comp/discount, NYCtax,tax-inclusive tip choices/minimum, policy disclaimer atop every actual customer-menu surface and final display. Never actual settlement/kitchen in current lab.",
+      "automated": "BLOCKED",
+      "physical": "NOT_RUN",
+      "independent": "PENDING",
+      "gate": "Required policy/financial/durable action-boundary implementation not built; emulator design/write approval pending",
+      "firstCycle": 2,
+      "simulatedTransport": "NOT_RUN",
+      "blockedBy": "implementation_or_design_approval"
     }
   ],
   "formalSummary": {
-    "criticalPassed": 0,
-    "criticalFailed": 1,
-    "criticalPartial": 2,
-    "criticalNotRun": 49,
-    "minorNotRun": 8,
-    "formalAccepted": 0
+    "accepted": 0,
+    "criticalAccepted": 0,
+    "minorAccepted": 0,
+    "target": 60,
+    "criticalTarget": 52,
+    "automatedPass": 1,
+    "automatedBlocked": 20,
+    "note": "M30 automated repair and internal-independent evidence PASS; formal0 pending external/applicable physical verification. No transport/financial acceptance claimed."
   },
   "initialManualAudit": {
     "profile": "actual POS + tracked BOH fixtures; no live backend",
@@ -803,5 +893,24 @@
     "aborted": 0,
     "artifact": "../../lab/docs/evidence/manual-inventory/results.json",
     "scope": "Three targeted audit checks, not the 60-test acceptance suite"
+  },
+  "requirements": "OWNER-REQUIREMENTS.md",
+  "firestoreDesign": {
+    "status": "DESIGN_ONLY_NOT_BUILT",
+    "approval": "Claude review and explicit owner emulator-write authorization pending",
+    "document": "FIRESTORE-ISOLATION-DESIGN.md"
+  },
+  "recommendationMapping": {
+    "M61": "M48 sent-item void subscenarios",
+    "M62": "M05/M46/M48 manager approval and immutable audit subscenarios",
+    "M63": "M45 totals integrity subscenarios"
+  },
+  "revisionManualAudit": {
+    "profile": "real POS + tracked BOH; no backend",
+    "passed": 3,
+    "failed": 0,
+    "aborted": 0,
+    "artifact": "../../lab/docs/evidence/manual-owner-revisions/results.json",
+    "scope": "Expanded M30 repair screen test plus catalog/PF smoke; formal acceptance0/60"
   }
 }

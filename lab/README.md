@@ -1,3 +1,9 @@
+# Owner revision of the manual milestone
+
+See [finalized owner policy](../docs/manual-pos/OWNER-REQUIREMENTS.md), [Firestore design awaiting approval](../docs/manual-pos/FIRESTORE-ISOLATION-DESIGN.md), and [revision evidence/next steps](../docs/manual-pos/OWNER-REVISION-VERIFICATION.md). The current repair profile has 3 passing browser checks, including distinct2/2A allergy toggles/table restrictions; formal acceptance remains0/60. Permissions/manager audits, void/comp/discount, tax/tips/disclaimers and database integration are planned, NOT implemented here. Missing authentic catalog cases are BLOCKED.
+
+Historical inventory context follows; its prior2-pass/1-fail counts refer to a529059, not this repair.
+
 # Manual POS priority milestone
 
 Voice development is paused. See [full inventory and two-cycle plan](../docs/manual-pos/INVENTORY-AND-PLAN.md), [60-test matrix](../docs/manual-pos/ACCEPTANCE-MATRIX.md), and the single [scorecard](../docs/manual-pos/SCORECARD.json). Manual profile: add `--manual` to the Mac launcher; `LAB_MANUAL=1 npm run test:screens` runs three actual-POS audit scenarios (2 pass, M30 allergy identity fails). This is not 60 completed acceptance tests. The profile includes tracked BOH beverages/PF/tasting; ordinary published food/cocktail/special exports are still missing. No price or product is invented.

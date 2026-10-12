@@ -2016,6 +2016,9 @@ function ingestOpenChecks(list){
 function seatAllergies(seat){
   var s = sessionOf(STATE.selectedTable);
   var k = String(seat==null?'table':seat);
+  // Legacy checks used numeric allergy keys even for an A-labelled seat.
+  var check=STATE.checks[activeCheckId()];
+  if(!(check&&Array.isArray(check.positionIdentities)) && /^\d+A$/.test(k)) k=String(parseInt(k,10));
   if (!s.allergies[k]) s.allergies[k] = [];
   return s.allergies[k];
 }
@@ -2375,7 +2378,7 @@ function checkPositionIdentities(){
 function selectedPositionIdentity(){ return STATE.activePositionCheck===activeCheckId() && STATE.activePositionIdentity && checkPositionIdentities().includes(STATE.activePositionIdentity) && parseInt(STATE.activePositionIdentity,10)===Number(STATE.activeSeat) ? STATE.activePositionIdentity : positionLabel(STATE.activeSeat); }
 function setActivePositionIdentity(identity){
   if(!checkPositionIdentities().includes(identity)) return;
-  STATE.activePositionIdentity=identity;STATE.activePositionCheck=activeCheckId();STATE.activeSeat=parseInt(identity,10);STATE.allergySeat=STATE.activeSeat;STATE.allergyOpen=true;renderOrder();paintChrome();
+  STATE.activePositionIdentity=identity;STATE.activePositionCheck=activeCheckId();STATE.activeSeat=parseInt(identity,10);STATE.allergySeat=identity;STATE.allergyOpen=true;renderOrder();paintChrome();
 }
 function seatHasPrixFixe(seat, priority){
   var base=seat==null?STATE.activeSeat:seat;
@@ -2573,7 +2576,9 @@ function backToFloor(){
 function allergenHits(item, seat){
   var listed=asList(item && item.allergens);
   var a=listed.map(function(x){return String(x).toLowerCase();});
-  var g=seatAllergies(seat).map(function(x){return String(x).toLowerCase();});
+  var identity=String(seat==null?'table':seat);
+  if(/^\d+$/.test(identity)&&item&&item.seatPriority!=null) identity+=(item.seatPriority?'A':'');
+  var g=seatAllergies(identity).concat(seatAllergies('table')).map(function(x){return String(x).toLowerCase();});
   return listed.filter(function(x){ return g.indexOf(String(x).toLowerCase())>-1; });
 }
 var SEATABLE = {table:1, stool:1, outdoor:1, couch:1};
@@ -8130,13 +8135,14 @@ function renderGuestAllergyStrip(){
     if (cur.length) bits.push(seatName(seat)+' '+cur.join(', '));
   }
   collect('table');
-  for (var i=1;i<=n;i++) collect(i);
+  checkPositionIdentities().forEach(collect);
   if (dining) {
     return '<div class="allergy-strip compact-line"><span>'+(bits.length?esc(bits.join(' · ')):'Allergies — tap a guest to flag')+'</span>'+
       '<button type="button" onclick="openAllergyEditor()">Edit</button>'+
       '<button type="button" onclick="sendKitchenAllergyNote()">Send note</button></div>';
   }
-  var open=STATE.allergySeat!=null?STATE.allergySeat:(STATE.activeSeat||'table');
+  var open=STATE.allergySeat!=null?String(STATE.allergySeat):selectedPositionIdentity();
+  if(open!=='table'&&!checkPositionIdentities().includes(open)) open=selectedPositionIdentity();
   var html='<div class="allergy-strip"><div class="as-label">Allergies — tap a guest, then flag</div><div class="as-guests">';
   function pill(seat){
     var cur=seatAllergies(seat);
@@ -8145,7 +8151,7 @@ function renderGuestAllergyStrip(){
       esc(seatName(seat))+(cur.length?' · '+cur.length:'')+'</button>';
   }
   pill('table');
-  for (var i=1;i<=n;i++) pill(i);
+  checkPositionIdentities().forEach(pill);
   html+='</div>';
   var cur=seatAllergies(open);
   html+='<div class="allergy-guest"><b>'+esc(seatName(open))+'</b><div class="chip-row">';
@@ -9499,7 +9505,7 @@ function maybeAllergyThenAdd(){
   if (hits.length) {
     openSheet(
       '<h2>Allergy warning</h2>'+
-      '<div class="warn-banner">'+seatName(p.seat)+' flagged: '+hits.join(', ')+'. This item lists those allergens.</div>'+
+      '<div class="warn-banner">'+seatName(orderPositionIdentity(p))+' flagged: '+hits.join(', ')+'. This item lists those allergens.</div>'+
       '<p class="sheet-sub">'+p.name+' will not be added unless you confirm.</p>'+
       '<button class="primary-btn" style="background:var(--danger);color:#fff;" onclick="commitPendingItem()">Send anyway</button>'+
       '<button class="ghost-btn" onclick="closeSheet()">Cancel</button>'
@@ -10143,7 +10149,7 @@ function openAllergyEditor(){
     return h+'</div>';
   }
   html+=block('table');
-  for (var i=1;i<=n;i++) html+=block(i);
+  checkPositionIdentities().forEach(function(identity){html+=block(identity);});
   var suggested=suggestedAllergyNote(flaggedAllergies());
   html+='<div class="tasting-section-label">Note for the kitchen</div>';
   if (suggested) html+='<p class="sheet-sub">'+esc(suggested)+'</p>';
@@ -10153,6 +10159,11 @@ function openAllergyEditor(){
   openSheet(html);
 }
 function toggleAllergy(seat, name, stay){
+  seat=String(seat);
+  if(seat!=='table'&&!checkPositionIdentities().includes(seat)) return;
+  if(COMMON_ALLERGENS.indexOf(name)<0) return;
+  var note=document.getElementById('allergy-kitchen-note');
+  if(note) sessionOf(STATE.selectedTable).kitchenNote=String(note.value||'').trim();
   var list=seatAllergies(seat);
   var i=list.indexOf(name);
   if (i>-1) list.splice(i,1); else list.push(name);

@@ -28,7 +28,14 @@
    for(const wine of source.wines.filter(w=>w.active!==false&&w.visible!==false)){const item=STATE.menuItems.find(i=>i.id===wine.id);assert(item&&item.vin===String(wine.vin)&&item.price===Number(wine.bottlePrice||wine.glassPrice||wine.price||0),'BOH wine identity/price mismatch: '+wine.id);}
    assert(STATE.tastingMenus.length===1,'Tasting menu absent');assert(!fbReady&&!STATE.orders.length,'Safety isolation lost');
   }},
-  {id:'manual-allergy-identity',manualOnly:true,name:'M30 distinct allergy controls for 2 and 2A',issue:'MANUAL_ALLERGY_IDENTITY',run:async()=>{await cases.find(c=>c.id==='manual-menu').run();await act('tap','#order-top button[onclick="openAllergyEditor()"]');assert(document.querySelector('#sheet-body')?.innerText.includes('Seat 2A')||Array.from(document.querySelectorAll('button[onclick]')).some(b=>b.getAttribute('onclick').includes("toggleAllergy('2A'")),'Missing distinct allergy controls for authoritative position 2A');}},
+  {id:'manual-allergy-identity',manualOnly:true,name:'M30 distinct allergy controls, toggling and table restrictions for 2 and 2A',issue:'MANUAL_ALLERGY_IDENTITY',run:async()=>{
+   await cases.find(c=>c.id==='manual-menu').run();await act('tap','#order-top button[onclick="openAllergyEditor()"]');
+   const toggle=(seat,allergen)=>act('tap','button[onclick="toggleAllergy(\''+seat+'\',\''+allergen+'\')"]');
+   await toggle('2','Fish');await toggle('2A','Dairy');assert(seatAllergies('2').includes('Fish')&&!seatAllergies('2').includes('Dairy'),'2 restrictions merged');assert(seatAllergies('2A').includes('Dairy')&&!seatAllergies('2A').includes('Fish'),'2A restrictions merged');
+   await toggle('2A','Dairy');assert(!seatAllergies('2A').includes('Dairy')&&seatAllergies('2').includes('Fish'),'Removing 2A changed 2');await toggle('2A','Dairy');await toggle('table','Sulfites');
+   assert(allergenHits({allergens:['Fish','Dairy','Sulfites'],seatPriority:false},2).join(',')==='Fish,Sulfites','2 warning ignores identity/table');assert(allergenHits({allergens:['Fish','Dairy','Sulfites'],seatPriority:true},2).join(',')==='Dairy,Sulfites','2A warning ignores identity/table');
+   await act('tap','#sheet-overlay button[onclick*="saveAllergyKitchenNote();"]');await act('tap','#order-top button[onclick="openAllergyEditor()"]');assert(seatAllergies('2').includes('Fish')&&seatAllergies('2A').includes('Dairy')&&seatAllergies('table').includes('Sulfites'),'Allergy state lost on reopen');
+  }},
   {id:'manual-menu',name:'Manual menu and authoritative price',run:async()=>{
    await base();await act('tap','.seat-chip[data-seat="2A"]');await act('tap','.period-tabs button:nth-child(3)');if(!document.querySelector('#pf-overlay.show'))await act('tap','.ts-tile[onclick*="openPrixFixeSelector"]');
    const menu=EpicureanLab.fixture.menu;for(const [id,courseId] of [['sf_p_linguini','pfc_primi'],['sf_m_pork','pfc_main']]){const ci=menu.courses.findIndex(c=>c.id===courseId),oi=menu.courses[ci].options.findIndex(o=>o.id===id);await act('tap','label:has(input[name="pf-course-'+ci+'"][value="'+oi+'"])');if(id==='sf_m_pork')await act('tap','label:has(input[name="pf-temp-'+ci+'-'+oi+'"][value="Medium"])');}
