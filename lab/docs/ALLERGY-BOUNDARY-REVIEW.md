@@ -1,3 +1,5 @@
+Latest label-matching correction: [ALLERGEN-MATCHING-REVIEW.md](ALLERGEN-MATCHING-REVIEW.md).
+
 # Corrective allergy-boundary review
 
 Same branch: `review/manual-pos-mobile-ordering-iteration1`, based on Claude-reviewed `f13ebfa`. No screen redesign. FOOD/DRINKS, persistent check, wine navigation and exact positions remain in the isolated lab. Independent Claude verification is pending.

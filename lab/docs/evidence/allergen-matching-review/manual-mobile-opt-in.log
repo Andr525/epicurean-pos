@@ -1,0 +1,1 @@
+PASS: mobile presentation loaded only by manual isolated lab; three literal true flags required; normal/partial/string flags and devControls URL cannot activate it.

@@ -2595,13 +2595,29 @@ function backToFloor(){
   STATE.hhMode='service';
   switchTab('tables');
 }
+// Label equivalence only: never infer allergens from recipes or free-text notes.
+function normalizeAllergenLabel(value){
+  var label=String(value==null?'':value).normalize('NFKC').trim().toLowerCase()
+    .replace(/\(s\)/g,'s').replace(/[-_\s]+/g,' ');
+  var aliases={'nut':'nuts','nuts':'nuts','tree nut':'tree nut','tree nuts':'tree nut',
+    'treenut':'tree nut','treenuts':'tree nut','peanut':'peanut','peanuts':'peanut',
+    'groundnut':'peanut','groundnuts':'peanut','ground nut':'peanut','ground nuts':'peanut',
+    'egg':'egg','eggs':'egg','sulfite':'sulfites','sulfites':'sulfites',
+    'sulphite':'sulfites','sulphites':'sulfites'};
+  return Object.prototype.hasOwnProperty.call(aliases,label)?aliases[label]:label;
+}
+function allergensConflict(left,right){
+  var a=normalizeAllergenLabel(left),b=normalizeAllergenLabel(right);
+  if(!a||!b) return false;
+  return a===b || (a==='nuts'&&(b==='tree nut'||b==='peanut')) ||
+    (b==='nuts'&&(a==='tree nut'||a==='peanut'));
+}
 function allergenHits(item, seat){
   var listed=asList(item && item.allergens);
-  var a=listed.map(function(x){return String(x).toLowerCase();});
   var identity=String(seat==null?'table':seat);
   if(/^\d+$/.test(identity)&&item&&item.seatPriority!=null) identity+=(item.seatPriority?'A':'');
-  var g=seatAllergies(identity).concat(seatAllergies('table')).map(function(x){return String(x).toLowerCase();});
-  return listed.filter(function(x){ return g.indexOf(String(x).toLowerCase())>-1; });
+  var g=seatAllergies(identity).concat(seatAllergies('table'));
+  return listed.filter(function(x){ return g.some(function(y){return allergensConflict(x,y);}); });
 }
 var SEATABLE = {table:1, stool:1, outdoor:1, couch:1};
 
@@ -8881,7 +8897,7 @@ function guestAllergyHits(allergens){
   Object.keys(seats).forEach(function(k){
     (seats[k]||[]).forEach(function(a){
       listed.forEach(function(x){
-        if (String(x).toLowerCase()===String(a).toLowerCase() && flagged.indexOf(x)<0) flagged.push(x);
+        if (allergensConflict(x,a) && flagged.indexOf(x)<0) flagged.push(x);
       });
     });
   });
@@ -8917,7 +8933,7 @@ function courseAllergyKitchenNote(c, identity, table){
   var flags=identity==null?flaggedAllergies():exactPositionAllergyContext(identity,table).effectiveAllergens;
   var name=String((c&&(c.choice||c.name||c.course))||'').toLowerCase();
   var notes=[];
-  function has(a){ return flags.some(function(x){ return String(x).toLowerCase()===a; }); }
+  function has(a){ return flags.some(function(x){ return allergensConflict(x,a); }); }
   if (has('fish') && /salmon/.test(name)) notes.push('ALLERGY FISH — replace this salmon. Keep ticket as Salmon.');
   if (has('gluten') && /salmon/.test(name)) notes.push('ALLERGY GLUTEN — no bread / no brioche.');
   if (has('gluten') && /zucchini/.test(name)) notes.push('ALLERGY GLUTEN — replace breaded zucchini.');
@@ -9205,7 +9221,7 @@ function orderLineAllergyWarning(line){
 }
 function manualMenuAllergyWarning(courses, identity, table){
   var context=exactPositionAllergyContext(identity,table);
-  var conflicts=(courses||[]).filter(function(c){return !c.noneChoice&&!c.headingOnly;}).map(function(c){var hits=asList(c.allergens).filter(function(a){return context.effectiveAllergens.some(function(b){return String(a).toLowerCase()===String(b).toLowerCase();});});return hits.length?{name:c.choice||c.name||c.course,hits:hits}:null;}).filter(Boolean);
+  var conflicts=(courses||[]).filter(function(c){return !c.noneChoice&&!c.headingOnly;}).map(function(c){var hits=asList(c.allergens).filter(function(a){return context.effectiveAllergens.some(function(b){return allergensConflict(a,b);});});return hits.length?{name:c.choice||c.name||c.course,hits:hits}:null;}).filter(Boolean);
   if(!conflicts.length) return false;
   var html='<div class="manual-preadd-warning" role="alert">Position '+esc(identity)+' — allergy conflict: '+conflicts.map(function(c){return esc(c.name)+': '+esc(c.hits.join(', '));}).join(' · ')+'</div><p>Nothing added. A substitution note does not remove BOH allergens. Choose a compatible published option. No override is authorized; notes never resolve an allergen conflict.</p>';
   var target=document.querySelector('#pf-overlay.show .pf-selector')||document.querySelector('#sheet-overlay.show .sheet');
