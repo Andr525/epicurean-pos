@@ -2604,12 +2604,26 @@ function normalizeAllergenLabel(value){
     'groundnut':'peanut','groundnuts':'peanut','ground nut':'peanut','ground nuts':'peanut',
     'egg':'egg','eggs':'egg','sulfite':'sulfites','sulfites':'sulfites',
     'sulphite':'sulfites','sulphites':'sulfites'};
-  return Object.prototype.hasOwnProperty.call(aliases,label)?aliases[label]:label;
+  if(Object.prototype.hasOwnProperty.call(aliases,label)) return aliases[label];
+  // This input is BOH/guest allergen metadata, never a dish name or substitution note.
+  // Resolve named nuts and annotated labels; ambiguous nut metadata fails closed.
+  var tokens=label.replace(/[^a-z ]/g,' ').split(/\s+/).filter(Boolean);
+  var treeNames=/^(?:almonds?|hazelnuts?|filberts?|walnuts?|cashews?|pecans?|pistachios?|macadamias?|brazilnuts?|pinenuts?)$/;
+  var tree=/\btree ?nuts?\b/.test(label)||/\b(?:brazil|pine) nuts?\b/.test(label)||tokens.some(function(t){return treeNames.test(t);});
+  var peanut=/\b(?:peanuts?|ground ?nuts?)\b/.test(label);
+  var unknown=tokens.some(function(t){return /nuts?$/.test(t)&&!treeNames.test(t)&&
+    !/^(?:nut|nuts|peanuts?|groundnuts?|treenuts?|donuts?|doughnuts?)$/.test(t);});
+  if(unknown||(tree&&peanut)) return 'unknown nut';
+  if(tree) return 'tree nut';
+  if(peanut) return 'peanut';
+  if(tokens.some(function(t){return /^nuts?$/.test(t);})) return 'unknown nut';
+  return label;
 }
 function allergensConflict(left,right){
   var a=normalizeAllergenLabel(left),b=normalizeAllergenLabel(right);
   if(!a||!b) return false;
-  return a===b || (a==='nuts'&&(b==='tree nut'||b==='peanut')) ||
+  return a===b || (a==='unknown nut'&&/^(nuts|tree nut|peanut)$/.test(b)) ||
+    (b==='unknown nut'&&/^(nuts|tree nut|peanut)$/.test(a)) || (a==='nuts'&&(b==='tree nut'||b==='peanut')) ||
     (b==='nuts'&&(a==='tree nut'||a==='peanut'));
 }
 function allergenHits(item, seat){
