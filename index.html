@@ -2378,7 +2378,7 @@ function checkPositionIdentities(){
 function selectedPositionIdentity(){ return STATE.activePositionCheck===activeCheckId() && STATE.activePositionIdentity && checkPositionIdentities().includes(STATE.activePositionIdentity) && parseInt(STATE.activePositionIdentity,10)===Number(STATE.activeSeat) ? STATE.activePositionIdentity : positionLabel(STATE.activeSeat); }
 function setActivePositionIdentity(identity){
   if(!checkPositionIdentities().includes(identity)) return;
-  STATE.activePositionIdentity=identity;STATE.activePositionCheck=activeCheckId();STATE.activeSeat=parseInt(identity,10);STATE.allergySeat=identity;STATE.allergyOpen=true;renderOrder();paintChrome();
+  STATE.activePositionIdentity=identity;STATE.activePositionCheck=activeCheckId();STATE.activeSeat=parseInt(identity,10);STATE.allergySeat=identity;STATE.allergyOpen=true;if(STATE.pendingItem)assignPendingPosition(identity);renderOrder();paintChrome();
 }
 function seatHasPrixFixe(seat, priority){
   var base=seat==null?STATE.activeSeat:seat;
@@ -5623,7 +5623,7 @@ function setActiveSeat(seat){
   STATE.activeSeat=seat;
   STATE.allergySeat=seat;
   STATE.allergyOpen=true;
-  if (STATE.pendingItem) STATE.pendingItem.seat=seat;
+  if (STATE.pendingItem) assignPendingPosition(selectedPositionIdentity());
   renderOrder();
   paintChrome();
 }
@@ -6340,6 +6340,7 @@ function replaceSelectedItem(){
   STATE._replaceLineId=line.lineId;
   STATE._replaceCtx={
     seat:line.seat,
+    seatPriority:line.seatPriority!=null?line.seatPriority:isPriorityPosition(line.seat),
     serviceCourse:line.serviceCourse!=null?line.serviceCourse:line.course,
     ticketPos:line.ticketPos,
     checkId:line.checkId,
@@ -9397,7 +9398,7 @@ function beginAddItem(itemId) {
   STATE.pendingItem.serviceCourse=STATE.pendingItem.course;
   if (STATE._replaceCtx) {
     var ctx=STATE._replaceCtx;
-    STATE.pendingItem.seat=ctx.seat;
+    if(!assignPendingPosition(String(ctx.seat)+(ctx.seatPriority?'A':''))){STATE.pendingItem=null;toast('Original exact position unavailable');return;}
     if (ctx.serviceCourse!=null) {
       STATE.pendingItem.course=ctx.serviceCourse;
       STATE.pendingItem.serviceCourse=ctx.serviceCourse;
@@ -9428,20 +9429,47 @@ function beginAddItem(itemId) {
   maybeAllergyThenAdd();
 }
 
+function assignPendingPosition(identity){
+  var p=STATE.pendingItem;identity=String(identity);
+  if(!p || (identity!=='table'&&!checkPositionIdentities().includes(identity))) return false;
+  if((p.checkId&&p.checkId!==activeCheckId()) || String(p.table)!==String(STATE.selectedTable)) return false;
+  p.seat=identity==='table'?'table':parseInt(identity,10);
+  p.seatPriority=identity!=='table'&&/A$/.test(identity);
+  return true;
+}
+function setPendingPosition(identity){
+  if(!assignPendingPosition(identity)){toast('Select an existing exact check position');return;}
+  renderModifierSheet();
+}
+function pendingPositionValid(p){
+  return !!p&&String(p.table)===String(STATE.selectedTable)&&(!p.checkId||p.checkId===activeCheckId())&&(p.seat==='table'?!p.seatPriority:checkPositionIdentities().includes(orderPositionIdentity(p)));
+}
+function addPendingGuestSeat(){
+  if(!pendingPositionValid(STATE.pendingItem)){toast('Finish the current check edit first');return;}
+  var sess=sessionOf(STATE.selectedTable),check=STATE.checks[activeCheckId()];
+  var next=Math.max(sess.guestCount||2,...checkPositionIdentities().map(function(p){return parseInt(p,10);})) + 1;
+  if(next>20){toast('Maximum position reached');return;}
+  sess.guestCount=next;STATE.guestCount=next;
+  if(check&&Array.isArray(check.positionIdentities)) check.positionIdentities.push(String(next));
+  // Explicit manual Add seat registers authority before selecting, never copies a suffix.
+  persistCheck(check||ensureOpenCheck(STATE.selectedTable));setPendingPosition(String(next));
+}
 function renderModifierSheet(){
   var p=STATE.pendingItem; if(!p) return;
   var html='<h2>'+p.name+'</h2>';
   if (p.extraPlate) {
-    html+='<p class="sheet-sub">'+esc(seatName(p.seat))+'</p>';
+    html+='<p class="sheet-sub">'+esc(seatName(orderPositionIdentity(p)))+'</p>';
   } else {
-    html+='<p class="sheet-sub">'+posLineMoney(p.price)+' · '+seatName(p.seat)+'</p>';
+    html+='<p class="sheet-sub">'+posLineMoney(p.price)+' · '+seatName(orderPositionIdentity(p))+'</p>';
   }
   if (isPosWineItem(p)) html+=wineGuideHtml(p);
   html+='<div class="tasting-section-label">Seat</div><div class="seat-pick-list">';
   var n=sessionOf(STATE.selectedTable).guestCount||2;
-  html+='<button type="button" class="'+(p.seat==='table'?'active':'')+'" onclick="STATE.pendingItem.seat=\'table\';renderModifierSheet()">Share</button>';
-  for (var i=1;i<=n;i++) html+='<button type="button" class="'+(String(p.seat)===String(i)?'active':'')+'" onclick="STATE.pendingItem.seat='+i+';renderModifierSheet()">Seat '+i+'</button>';
-  html+='<button type="button" onclick="var s=sessionOf(STATE.selectedTable);s.guestCount=Math.min(20,(s.guestCount||2)+1);STATE.guestCount=s.guestCount;STATE.pendingItem.seat=s.guestCount;renderModifierSheet()">+ Add seat</button></div>';
+  html+='<button type="button" data-pending-position="table" class="'+(p.seat==='table'?'active':'')+'" onclick="setPendingPosition(\'table\')">Share</button>';
+  checkPositionIdentities().forEach(function(identity){
+    html+='<button type="button" data-pending-position="'+esc(identity)+'" class="'+(orderPositionIdentity(p)===identity?'active':'')+'" onclick="'+esc('setPendingPosition('+JSON.stringify(identity)+')')+'">Seat '+esc(identity)+'</button>';
+  });
+  html+='<button type="button" onclick="addPendingGuestSeat()">+ Add seat</button></div>';
   html+='<div class="tasting-section-label">Quantity</div><div class="qty-row">';
   html+='<button type="button" onclick="STATE.pendingItem.qty=Math.max(1,(STATE.pendingItem.qty||1)-1);renderModifierSheet()">−</button>';
   html+='<div style="font-size:1.3rem;font-weight:800;">'+(p.qty||1)+'</div>';
@@ -9501,6 +9529,7 @@ function modifiersReady(p){
 }
 function maybeAllergyThenAdd(){
   var p=STATE.pendingItem; if(!p) return;
+  if(!pendingPositionValid(p)){toast('Invalid exact position or check; no item added');return;}
   var hits=allergenHits(p, p.seat);
   if (hits.length) {
     openSheet(
@@ -9516,6 +9545,7 @@ function maybeAllergyThenAdd(){
 }
 function commitPendingItem(){
   var p=STATE.pendingItem; if(!p) return;
+  if(!pendingPositionValid(p)){toast('Invalid exact position or check; no item added');return;}
   if (!modifiersReady(p)) { toast('Choose required modifiers'); return; }
   if (STATE._voiceCommit) p.voiceOrigin=true;
   settleVoiceDraftForItem(p.id);
@@ -9551,7 +9581,7 @@ function commitPendingItem(){
     toast('Updated '+p.name);
   } else {
     STATE.currentOrder.push(p);
-    toast('+ '+p.name+' · '+seatName(p.seat));
+    toast('+ '+p.name+' · '+seatName(orderPositionIdentity(p)));
   }
   persistCheck(ensureOpenCheck(STATE.selectedTable));
   closeSheet();

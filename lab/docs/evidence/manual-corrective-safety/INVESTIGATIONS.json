@@ -1,0 +1,31 @@
+{
+  "mode": "source-backed local investigation",
+  "cases": [
+    {
+      "id": "C2-local-check-roundtrip",
+      "status": "failed",
+      "persistedAllergies": null,
+      "restored": {
+        "table": []
+      },
+      "limitation": "Actual persistCheck serialization + ingestOpenChecks; no live Firebase or physical reload"
+    },
+    {
+      "id": "C3-substitution-editor",
+      "status": "failed",
+      "controls": [
+        "1",
+        "2",
+        "3"
+      ]
+    },
+    {
+      "id": "C3-exact-substitution-lookup",
+      "status": "failed",
+      "actual": "2A — LAB NOTE FOR 2",
+      "expected": "2A — LAB NOTE FOR 2A"
+    }
+  ],
+  "kitchenActions": 0,
+  "firebaseWrites": 0
+}

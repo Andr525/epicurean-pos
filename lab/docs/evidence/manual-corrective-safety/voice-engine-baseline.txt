@@ -1,0 +1,203 @@
+node:internal/modules/run_main:123
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: function beginAddItem
++ actual - expected
+... Skipped lines
+
+  'function beginAddItem(itemId) {\n' +
+    '  var items=STATE.menuItems.length?STATE.menuItems:SEED_ITEMS;\n' +
+    '  var item=items.find(function(i){return i.id===itemId;});\n' +
+    '  if (!item) return;\n' +
+    "  if (item.eightySixed) { toast('86 — not available'); return; }\n" +
+...
+    '    seat:STATE.activeSeat,\n' +
++   '    seatPriority:/A$/.test(selectedPositionIdentity()),\n' +
+    '    course:defaultCourse(item),\n' +
+    '    held:false,\n' +
+    '    checkId:activeCheckId(),\n' +
+    '    qty:1,\n' +
+    "    notes:'',\n" +
+
+    at file:///tmp/epicurean-voice-baseline-2ff/test/voice-engine.mjs:791:10
+    at Array.forEach (<anonymous>)
+    at file:///tmp/epicurean-voice-baseline-2ff/test/voice-engine.mjs:790:3 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 'function beginAddItem(itemId) {\n' +
+    '  var items=STATE.menuItems.length?STATE.menuItems:SEED_ITEMS;\n' +
+    '  var item=items.find(function(i){return i.id===itemId;});\n' +
+    '  if (!item) return;\n' +
+    "  if (item.eightySixed) { toast('86 — not available'); return; }\n" +
+    '  var price=Number(item.price)||0;\n' +
+    '  var dining=tableHasDining() && !isDrinkItem(item);\n' +
+    '  var extraFee=dining ? extraPlateFee(item) : 0;\n' +
+    '  var surcharge=dining ? extraOnItem(item) : 0;\n' +
+    '  if (dining) price=extraFee+surcharge;\n' +
+    '  STATE.pendingItem={\n' +
+    '    lineId:genId(),\n' +
+    '    table:STATE.selectedTable,\n' +
+    '    seat:STATE.activeSeat,\n' +
+    '    seatPriority:/A$/.test(selectedPositionIdentity()),\n' +
+    '    course:defaultCourse(item),\n' +
+    '    held:false,\n' +
+    '    checkId:activeCheckId(),\n' +
+    '    qty:1,\n' +
+    "    notes:'',\n" +
+    "    selectedMod:dining?'Extra plate':null,\n" +
+    '    mods:{},\n' +
+    '    extraPlate:dining,\n' +
+    '    extraFee:extraFee,\n' +
+    '    itemSurcharge:surcharge,\n' +
+    '    id:item.id,\n' +
+    '    name:item.name,\n' +
+    '    price:price,\n' +
+    '    category:item.category,\n' +
+    '    catIds:item.catIds,\n' +
+    '    station:item.station,\n' +
+    '    cookTime:item.cookTime||item.cookMin||0,\n' +
+    '    modifiers:(function(){\n' +
+    '      var mods=item.modifiers||[];\n' +
+    '      if (isPosWineItem(item) && !item.byTheGlass && !item.scaliniOnly) {\n' +
+    "        mods=mods.filter(function(m){ return m && String(m.group||'')!=='Pour'; });\n" +
+    '      }\n' +
+    '      return mods;\n' +
+    '    })(),\n' +
+    '    allergens:item.allergens||[],\n' +
+    '    dietaryFlags:item.dietaryFlags||item.dietary||[],\n' +
+    "    description:item.description||item.desc||'',\n" +
+    "    source:item.source||'menu',\n" +
+    '    bottleOz:item.bottleOz,\n' +
+    "    producer:item.producer||'',\n" +
+    "    vintage:item.vintage||'',\n" +
+    "    region:item.region||'',\n" +
+    "    country:item.country||'',\n" +
+    "    varietal:item.varietal||item.grape||'',\n" +
+    "    grape:item.grape||item.varietal||'',\n" +
+    '    byTheGlass:!!item.byTheGlass,\n' +
+    '    scaliniOnly:!!item.scaliniOnly\n' +
+    '  };\n' +
+    '  STATE.pendingItem.serviceCourse=STATE.pendingItem.course;\n' +
+    '  if (STATE._replaceCtx) {\n' +
+    '    var ctx=STATE._replaceCtx;\n' +
+    '    STATE.pendingItem.seat=ctx.seat;\n' +
+    '    if (ctx.serviceCourse!=null) {\n' +
+    '      STATE.pendingItem.course=ctx.serviceCourse;\n' +
+    '      STATE.pendingItem.serviceCourse=ctx.serviceCourse;\n' +
+    '    }\n' +
+    '    if (ctx.ticketPos!=null) STATE.pendingItem.ticketPos=ctx.ticketPos;\n' +
+    '    if (ctx.checkId) STATE.pendingItem.checkId=ctx.checkId;\n' +
+    '    STATE.pendingItem.mods={};\n' +
+    '    if (ctx.extraPlate) {\n' +
+    '      STATE.pendingItem.extraPlate=true;\n' +
+    '      STATE.pendingItem.pfExtra=!!ctx.pfExtra;\n' +
+    '      STATE.pendingItem.pfCourseKind=ctx.pfCourseKind||extraKindOf(STATE.pendingItem);\n' +
+    "      STATE.pendingItem.selectedMod='Extra plate';\n" +
+    '    } else {\n' +
+    '      STATE.pendingItem.extraPlate=false;\n' +
+    '      STATE.pendingItem.pfExtra=false;\n' +
+    '      STATE.pendingItem.selectedMod=null;\n' +
+    '    }\n' +
+    '  }\n' +
+    '  if (dining && !STATE._replaceCtx) {\n' +
+    '    STATE.pendingItem.pfCourseKind=extraKindOf(STATE.pendingItem);\n' +
+    '    STATE.pendingItem.ticketPos=defaultTicketPosForKind(STATE.pendingItem.pfCourseKind)+1;\n' +
+    '    STATE.pendingItem.serviceCourse=({app:2,main:3,des:4,drink:1}[STATE.pendingItem.pfCourseKind]||STATE.pendingItem.course);\n' +
+    '  }\n' +
+    '  if (dining || isPosWineItem(item) || (STATE.pendingItem.modifiers&&STATE.pendingItem.modifiers.length)) {\n' +
+    '    renderModifierSheet();\n' +
+    '    return;\n' +
+    '  }\n' +
+    '  maybeAllergyThenAdd();\n' +
+    '}',
+  expected: 'function beginAddItem(itemId) {\n' +
+    '  var items=STATE.menuItems.length?STATE.menuItems:SEED_ITEMS;\n' +
+    '  var item=items.find(function(i){return i.id===itemId;});\n' +
+    '  if (!item) return;\n' +
+    "  if (item.eightySixed) { toast('86 — not available'); return; }\n" +
+    '  var price=Number(item.price)||0;\n' +
+    '  var dining=tableHasDining() && !isDrinkItem(item);\n' +
+    '  var extraFee=dining ? extraPlateFee(item) : 0;\n' +
+    '  var surcharge=dining ? extraOnItem(item) : 0;\n' +
+    '  if (dining) price=extraFee+surcharge;\n' +
+    '  STATE.pendingItem={\n' +
+    '    lineId:genId(),\n' +
+    '    table:STATE.selectedTable,\n' +
+    '    seat:STATE.activeSeat,\n' +
+    '    course:defaultCourse(item),\n' +
+    '    held:false,\n' +
+    '    checkId:activeCheckId(),\n' +
+    '    qty:1,\n' +
+    "    notes:'',\n" +
+    "    selectedMod:dining?'Extra plate':null,\n" +
+    '    mods:{},\n' +
+    '    extraPlate:dining,\n' +
+    '    extraFee:extraFee,\n' +
+    '    itemSurcharge:surcharge,\n' +
+    '    id:item.id,\n' +
+    '    name:item.name,\n' +
+    '    price:price,\n' +
+    '    category:item.category,\n' +
+    '    catIds:item.catIds,\n' +
+    '    station:item.station,\n' +
+    '    cookTime:item.cookTime||item.cookMin||0,\n' +
+    '    modifiers:(function(){\n' +
+    '      var mods=item.modifiers||[];\n' +
+    '      if (isPosWineItem(item) && !item.byTheGlass && !item.scaliniOnly) {\n' +
+    "        mods=mods.filter(function(m){ return m && String(m.group||'')!=='Pour'; });\n" +
+    '      }\n' +
+    '      return mods;\n' +
+    '    })(),\n' +
+    '    allergens:item.allergens||[],\n' +
+    '    dietaryFlags:item.dietaryFlags||item.dietary||[],\n' +
+    "    description:item.description||item.desc||'',\n" +
+    "    source:item.source||'menu',\n" +
+    '    bottleOz:item.bottleOz,\n' +
+    "    producer:item.producer||'',\n" +
+    "    vintage:item.vintage||'',\n" +
+    "    region:item.region||'',\n" +
+    "    country:item.country||'',\n" +
+    "    varietal:item.varietal||item.grape||'',\n" +
+    "    grape:item.grape||item.varietal||'',\n" +
+    '    byTheGlass:!!item.byTheGlass,\n' +
+    '    scaliniOnly:!!item.scaliniOnly\n' +
+    '  };\n' +
+    '  STATE.pendingItem.serviceCourse=STATE.pendingItem.course;\n' +
+    '  if (STATE._replaceCtx) {\n' +
+    '    var ctx=STATE._replaceCtx;\n' +
+    '    STATE.pendingItem.seat=ctx.seat;\n' +
+    '    if (ctx.serviceCourse!=null) {\n' +
+    '      STATE.pendingItem.course=ctx.serviceCourse;\n' +
+    '      STATE.pendingItem.serviceCourse=ctx.serviceCourse;\n' +
+    '    }\n' +
+    '    if (ctx.ticketPos!=null) STATE.pendingItem.ticketPos=ctx.ticketPos;\n' +
+    '    if (ctx.checkId) STATE.pendingItem.checkId=ctx.checkId;\n' +
+    '    STATE.pendingItem.mods={};\n' +
+    '    if (ctx.extraPlate) {\n' +
+    '      STATE.pendingItem.extraPlate=true;\n' +
+    '      STATE.pendingItem.pfExtra=!!ctx.pfExtra;\n' +
+    '      STATE.pendingItem.pfCourseKind=ctx.pfCourseKind||extraKindOf(STATE.pendingItem);\n' +
+    "      STATE.pendingItem.selectedMod='Extra plate';\n" +
+    '    } else {\n' +
+    '      STATE.pendingItem.extraPlate=false;\n' +
+    '      STATE.pendingItem.pfExtra=false;\n' +
+    '      STATE.pendingItem.selectedMod=null;\n' +
+    '    }\n' +
+    '  }\n' +
+    '  if (dining && !STATE._replaceCtx) {\n' +
+    '    STATE.pendingItem.pfCourseKind=extraKindOf(STATE.pendingItem);\n' +
+    '    STATE.pendingItem.ticketPos=defaultTicketPosForKind(STATE.pendingItem.pfCourseKind)+1;\n' +
+    '    STATE.pendingItem.serviceCourse=({app:2,main:3,des:4,drink:1}[STATE.pendingItem.pfCourseKind]||STATE.pendingItem.course);\n' +
+    '  }\n' +
+    '  if (dining || isPosWineItem(item) || (STATE.pendingItem.modifiers&&STATE.pendingItem.modifiers.length)) {\n' +
+    '    renderModifierSheet();\n' +
+    '    return;\n' +
+    '  }\n' +
+    '  maybeAllergyThenAdd();\n' +
+    '}',
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v22.23.3

@@ -1,3 +1,7 @@
+# Current corrective revision
+
+See CORRECTIVE-SAFETY-REVISION.md for C1 candidate repair, C2/C3 unresolved reproductions and new RCA. M30 remains compositeFAIL, formal0/60. Current manual smoke has4passing components, not a completed allergy/persistence acceptance row. Matrix nowpromotesmandatorydisclaimerM18 tocritical andnarrowsM47 tovisual-onlyminor, preserving52critical/8minor. UpdatedFirestoretencontracts are DESIGNONLY, not an approved/built transport. Historical owner-revision inventory follows; earlierM30pass refers only to its narrow editor/helper coverage.
+
 # Manual POS milestone inventory and delivery plan — owner revision
 
 Historical inventory baseline75ba5d8 and a529059. Current revision implements only the separate 2/2A allergy repair and stronger tests. OWNER-REQUIREMENTS.md controls staff/tax/tip/adjustment policy; FIRESTORE-ISOLATION-DESIGN.md is a proposal for Claude approval before any emulator build. Voice development is paused. “Implemented” means a code path exists; it does not mean reliable or accepted.

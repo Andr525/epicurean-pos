@@ -36,6 +36,15 @@
    assert(allergenHits({allergens:['Fish','Dairy','Sulfites'],seatPriority:false},2).join(',')==='Fish,Sulfites','2 warning ignores identity/table');assert(allergenHits({allergens:['Fish','Dairy','Sulfites'],seatPriority:true},2).join(',')==='Dairy,Sulfites','2A warning ignores identity/table');
    await act('tap','#sheet-overlay button[onclick*="saveAllergyKitchenNote();"]');await act('tap','#order-top button[onclick="openAllergyEditor()"]');assert(seatAllergies('2').includes('Fish')&&seatAllergies('2A').includes('Dairy')&&seatAllergies('table').includes('Sulfites'),'Allergy state lost on reopen');
   }},
+  {id:'manual-modifier-position',manualOnly:true,name:'C1 exact modifier positions and downstream Fish/Dairy warnings',issue:'MODIFIER_POSITION_IDENTITY',run:async()=>{
+   await base();const dish=EpicureanLab.fixture.menu.dishes.find(d=>d.id==='sf_m_forestiere');assert(dish,'Actual BOH allergen fixture missing');
+   sessionOf('14').allergies={table:[],2:['Fish'],'2A':['Dairy'],3:['Fish']};
+   for(const identity of ['3','2','2A','3']){
+    // Controlled pending-editor fixture from real BOH metadata; no standalone price is manufactured and no Add is confirmed.
+    STATE.pendingItem=Object.assign({},JSON.parse(JSON.stringify(dish)),{lineId:'lab-c1-pending',table:'14',checkId:activeCheckId(),seat:2,seatPriority:true,qty:1,mods:{},modifiers:[],notes:''});EpicureanLab.currentCase.steps.push({kind:'fixture',value:'actual BOH pending metadata at2A; no standalone-price claim'});renderModifierSheet();
+    await act('tap','[data-pending-position="'+identity+'"]');assert(orderPositionIdentity(STATE.pendingItem)===identity,'Phantom position created');assert(checkPositionIdentities().includes(orderPositionIdentity(STATE.pendingItem)),'Unregistered position created');await act('tap','#sheet-overlay button[onclick="maybeAllergyThenAdd()"]');const body=document.querySelector('#sheet-overlay').innerText;assert(body.includes('Seat '+identity+' flagged: '+(identity==='2A'?'Dairy':'Fish')),'Exact guest allergy warning missing');assert(!STATE.currentOrder.length,'Allergy warning bypassed');await act('tap','#sheet-overlay button[onclick="closeSheet()"]');
+   }
+  }},
   {id:'manual-menu',name:'Manual menu and authoritative price',run:async()=>{
    await base();await act('tap','.seat-chip[data-seat="2A"]');await act('tap','.period-tabs button:nth-child(3)');if(!document.querySelector('#pf-overlay.show'))await act('tap','.ts-tile[onclick*="openPrixFixeSelector"]');
    const menu=EpicureanLab.fixture.menu;for(const [id,courseId] of [['sf_p_linguini','pfc_primi'],['sf_m_pork','pfc_main']]){const ci=menu.courses.findIndex(c=>c.id===courseId),oi=menu.courses[ci].options.findIndex(o=>o.id===id);await act('tap','label:has(input[name="pf-course-'+ci+'"][value="'+oi+'"])');if(id==='sf_m_pork')await act('tap','label:has(input[name="pf-temp-'+ci+'-'+oi+'"][value="Medium"])');}

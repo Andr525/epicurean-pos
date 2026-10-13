@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "milestone": "Manual POS first 60",
-  "baselineCommit": "a529059d295902e6df4e0eaf8467cbf4564c54c2",
-  "phase": "owner-requirements revision; formal acceptance held at zero",
+  "baselineCommit": "2ff42a75fc84762854e73854e4ac88abe196005d",
+  "phase": "corrective safety review; C1 repair candidate, C2/C3 unresolved; formal0",
   "criticalTarget": 52,
   "minorTarget": 8,
   "formalAccepted": 0,
@@ -28,8 +28,8 @@
       "severity": "critical",
       "finding": "Allergy editor enumerates numeric seats, not separate explicit 2/2A",
       "code": "index.html:10133",
-      "status": "Repair automated and internal-independent checks PASS; physical/legacy-to-explicit migration/Claude review pending",
-      "cyclesObserved": 1,
+      "status": "C1 modifier candidate passes; composite allergy safety remains failed due C2/C3",
+      "cyclesObserved": 2,
       "evidence": "../../lab/docs/evidence/manual-owner-revisions/results.json"
     },
     {
@@ -71,6 +71,20 @@
       "code": "index.html:10946; setCustomTip/checkTotals",
       "status": "source-confirmed owner-requirement gap; blocked implementation",
       "cyclesObserved": 0
+    },
+    {
+      "id": "C2",
+      "severity": "critical",
+      "finding": "persistCheck omits allergies; ingestOpenChecks does not restore them",
+      "status": "UNRESOLVED; reproduced local serialization/ingest, not live Firebase test",
+      "cyclesObserved": 1
+    },
+    {
+      "id": "C3",
+      "severity": "critical",
+      "finding": "Substitution editor numeric-only and 2A lookup uses2 note; kernel allergy note flattened by globalflags",
+      "status": "UNRESOLVED; editor/lookup reproduced; note payload source-inspected, no SEND called",
+      "cyclesObserved": 1
     }
   ],
   "tests": [
@@ -116,9 +130,9 @@
     {
       "id": "M04",
       "group": "Auth",
-      "name": "Valid and invalid PIN",
+      "name": "Backend PIN session lifecycle",
       "severity": "critical",
-      "acceptance": "Valid authorized staff enters; invalid PIN changes no orders; use synthetic staff",
+      "acceptance": "Verify PIN at backend, not client role. Invalid PIN, expiry, logout/relogin, staff switch, revoked grant and forged session/token are denied at each action boundary; no old session can mutate new check.",
       "automated": "NOT_RUN",
       "physical": "NOT_RUN",
       "independent": "PENDING",
@@ -129,9 +143,9 @@
     {
       "id": "M05",
       "group": "Auth",
-      "name": "Action-boundary permissions and manager audit",
+      "name": "Authorization, manager approvals and replay",
       "severity": "critical",
-      "acceptance": "Server/manager SEND+FIRE; scoped kitchen FIRE only; kitchen SEND denied. Every void/comp/discount requires fresh valid manager code, immutable manager/initiator/action/time/check/item/reason/before-after audit. Direct calls and stale/revoked grants denied.",
+      "acceptance": "Direct SEND/FIRE/void/comp/discount calls enforce current staff/manager/kitchen grant and owned check; fresh manager code approval exact action/amount/item/revision/reason; wrong/expired/revoked/reused approval or altered request replay denied with zero mutation; same finalized request returns one immutable audit/result.",
       "automated": "BLOCKED",
       "physical": "NOT_RUN",
       "independent": "PENDING",
@@ -304,15 +318,16 @@
     {
       "id": "M18",
       "group": "UI",
-      "name": "Customer-menu policy and readability",
-      "severity": "minor",
-      "acceptance": "Top-of-menu tipping disclaimer on every actual customer-menu route; long product/VIN/size readable. Financial correctness remains critical in M13/M45.",
-      "automated": "NOT_RUN",
+      "name": "Critical customer-menu tipping disclaimer",
+      "severity": "critical",
+      "acceptance": "Mandatory tipping disclaimer at top of EVERY actual guest-menu route, including food/wine/PF/tasting/alternate entrypoints; absent/hidden/stale copy fails critical acceptance. Valid tax-inclusive20/25/40/Custom>=20 policy and displayed totals must agree.",
+      "automated": "BLOCKED",
       "physical": "NOT_RUN",
       "independent": "PENDING",
-      "gate": "Implement exact screen scenario; existing regression evidence is not acceptance credit",
+      "gate": "Customer menu routes and mandated disclaimer not implemented/verified",
       "firstCycle": 1,
-      "simulatedTransport": "NOT_RUN"
+      "simulatedTransport": "NOT_RUN",
+      "blockedBy": "unimplemented_customer_disclaimer"
     },
     {
       "id": "M19",
@@ -369,9 +384,9 @@
     {
       "id": "M23",
       "group": "Positions",
-      "name": "Move item position",
+      "name": "Exact position edits and reorder ownership",
       "severity": "critical",
-      "acceptance": "Authorized unsent move changes one exact identity without merging checks",
+      "acceptance": "Owned unsent move/modifier/replace/reorder retains exact2/2A/3, check/line identity and guest allergy lookup; no carried suffix or phantom. Safety aspects removed from visual-only M47 remain critical here.",
       "automated": "NOT_RUN",
       "physical": "NOT_RUN",
       "independent": "PENDING",
@@ -421,9 +436,9 @@
     {
       "id": "M27",
       "group": "Manual order",
-      "name": "Add food/quantity",
+      "name": "Manual Add/confirm rapid double-tap",
       "severity": "critical",
-      "acceptance": "Actual visible controls create intended item and quantity on exact check",
+      "acceptance": "Real BOH item/quantity added to exact owned check. Rapid double-tap Add/confirm and retry while pending yield one operation/line/menu, not two charges; direct duplicate request tested, not only disabled button.",
       "automated": "BLOCKED",
       "physical": "NOT_RUN",
       "independent": "PENDING",
@@ -435,9 +450,9 @@
     {
       "id": "M28",
       "group": "Manual order",
-      "name": "Choose course",
+      "name": "Critical course/identity after editing",
       "severity": "critical",
-      "acceptance": "Starter/main/dessert course assignment changes only intended unsent line",
+      "acceptance": "Starter/main/dessert assignment and reorder/replace retain intended course and stable line/check/position without changing wrong guest or charge. Reordering safety remains critical here and M60.",
       "automated": "NOT_RUN",
       "physical": "NOT_RUN",
       "independent": "PENDING",
@@ -448,9 +463,9 @@
     {
       "id": "M29",
       "group": "Allergies",
-      "name": "Table allergy",
+      "name": "Allergy changes including AFTER SEND",
       "severity": "critical",
-      "acceptance": "BOH allergen warning appears before food confirmation and remains attached",
+      "acceptance": "Table/guest restrictions appear before confirmation and remain scoped. Allergy added after local approved SEND creates durable safety change/notification for affected intents, invalidates stale FIRE/overrides and requires acknowledgment; fired history retained, never falsely unsent.",
       "automated": "NOT_RUN",
       "physical": "NOT_RUN",
       "independent": "PENDING",
@@ -461,16 +476,23 @@
     {
       "id": "M30",
       "group": "Allergies",
-      "name": "Distinct 2/2A allergies and table restrictions",
+      "name": "Complete exact-position allergy safety and recovery",
       "severity": "critical",
-      "acceptance": "Separate exact-identity editor/inline controls; independent toggles/removal/reopen; table-wide restrictions applied to both; legacy numeric allergy keys retained. No inference of new seats.",
-      "automated": "PASS",
+      "acceptance": "Separate2/2A/3 editor+modifier warnings; every transition resets suffix and rejects phantom; table restrictions and legacy map retained; removal/reopen/reload/cold recovery preserves allergies; substitutions and kitchen allergy notes retain exact guest identity. C1 pass alone cannot accept row while C2/C3 fail.",
+      "automated": "FAIL",
       "physical": "NOT_RUN",
-      "independent": "Internal verifier reproduced; Claude external review PENDING",
-      "gate": "Automated/independent repair checks pass; physical and durable/backend verification pending; formal0",
+      "independent": "Internal verifier reproduced C1 pass and C2/C3 failures; external Claude PENDING",
+      "gate": "C2 projection/restore and C3 exact substitutions/notes still fail; no formal acceptance",
       "firstCycle": 1,
-      "evidence": "../../lab/docs/evidence/manual-owner-revisions/results.json",
-      "simulatedTransport": "NOT_RUN"
+      "evidence": "../../lab/docs/evidence/manual-corrective-safety/INVESTIGATIONS.json",
+      "simulatedTransport": "NOT_RUN",
+      "components": {
+        "C1": "PASS unit/browser candidate",
+        "C2": "FAIL local serialization/ingest",
+        "C3": "FAIL editor and lookup; note payload source gap",
+        "durableTransport": "BLOCKED",
+        "physical": "NOT_RUN"
+      }
     },
     {
       "id": "M31",
@@ -686,10 +708,10 @@
     },
     {
       "id": "M47",
-      "group": "Editing",
-      "name": "Move/reorder/course edit",
-      "severity": "critical",
-      "acceptance": "Stable line identities and seat/course maintained after sequence changes",
+      "group": "UI",
+      "name": "Visual-only reorder usability",
+      "severity": "minor",
+      "acceptance": "Row resequencing/readability/navigation presents stable order clearly. This minor row excludes safety correctness: exact item/check/seat ownership is critical M23, course/charges critical M28/M45, serialized safety critical M60.",
       "automated": "NOT_RUN",
       "physical": "NOT_RUN",
       "independent": "PENDING",
@@ -766,9 +788,9 @@
     {
       "id": "M53",
       "group": "Persistence",
-      "name": "Browser reload recovery",
+      "name": "Durable allergy/check reload recovery",
       "severity": "critical",
-      "acceptance": "Restore full structured unsent items, modifiers, PF selections and stable IDs",
+      "acceptance": "Real full-page reload/cold backend restart restores complete structured lines/PF/modifiers, exact2/2A allergies/substitutions/notes and revisions. No reset-fixture or reconstructed display text substitute; serialized/ingested allergy loss fails.",
       "automated": "BLOCKED",
       "physical": "NOT_RUN",
       "independent": "PENDING",
@@ -780,9 +802,9 @@
     {
       "id": "M54",
       "group": "Persistence",
-      "name": "Offline recovery/retry",
+      "name": "Offline/retry/request reconciliation",
       "severity": "critical",
-      "acceptance": "Clear failure state; no lost check or duplicate on approved retry",
+      "acceptance": "Clear offline/pending state; reconcile same stable operationId after reload/timeout, no lost allergy/check or duplicate; stale/expired authorization cannot be replayed; late allergy revision cancels stale confirmation.",
       "automated": "BLOCKED",
       "physical": "NOT_RUN",
       "independent": "PENDING",
@@ -808,9 +830,9 @@
     {
       "id": "M56",
       "group": "Kitchen",
-      "name": "SEND action authorization and idempotency",
+      "name": "SEND authorization and rapid/replay idempotency",
       "severity": "critical",
-      "acceptance": "Active scoped server/manager may SEND; kitchen cannot. Validate check/line ownership and revisions at boundary; no caller supplied role override; retries produce one local intent.",
+      "acceptance": "Current active server/manager SEND allowed; kitchen denied; direct unauthorized/expired/revoked/foreign-check calls denied. Rapid double-tap/concurrent/retried local intent records one acknowledged effect with exact IDs.",
       "automated": "BLOCKED",
       "physical": "NOT_RUN",
       "independent": "PENDING",
@@ -822,9 +844,9 @@
     {
       "id": "M57",
       "group": "Kitchen",
-      "name": "FIRE permission and course/allergy gating",
+      "name": "FIRE authorization, late-allergy and replay gates",
       "severity": "critical",
-      "acceptance": "Server/manager and explicitly authorized active kitchen may FIRE; others/revoked grants denied at boundary. No implicit allergy waiver; pending choice/fired/check/2A identity verified in exact local payload.",
+      "acceptance": "Active scoped server/manager or explicitly granted kitchen may FIRE; direct bypass/stale session/revoked grant rejected. Pending choice, current allergy revision, exact2/2A and already-fired state checked; delayed or forged ACK cannot bypass safety; double taps/replays one effect.",
       "automated": "BLOCKED",
       "physical": "NOT_RUN",
       "independent": "PENDING",
@@ -882,9 +904,9 @@
     "minorAccepted": 0,
     "target": 60,
     "criticalTarget": 52,
-    "automatedPass": 1,
-    "automatedBlocked": 20,
-    "note": "M30 automated repair and internal-independent evidence PASS; formal0 pending external/applicable physical verification. No transport/financial acceptance claimed."
+    "criticalFailed": 1,
+    "criticalBlocked": 21,
+    "note": "M30 composite FAIL with C2/C3 unresolved even if four browser components pass; no formal acceptance"
   },
   "initialManualAudit": {
     "profile": "actual POS + tracked BOH fixtures; no live backend",
@@ -911,6 +933,48 @@
     "failed": 0,
     "aborted": 0,
     "artifact": "../../lab/docs/evidence/manual-owner-revisions/results.json",
-    "scope": "Expanded M30 repair screen test plus catalog/PF smoke; formal acceptance0/60"
+    "scope": "Expanded M30 repair screen test plus catalog/PF smoke; formal acceptance0/60",
+    "commit": "2ff42a7",
+    "historical": true
+  },
+  "classificationChange": {
+    "promoted": "M18 mandatory disclaimer becomes critical",
+    "demoted": "M47 narrowed to visual-only row usability; safety/ownership/course/charge assertions transferred to criticalM23/M28/M45/M60",
+    "critical": 52,
+    "minor": 8,
+    "reason": "Required disclaimer must gate acceptance; no safety requirement downgraded"
+  },
+  "requestedRevisionThemes": [
+    "R1 complete allergy recovery including C2/C3",
+    "R2 critical disclaimer all actual customer menus",
+    "R3 authorization/session/approval replay negative cases",
+    "R4 rapid double-tap and duplicate intent protection",
+    "R5 allergies introduced after SEND",
+    "R6 M30 composite complete-criteria gate; honest blocked/formal0 status"
+  ],
+  "reviewSource": "Owner-provided findings and C1 steps; original Claude attachments not supplied or reviewed",
+  "preExistingFailures": [
+    {
+      "test": "test/voice-engine.mjs",
+      "baselineCommit": "2ff42a7",
+      "status": "FAIL before and after; function beginAddItem byte-for-byte origin/main freeze assertion",
+      "evidence": "../../lab/docs/evidence/manual-corrective-safety/VOICE-BASELINE.md",
+      "action": "Documented; test/Voice unchanged; no Voice development resumed"
+    }
+  ],
+  "correctiveAudit": {
+    "browserComponents": {
+      "passed": 4,
+      "failed": 0,
+      "aborted": 0
+    },
+    "source": "real POS controls + declared fixture/fault injection; Chromium not physicaliPhone",
+    "artifact": "../../lab/docs/evidence/manual-corrective-safety/screens.json",
+    "C1": "baseline2ffFAIL; candidate unit/browser PASS; internally reproduced",
+    "C2": "UNRESOLVED local roundtrip FAIL",
+    "C3": "UNRESOLVED local editor/lookup FAIL; note payload source-inspected",
+    "physical": "NOT_RUN",
+    "simulatedTransport": "NOT_RUN",
+    "formalAccepted": 0
   }
 }

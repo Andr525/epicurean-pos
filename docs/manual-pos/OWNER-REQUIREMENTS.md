@@ -33,6 +33,6 @@ Top of EVERY customer-menu surface: a visible tipping-policy disclaimer, not onl
 
 ## Consolidated matrix and evidence
 
-Keep M01–M60 only, 52 critical/8 minor; every grouped test passes only when every mandatory subscenario passes. Owner-described Claude M61–M63 themes map into existing critical rows: sent-item void → M48; manager/audit trails → M05/M46/M48; totals integrity → M45. Manager comps/discounts → M46; tax → M12/M13/M45; tip validation → M13/M45/M60; customer disclaimer → M18 with financial correctness still critical. Cross-reference retained without adding M61–M63 as extra denominator rows.
+Keep M01–M60 only, 52 critical/8 minor; every grouped test passes only when every mandatory subscenario passes. Owner-described Claude M61–M63 themes map into existing critical rows: sent-item void → M48; manager/audit trails → M05/M46/M48; totals integrity → M45. Manager comps/discounts → M46; tax → M12/M13/M45; tip validation → M13/M45/M60; customer disclaimer → critical M18; financial correctness also critical. Cross-reference retained without adding M61–M63 as extra denominator rows.
 
 Automated browser results, simulated transport/emulator results, independent disposition and physical iPhone results are separate fields. Missing authentic BOH records produce BLOCKED, never PASS. Formal accepted stays 0/60 until verified. Source review and limited smoke evidence do not certify manager controls, tax, persistence or kitchen safety.
