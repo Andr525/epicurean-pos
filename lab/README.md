@@ -1,3 +1,7 @@
+# Current mobile ordering screen revision
+
+Use [iteration1 Mac/iPhone instructions, verification and limits](docs/MOBILE-ORDERING-ITERATION1.md). Branch `review/manual-pos-mobile-ordering-iteration1` retains FOOD/DRINKS, pins the live check and guest allergies during selection, restores category navigation, hides development controls and blocks known PF/tasting conflicts before adding. Physical owner testing pending. Earlier delivery notes follow.
+
 # Current manual POS hands-on pilot
 
 Start here: [Mac/iPhone opening instructions and testable workflow](docs/MANUAL-IPHONE-PILOT.md). Review branch `review/manual-pos-table-safety-pilot` adds split/late-menu/merge allergy regressions and a five-scenario manual screen audit. Formal acceptance remains0/60; durable database and physical verification pending. [Repair evidence](../docs/manual-pos/TABLE-SAFETY-PILOT.md).

@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "milestone": "Manual POS first 60",
   "baselineCommit": "2ff42a75fc84762854e73854e4ac88abe196005d",
-  "phase": "manual table-safety and hands-on pilot candidate; independent/physical/durable acceptance pending",
+  "phase": "mobile manual ordering iteration1 candidate; owner and independent verification pending",
   "criticalTarget": 52,
   "minorTarget": 8,
   "formalAccepted": 0,
@@ -1009,5 +1009,26 @@
     "durableDatabase": "NOT_TESTED",
     "formalAccepted": 0,
     "evidence": "../../lab/docs/evidence/table-safety-pilot/results.json"
+  },
+  "mobileOrderingIteration1": {
+    "branch": "review/manual-pos-mobile-ordering-iteration1",
+    "baseCommit": "f4346d7",
+    "localSecuritySuites": {
+      "passed": 10,
+      "failed": 0
+    },
+    "syntheticScreenScenarios": {
+      "passed": 5,
+      "failed": 0
+    },
+    "trustedChromiumCheckpoints": {
+      "passed": 16,
+      "failed": 0
+    },
+    "wineListNativePages": 73,
+    "wineListRecordsReached": 3612,
+    "physical": "NOT_RUN",
+    "formalAccepted": 0,
+    "evidence": "../../lab/docs/evidence/mobile-ordering-iteration1/"
   }
 }

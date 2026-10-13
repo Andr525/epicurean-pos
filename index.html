@@ -2267,6 +2267,7 @@ function listPrixFixeExtraDishes(){
   function add(pf, course, opt){
     if (!opt || opt.headingOnly || !String(opt.name||'').trim()) return;
     var courseLabel=(course && (course.label||course.name||course.course)) || opt.course || '';
+    if(/entremet/i.test(courseLabel)||(course&&course.mode==='entremets')) return;
     var kind=pfCourseKind(courseLabel);
     var id=String(opt.id||opt.dishId||opt.name||'');
     var key=String((pf && pf.id) || 'pf')+'::'+id+'::'+kind;
@@ -2443,6 +2444,7 @@ function closeSheet(){
   flushDeferredCatalog();
 }
 function openSheet(html){
+  STATE.manualOrderingPosition=selectedPositionIdentity();
   var el=document.getElementById('sheet-overlay');
   el.innerHTML='<div class="sheet">'+html+'</div>';
   el.classList.add('show');
@@ -2454,7 +2456,7 @@ document.addEventListener('click', function(e){
   var ov=document.getElementById('sheet-overlay');
   if (!ov || !ov.classList.contains('show')) return;
   var t=e.target;
-  if (t && t.closest && t.closest('.sheet, .guest-keypad')) return;
+  if (t && t.closest && t.closest('.sheet, .guest-keypad, #manual-live-check')) return;
   e.preventDefault();
   e.stopPropagation();
 }, true);
@@ -3098,7 +3100,7 @@ function rebuildPosCatalog(){
     if (typeof EPICUREAN_VOICE!=='undefined') EPICUREAN_VOICE.applyApprovedKeywords(mapped);
     items.push(mapped);
   });
-  SEED_DRINK_EXTRAS.forEach(function(it){
+  if(!STATE.menuLive) SEED_DRINK_EXTRAS.forEach(function(it){
     var exists=items.some(function(x){
       if (!x) return false;
       if (x.id===it.id) return true;
@@ -5749,7 +5751,7 @@ function renderPrixFixeRows(q){
   });
   (STATE.tastingMenus||[]).forEach(function(tm){
     if (q && !itemMatchesSearch(tm, q)) return;
-    html+='<div class="menu-item-row tasting-row" onclick="addTastingMenu('+JSON.stringify(String(tm.id))+')">'+
+    html+='<div class="menu-item-row tasting-row" onclick="'+esc('addTastingMenu('+JSON.stringify(String(tm.id))+')')+'">'+
       '<div class="item-info"><div class="item-name">✦ '+esc(tm.name)+'</div>'+
       '<div class="item-meta">'+(tm.courses?tm.courses.length:0)+' courses · Fire one by one</div></div>'+
       '<div class="item-price">'+posLineMoney(Number(tm.price)||0)+'</div></div>';
@@ -8214,11 +8216,12 @@ function renderMenuGrid(){
   if (STATE.menuFamily==='drinks') return renderBeverageSearchPanel();
   var nav=STATE.menuNav||{level:'root'};
   var items=STATE.menuItems.length?STATE.menuItems:(STATE.menuLive?[]:SEED_ITEMS);
+  if(window.manualFoodMatch) items=items.filter(function(i){return !isBeverageCatalogItem(i)&&(!STATE.mobileMenuCategory||['pf','tasting'].includes(STATE.mobileMenuCategory)||manualFoodMatch(i,STATE.mobileMenuCategory));});
   var tiles=[];
   var top='';
   var findQ=String(STATE.menuSearch||'').trim();
   if (findQ) {
-    if (extraDishSearchOnly()) {
+    if (extraDishSearchOnly()&&!window.manualFoodMatch) {
       matchPrixFixeExtraDishes(findQ).forEach(function(d){ tiles.push(prixFixeExtraTileHtml(d)); });
       if (!tiles.length) {
         return '<p style="color:var(--text-muted);font-size:0.85rem;padding:0.8rem 0.2rem;">No matching prix fixe dishes. Drinks and wine have their own window.</p>';
@@ -8235,6 +8238,13 @@ function renderMenuGrid(){
       return '<p style="color:var(--text-muted);font-size:0.85rem;padding:0.8rem 0.2rem;">No matches.</p>';
     }
     return paginateTiles(tiles, 'list');
+  }
+  if(window.manualFoodMatch&&STATE.mobileMenuCategory&&STATE.menuFamily!=='drinks'&&!['pf','tasting'].includes(STATE.mobileMenuCategory)){
+    items.filter(function(item){return !isBeverageCatalogItem(item)&&manualFoodMatch(item,STATE.mobileMenuCategory);}).forEach(function(item){
+      var click=item.eightySixed?'toast("86 — not available")':'beginAddItem('+JSON.stringify(String(item.id))+')';
+      tiles.push('<button type="button" class="ts-tile" onclick="'+esc(click)+'">'+esc(item.name)+'<span class="price">'+posLineMoney(Number(item.price)||0)+'</span></button>');
+    });
+    return tiles.length?paginateTiles(tiles,'list'):'<p>No published BOH items in this category.</p>';
   }
   if (nav.level==='root') {
     tiles.push('<button type="button" class="ts-tile food" onclick="setMenuFamily(\'food\')">FOOD</button>');
@@ -8261,7 +8271,7 @@ function renderMenuGrid(){
     });
   } else if (STATE.orderCat==='__tasting__') {
     (STATE.tastingMenus||[]).forEach(function(tm){
-      tiles.push('<button type="button" class="ts-tile prix" onclick="addTastingMenu('+JSON.stringify(String(tm.id))+')">'+esc(tm.name)+'<span class="price">'+posLineMoney(Number(tm.price)||0)+'</span></button>');
+      tiles.push('<button type="button" class="ts-tile prix" onclick="'+esc('addTastingMenu('+JSON.stringify(String(tm.id))+')')+'">'+esc(tm.name)+'<span class="price">'+posLineMoney(Number(tm.price)||0)+'</span></button>');
     });
   } else {
     var catItems=items.filter(function(i){
@@ -8292,7 +8302,7 @@ var WINE_WINDOW_SIZE=50;
 function wineRowHtml(item){
   var click=item.eightySixed ? 'toast("86 — not available")' : 'beginAddItem('+JSON.stringify(String(item.id))+')';
   var vin=itemVinCode(item);
-  return '<button type="button" class="wine-row'+(item.eightySixed?' sold':'')+'" onclick=\''+click+'\'><span>'+esc(item.name)+(vin?' <span class="wine-meta">'+esc(vin)+'</span>':'')+'</span><span class="price">'+posLineMoney(Number(item.price)||0)+'</span></button>';
+  return '<button type="button" data-item-id="'+esc(item.id)+'" class="wine-row'+(item.eightySixed?' sold':'')+'" onclick=\''+click+'\'><span>'+esc(item.name)+(vin?' <span class="wine-meta">'+esc(vin)+'</span>':'')+'</span><span class="price">'+posLineMoney(Number(item.price)||0)+'</span></button>';
 }
 function wineWindowRows(items, start, size){
   start=Math.max(0, start||0);
@@ -8309,6 +8319,7 @@ function renderWineWindow(items, backHtml){
   if (backHtml) html+=backHtml;
   html+='<div class="wine-window-list" id="wine-window-list">'+wineWindowRows(STATE._wineWinItems, start, size)+'</div>';
   if (STATE._wineWinItems.length>size) {
+    if(window.manualWinePage) html+='<div class="manual-wine-pages"><button type="button" data-wine-page="previous" onclick="manualWinePage(-1)">Previous wines</button><button type="button" data-wine-page="next" onclick="manualWinePage(1)">Next wines</button></div>';
     html+='<div class="wine-meta" style="padding:0.35rem 0.4rem">'+(start+1)+'–'+Math.min(STATE._wineWinItems.length, start+size)+' of '+STATE._wineWinItems.length+'</div>';
   }
   return html+'</div>';
@@ -8347,6 +8358,7 @@ function isBeverageCatalogItem(item){
 }
 function ensureBeverageIndex(){
   var items=STATE.menuItems.length?STATE.menuItems:SEED_ITEMS;
+  if(window.manualDrinkMatch&&STATE.mobileMenuCategory) items=items.filter(function(i){return manualDrinkMatch(i,STATE.mobileMenuCategory);});
   var fp=String(STATE._catalogFp||'')+'|'+posIdsFingerprint(items);
   if (STATE._bevIndex && STATE._bevIndex.fp===fp) return STATE._bevIndex;
   STATE._bevIndex={
@@ -8453,7 +8465,7 @@ function renderTastingItems() {
 function findTastingMenu(tmId){
   var lists=[STATE.tastingMenus, typeof SEED_TASTING_MENUS!=='undefined'?SEED_TASTING_MENUS:[]];
   for (var i=0;i<lists.length;i++){
-    var hit=(lists[i]||[]).filter(function(t){ return t && t.id===tmId; })[0];
+    var hit=(lists[i]||[]).filter(function(t){ return t && String(t.id)===String(tmId); })[0];
     if (hit) return hit;
   }
   return null;
@@ -8505,6 +8517,7 @@ function addTastingMenu(tmId) {
   var tm=findTastingMenu(tmId);
   if (!tm) return;
   var courses=(tm.courses||[]).map(hydrateDiningCourse);
+  if(manualMenuAllergyWarning(courses,selectedPositionIdentity())) return;
   STATE.currentOrder.push({
     lineId:genId(),
     table:STATE.selectedTable,
@@ -8546,9 +8559,10 @@ function openTastingTempSheet(to){
     });
     html+='</div>';
   });
-  html+='<button class="primary-btn" onclick="confirmTastingTemps('+JSON.stringify(String(to.id))+')">Confirm</button>';
+  html+='<button class="primary-btn" onclick="'+esc('confirmTastingTemps('+JSON.stringify(String(to.id))+')')+'">Confirm</button>';
   html+='<button class="ghost-btn" onclick="closeSheet()">Cancel</button>';
   openSheet(html);
+  STATE.manualOrderingPosition=orderPositionIdentity(to);
 }
 function confirmTastingTemps(toId){
   var to=(STATE.activeTastingOrders||[]).filter(function(o){ return o.id===toId; })[0];
@@ -8568,6 +8582,7 @@ function openTastingCourseModifySheet(toId, idx){
   if (!to) return;
   var c=diningCourses(to)[idx];
   if (!c) return;
+  STATE.manualOrderingPosition=orderPositionIdentity(to);
   if (c.fired) { toast('Already fired'); return; }
   var temps=c.askTemp?prixFixeTempOptions(c.askTemp, c):[];
   var html='<h2>'+esc(operationalDishName(c.choice||c.name,c))+'</h2>';
@@ -8584,6 +8599,7 @@ function openTastingCourseModifySheet(toId, idx){
   html+='<button class="primary-btn" onclick="saveTastingCourseModify('+JSON.stringify(String(toId))+','+idx+')">Save</button>';
   html+='<button class="ghost-btn" onclick="closeSheet()">Cancel</button>';
   openSheet(html);
+  STATE.manualOrderingPosition=orderPositionIdentity(to);
 }
 function saveTastingCourseModify(toId, idx){
   var to=(STATE.activeTastingOrders||[]).filter(function(o){ return o.id===toId; })[0];
@@ -9107,6 +9123,7 @@ function prixFixeTempOptions(kind, opt){
 }
 
 function openPrixFixeSelector(pfId) {
+  STATE.manualOrderingPosition=selectedPositionIdentity();STATE.manualSelectingPfId=pfId;
   if (seatHasPrixFixe(STATE.activeSeat)) {
     warnPrixFixeAlreadyOnSeat();
     return;
@@ -9148,7 +9165,7 @@ function openPrixFixeSelector(pfId) {
     html+='</div></div>';
   });
   html+='<div class="pf-course-select"><label>Modifier / kitchen note</label>';
-  html+='<input class="search-box" id="pf-mod-note" placeholder="No onion, extra sauce, allergy confirmed…"></div>';
+  html+='<input class="search-box" id="pf-mod-note" placeholder="Kitchen instructions — notes do not clear allergens"></div>';
   html+='<div class="pf-sel-actions"><button class="send-btn" onclick=\'confirmPrixFixe('+JSON.stringify(String(pf.id))+')\'>Add to Order</button>'+
     '<button class="cancel-pay-btn" onclick="backToOrderScreen()">Back to order</button></div></div>';
   ov.innerHTML=html;
@@ -9156,10 +9173,20 @@ function openPrixFixeSelector(pfId) {
 }
 
 function closePfSelector() {
+  STATE.manualOrderingPosition=null;STATE.manualSelectingPfId=null;
   var ov=document.getElementById('pf-overlay');
   if (ov) { ov.classList.remove('show'); ov.innerHTML=''; }
 }
 
+function manualMenuAllergyWarning(courses, identity){
+  var context=exactPositionAllergyContext(identity);
+  var conflicts=(courses||[]).filter(function(c){return !c.noneChoice&&!c.headingOnly;}).map(function(c){var hits=asList(c.allergens).filter(function(a){return context.effectiveAllergens.some(function(b){return String(a).toLowerCase()===String(b).toLowerCase();});});return hits.length?{name:c.choice||c.name||c.course,hits:hits}:null;}).filter(Boolean);
+  if(!conflicts.length) return false;
+  var html='<div class="manual-preadd-warning" role="alert">Position '+esc(identity)+' — allergy conflict: '+conflicts.map(function(c){return esc(c.name)+': '+esc(c.hits.join(', '));}).join(' · ')+'</div><p>Nothing added. A substitution note does not remove BOH allergens. Choose a compatible published option or obtain a verified BOH change.</p>';
+  var target=document.querySelector('#pf-overlay.show .pf-selector')||document.querySelector('#sheet-overlay.show .sheet');
+  if(target){var old=target.querySelector('[data-manual-allergy-block]');if(old)old.remove();var box=document.createElement('section');box.setAttribute('data-manual-allergy-block','1');box.innerHTML=html;target.prepend(box);if(box.scrollIntoView)box.scrollIntoView({block:'start'});}else openSheet('<h2>Allergy warning</h2>'+html+'<button class="ghost-btn" onclick="closeSheet()">Back</button>');
+  return true;
+}
 function confirmPrixFixe(pfId) {
   if (seatHasPrixFixe(STATE.activeSeat)) {
     warnPrixFixeAlreadyOnSeat();
@@ -9202,6 +9229,7 @@ function confirmPrixFixe(pfId) {
   if (missingTemp) { toast('Choose temperature for '+missingTemp); return; }
   if (missingScoops) { toast('Choose scoops for '+missingScoops); return; }
   var selections=buildPrixFixeSelections(pf, picked);
+  if(manualMenuAllergyWarning(selections,selectedPositionIdentity())) return;
   selections.forEach(function(s,si){
     var ci=-1;
     (pf.courses||[]).forEach(function(c,i){
@@ -10807,6 +10835,7 @@ function applyOptionToDiningCourse(c, opt, extras){
 function openDiningCourseEditor(toId, idx){
   var to=(STATE.activeTastingOrders||[]).find(function(o){ return o.id===toId; });
   if (!to) return;
+  STATE.manualOrderingPosition=orderPositionIdentity(to);
   var c=diningCourses(to)[idx];
   if (!c) return;
   if (c.fired || (c.skipped && !c.noneChoice)) { toast('Already fired'); return; }
@@ -10879,6 +10908,7 @@ function confirmDiningCourseEdit(toId, idx){
     if (!tEl) { toast('Choose temperature'); return; }
     extras.temp=tEl.value;
   }
+  if(manualMenuAllergyWarning([opt],orderPositionIdentity(to))) return;
   applyOptionToDiningCourse(c, opt, extras);
   applyDiningAllergyNotes();
   var line=(STATE.currentOrder||[]).filter(function(i){ return i.diningOrderId===to.id || i.lineId===to._boundLine; })[0];
@@ -10928,6 +10958,7 @@ function eraseDiningCourse(toId, idx, quiet){
 function openDessertSelector(orderId){
   var to=STATE.activeTastingOrders.find(function(o){ return o.id===orderId; });
   if (!to) return;
+  STATE.manualOrderingPosition=orderPositionIdentity(to);
   var options=dessertOptionsFor(to);
   if (!options.length) { toast('No dessert options on the menu'); return; }
   var later=diningCourses(to).filter(function(c){ return c.later || c.mode==='later'; })[0];
@@ -10973,6 +11004,7 @@ function toggleDessertScoops(active){
 function confirmDessert(orderId){
   var to=STATE.activeTastingOrders.find(function(o){ return o.id===orderId; });
   if (!to) return;
+  STATE.manualOrderingPosition=orderPositionIdentity(to);
   var options=dessertOptionsFor(to);
   var radios=document.querySelectorAll('input[name="dessert-opt"]');
   var sel=-1;
@@ -11354,5 +11386,6 @@ if ('serviceWorker' in navigator) {
   }).catch(function(){});
 }
 </script>
+<script src="manual-mobile.js"></script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 import http from 'node:http';import https from 'node:https';import {readFileSync,mkdirSync,writeFileSync} from 'node:fs';import {resolve,dirname} from 'node:path';import {fileURLToPath} from 'node:url';import {randomBytes} from 'node:crypto';import {isIP} from 'node:net';
 import {fixture} from './fixture.mjs';import {mockInterpret} from './mock-interpret.mjs';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
-const assets=new Set(['cellar.js','scalini-dining.js','voice-vocab.js','voice-engine.js','voice-turn.js','voice-catalog.js','voice-cocktails.js','voice-price.js','voice-service.js','voice-order.js','voice-order-bridge.js','icon-192.png','icon-512.png']);
+const assets=new Set(['manual-mobile.js','cellar.js','scalini-dining.js','voice-vocab.js','voice-engine.js','voice-turn.js','voice-catalog.js','voice-cocktails.js','voice-price.js','voice-service.js','voice-order.js','voice-order-bridge.js','icon-192.png','icon-512.png']);
 const csp="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; font-src 'self'; media-src 'self' blob:; worker-src 'none'; frame-src 'none'; object-src 'none'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'";
 export function isolatedHtml(source,token,screenOnly=false,manual=false){
  let html=source.replace(/<script\b[^>]*src=["']https?:\/\/[^>]*>[\s\S]*?<\/script>/gi,'').replace(/<link\b[^>]*(?:href=["']https?:\/\/|rel=["']manifest)[^>]*>/gi,'');
