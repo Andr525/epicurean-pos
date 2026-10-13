@@ -1977,6 +1977,7 @@ function persistCheck(check){
   if (!check) return;
   check.guest=check.guest||{ items:[], totals:{ subtotal:0 } };
   if (String(check.table)===String(STATE.selectedTable)) {
+    (STATE.currentOrder||[]).filter(function(line){return String(line.table)===String(check.table);}).forEach(attachOrderGuestSafety);
     check.guest.items=guestCheckItems(check.id);
     check.guest.totals={ subtotal:checkItemsTotal(check.id) };
     check.guestCount=sessionOf(check.table).guestCount||check.guestCount;
@@ -1997,6 +1998,7 @@ function persistCheck(check){
 function persistTableSafety(){
   var sess=sessionOf(STATE.selectedTable);
   sess.safetyRevision=Math.max(Date.now(),(sess.safetyRevision||0)+1);
+  (STATE.currentOrder||[]).filter(function(line){return String(line.table)===String(STATE.selectedTable);}).forEach(attachOrderGuestSafety);
   tableCheckIds(STATE.selectedTable).forEach(function(id){persistCheck(STATE.checks[id]);});
 }
 function closeOpenCheck(table, status){
@@ -7351,6 +7353,7 @@ function voiceRunBatch(act){
 function voiceCommitBatch(){
   var batch=STATE.voiceBatch||[];
   if (!batch.length) return false;
+  if(batch.some(orderLineAllergyWarning)) return false;
   STATE.voiceBatch=null;
   STATE._voiceSuppressSpeech=true;
   try {
@@ -7387,6 +7390,7 @@ function voiceApplyCorrection(act){
     voiceSpeak('Which item should move to position '+toLabel+'?');
     return;
   }
+  if(orderLineAllergyWarning(Object.assign({},target,{seat:act.to.seat,seatPriority:!!act.to.priority}))) return;
   target.seat=act.to.seat;
   target.seatPriority=!!act.to.priority;
   applyVoiceSeat(act.to.seat, !!act.to.priority);
@@ -8568,6 +8572,7 @@ function confirmTastingTemps(toId){
   var to=(STATE.activeTastingOrders||[]).filter(function(o){ return o.id===toId; })[0];
   if (!to) { closeSheet(); return; }
   var ask=diningCourses(to).filter(function(c){ return c && c.askTemp && !c.headingOnly; });
+  if(manualMenuAllergyWarning(ask,orderPositionIdentity(to),to.table)) return;
   ask.forEach(function(c,i){
     var el=document.querySelector('input[name="tm-ask-'+i+'"]:checked');
     if (!el) return;
@@ -8606,6 +8611,7 @@ function saveTastingCourseModify(toId, idx){
   if (!to) return;
   var c=diningCourses(to)[idx];
   if (!c) return;
+  if(manualMenuAllergyWarning([c],orderPositionIdentity(to),to.table)) return;
   var noteEl=document.getElementById('tm-mod-note');
   if (noteEl) c.modNote=String(noteEl.value||'').trim();
   var tEl=document.querySelector('input[name="tm-mod-temp"]:checked');
@@ -8618,10 +8624,13 @@ function saveTastingCourseModify(toId, idx){
 }
 
 function addPairing(tmId, pairingId) {
-  var tm=STATE.tastingMenus.find(t=>t.id===tmId);
+  var tm=STATE.tastingMenus.find(t=>String(t.id)===String(tmId));
   if (!tm) return;
-  var p=tm.pairings.find(x=>x.id===pairingId);
+  var p=(tm.pairings||[]).find(x=>String(x.id)===String(pairingId));
   if (!p) return;
+  if(!Array.isArray(p.allergens)){openSheet('<h2>Pairing unavailable</h2><p>Published BOH pairing allergen data is required. No item added.</p><button onclick="closeSheet()">Back</button>');return;}
+  if(manualMenuAllergyWarning([{name:p.name,allergens:p.allergens}],selectedPositionIdentity())) return;
+  if(p.price==null||String(p.price).trim()===''||!isFinite(Number(p.price))||Number(p.price)<0||!String(p.name||'').trim()){openSheet('<h2>Pairing unavailable</h2><p>Published BOH pairing identity and price are required. No item added.</p><button onclick="closeSheet()">Back</button>');return;}
   STATE.currentOrder.push({
     lineId:genId(),
     table:STATE.selectedTable,
@@ -8637,8 +8646,12 @@ function addPairing(tmId, pairingId) {
     station:'Bar',
     cookTime:0,
     isPairing:true,
+    checkId:activeCheckId(),
+    allergens:p.allergens.slice(),
+    positionSubs:JSON.parse(JSON.stringify(sessionOf(STATE.selectedTable).positionSubs||{})),
     selectedMod:null
   });
+  attachOrderGuestSafety(STATE.currentOrder[STATE.currentOrder.length-1]);
   toast('+ '+p.name);
   renderOrder();
 }
@@ -8897,6 +8910,7 @@ function exactPositionAllergyContext(identity, table){
   var key=identity;
   if(!(check&&Array.isArray(check.positionIdentities))&&/^\d+A$/.test(key)) key=String(parseInt(key,10));
   var own=asList(sess.allergies&&sess.allergies[key]),shared=asList(sess.allergies&&sess.allergies.table);
+  if(identity==='table') own=Array.from(new Set(Object.keys(sess.allergies||{}).filter(function(k){return k!=='table';}).flatMap(function(k){return asList(sess.allergies[k]);})));
   return {position:identity,table:String(table),allergens:own,tableAllergies:shared,effectiveAllergens:Array.from(new Set(shared.concat(own)))};
 }
 function courseAllergyKitchenNote(c, identity, table){
@@ -9178,13 +9192,24 @@ function closePfSelector() {
   if (ov) { ov.classList.remove('show'); ov.innerHTML=''; }
 }
 
-function manualMenuAllergyWarning(courses, identity){
-  var context=exactPositionAllergyContext(identity);
+function attachOrderGuestSafety(line){
+  var identity=orderPositionIdentity(line),sess=sessionOf(line.table==null?STATE.selectedTable:line.table);
+  line.positionSubs=JSON.parse(JSON.stringify(sess.positionSubs||{}));
+  line.allergyContext=exactPositionAllergyContext(identity,line.table);
+  var check=STATE.checks[line.checkId||activeCheckId()],legacy=!(check&&Array.isArray(check.positionIdentities));
+  var key=legacy&&/^\d+A$/.test(identity)?String(parseInt(identity,10)):identity;
+  line.substitutionContext={position:identity,welcome:(line.positionSubs.welcome||{})[key]||'',entremet:(line.positionSubs.entremet||{})[key]||''};
+}
+function orderLineAllergyWarning(line){
+  return manualMenuAllergyWarning([{name:line.name,allergens:line.allergens}].concat(line.selections||line.courses||[]),orderPositionIdentity(line),line.table);
+}
+function manualMenuAllergyWarning(courses, identity, table){
+  var context=exactPositionAllergyContext(identity,table);
   var conflicts=(courses||[]).filter(function(c){return !c.noneChoice&&!c.headingOnly;}).map(function(c){var hits=asList(c.allergens).filter(function(a){return context.effectiveAllergens.some(function(b){return String(a).toLowerCase()===String(b).toLowerCase();});});return hits.length?{name:c.choice||c.name||c.course,hits:hits}:null;}).filter(Boolean);
   if(!conflicts.length) return false;
-  var html='<div class="manual-preadd-warning" role="alert">Position '+esc(identity)+' — allergy conflict: '+conflicts.map(function(c){return esc(c.name)+': '+esc(c.hits.join(', '));}).join(' · ')+'</div><p>Nothing added. A substitution note does not remove BOH allergens. Choose a compatible published option or obtain a verified BOH change.</p>';
+  var html='<div class="manual-preadd-warning" role="alert">Position '+esc(identity)+' — allergy conflict: '+conflicts.map(function(c){return esc(c.name)+': '+esc(c.hits.join(', '));}).join(' · ')+'</div><p>Nothing added. A substitution note does not remove BOH allergens. Choose a compatible published option. No override is authorized; notes never resolve an allergen conflict.</p>';
   var target=document.querySelector('#pf-overlay.show .pf-selector')||document.querySelector('#sheet-overlay.show .sheet');
-  if(target){var old=target.querySelector('[data-manual-allergy-block]');if(old)old.remove();var box=document.createElement('section');box.setAttribute('data-manual-allergy-block','1');box.innerHTML=html;target.prepend(box);if(box.scrollIntoView)box.scrollIntoView({block:'start'});}else openSheet('<h2>Allergy warning</h2>'+html+'<button class="ghost-btn" onclick="closeSheet()">Back</button>');
+  if(target){var old=target.querySelector('[data-manual-allergy-block]');if(old)old.remove();var box=document.createElement('section');box.setAttribute('data-manual-allergy-block','1');box.innerHTML=html;target.prepend(box);if(box.scrollIntoView)box.scrollIntoView({block:'start'});}else {openSheet('<h2>Allergy warning</h2>'+html+'<button class="ghost-btn" onclick="closeSheet()">Back</button>');STATE.manualOrderingPosition=identity;}
   return true;
 }
 function confirmPrixFixe(pfId) {
@@ -9608,8 +9633,7 @@ function maybeAllergyThenAdd(){
     openSheet(
       '<h2>Allergy warning</h2>'+
       '<div class="warn-banner">'+seatName(orderPositionIdentity(p))+' flagged: '+hits.join(', ')+'. This item lists those allergens.</div>'+
-      '<p class="sheet-sub">'+p.name+' will not be added unless you confirm.</p>'+
-      '<button class="primary-btn" style="background:var(--danger);color:#fff;" onclick="commitPendingItem()">Send anyway</button>'+
+      '<p class="sheet-sub">'+esc(p.name)+' cannot be added. No override is authorized. Notes do not remove allergens.</p>'+
       '<button class="ghost-btn" onclick="closeSheet()">Cancel</button>'
     );
     return;
@@ -9619,7 +9643,9 @@ function maybeAllergyThenAdd(){
 function commitPendingItem(){
   var p=STATE.pendingItem; if(!p) return;
   if(!pendingPositionValid(p)){toast('Invalid exact position or check; no item added');return;}
+  if(orderLineAllergyWarning(p)) return;
   if (!modifiersReady(p)) { toast('Choose required modifiers'); return; }
+  attachOrderGuestSafety(p);
   if (STATE._voiceCommit) p.voiceOrigin=true;
   settleVoiceDraftForItem(p.id);
   if (p.serviceCourse==null) p.serviceCourse=p.course||defaultCourse(p);
@@ -9696,7 +9722,12 @@ function stayOrder(){
 function moveLineSeat(lineId, seat){
   var line=STATE.currentOrder.find(function(i){return i.lineId===lineId;});
   if (!line) return;
-  line.seat=seat;
+  var check=STATE.checks[activeCheckId()],identity=String(seat);
+  if(!(check&&Array.isArray(check.positionIdentities))&&/^\d+$/.test(identity)) identity=positionLabel(seat);
+  if(identity!=='table'&&!checkPositionIdentities().includes(identity)){toast('Invalid exact position');return;}
+  var candidate=Object.assign({},line,{seat:identity==='table'?'table':parseInt(identity,10),seatPriority:/A$/.test(identity)});
+  if(orderLineAllergyWarning(candidate)) return;
+  line.seat=candidate.seat;line.seatPriority=candidate.seatPriority;attachOrderGuestSafety(line);
   renderCheck();
   paintChrome();
 }
@@ -9704,6 +9735,7 @@ function moveLineSeat(lineId, seat){
 function bumpLineQty(lineId, d){
   var line=STATE.currentOrder.find(function(i){return i.lineId===lineId;});
   if (!line || line.held===undefined) return;
+  if(d>0&&orderLineAllergyWarning(line)) return;
   line.qty=Math.max(1,(parseInt(line.qty,10)||1)+d);
   persistCheck(ensureOpenCheck(STATE.selectedTable));
   renderOrder();
@@ -10136,7 +10168,7 @@ function mergeChecksIntoTable(srcTable, destTable){
   var previousTable=STATE.selectedTable,previousView=STATE.viewCheckId;
   STATE.selectedTable=destTable;STATE.viewCheckId=null;
   var dest=ensureOpenCheck(destTable);destIds.forEach(function(id){STATE.checks[id].positionIdentities=all.slice();});dest.positionIdentities=all;dest.positionMerge={sourceTable:srcTable,positions:mapping};
-  function remap(line){var old=orderPositionIdentity(line),identity=mapping[old];if(identity){line.seat=parseInt(identity,10);line.seatPriority=/A$/.test(identity);}line.table=destTable;line.checkId=dest.id;}
+  function remap(line){var old=orderPositionIdentity(line),identity=mapping[old];if(identity){line.seat=parseInt(identity,10);line.seatPriority=/A$/.test(identity);}line.table=destTable;line.checkId=dest.id;attachOrderGuestSafety(line);}
   STATE.currentOrder.forEach(function(i){if(String(i.table)===srcTable) remap(i);});
   STATE.orders.forEach(function(o){if(String(o.table)===srcTable&&o.status==='new'){o.table=destTable;o.checkId=dest.id;(o.items||[]).forEach(remap);}});
   (STATE.activeTastingOrders||[]).forEach(function(to){if(String(to.table)!==srcTable) return;remap(to);to.positionSubs=JSON.parse(JSON.stringify(destSess.positionSubs));diningCourses(to).forEach(function(c){var kind=isWelcomeTrioCourse(c)?'welcome':(isEntremetCourse(c)?'entremet':'');if(kind)c.positionSubs=Object.assign({},destSess.positionSubs[kind]);});});
@@ -10328,6 +10360,7 @@ function kitchenItemsFrom(lines){
 
 function startDiningFromCheckLine(ti){
   if (!ti || !(ti.isTasting || ti.isPrixFixe)) return null;
+  attachOrderGuestSafety(ti);
   if (ti.diningOrderId) {
     return (STATE.activeTastingOrders||[]).filter(function(o){ return o.id===ti.diningOrderId; })[0] || null;
   }
@@ -10619,6 +10652,7 @@ function saveCourseNote(orderId, idx){
   var to=STATE.activeTastingOrders.find(function(o){ return o.id===orderId; });
   if (!to) return;
   var c=diningCourses(to)[idx];
+  if(!c||manualMenuAllergyWarning([c],orderPositionIdentity(to),to.table)) return;
   var el=document.getElementById('course-mod-note');
   if (c && el) c.modNote=String(el.value||'').trim();
   closeSheet();
@@ -10810,7 +10844,10 @@ function diningCourseOptions(to, c){
 }
 function applyOptionToDiningCourse(c, opt, extras){
   extras=extras||{};
-  if (!c || !opt) return;
+  if (!c || !opt) return false;
+  var owner=(STATE.activeTastingOrders||[]).find(function(to){return diningCourses(to).indexOf(c)>=0;});
+  if(!owner){toast('Open the owning check before editing a course');return false;}
+  if(manualMenuAllergyWarning([opt],orderPositionIdentity(owner),owner.table)) return false;
   c.pending=false;
   c.skipped=false;
   c.noneChoice=false;
@@ -10908,8 +10945,8 @@ function confirmDiningCourseEdit(toId, idx){
     if (!tEl) { toast('Choose temperature'); return; }
     extras.temp=tEl.value;
   }
-  if(manualMenuAllergyWarning([opt],orderPositionIdentity(to))) return;
-  applyOptionToDiningCourse(c, opt, extras);
+  if(manualMenuAllergyWarning([opt],orderPositionIdentity(to),to.table)) return;
+  if(applyOptionToDiningCourse(c, opt, extras)===false) return;
   applyDiningAllergyNotes();
   var line=(STATE.currentOrder||[]).filter(function(i){ return i.diningOrderId===to.id || i.lineId===to._boundLine; })[0];
   if (line && line.selections && line.selections[idx]) line.selections[idx]=Object.assign({}, c);
@@ -11010,6 +11047,7 @@ function confirmDessert(orderId){
   var sel=-1;
   radios.forEach(function(r){ if(r.checked) sel=r.value; });
   if (isPfNonePick(sel)) {
+    if(manualMenuAllergyWarning(diningCourses(to).filter(isEntremetCourse),orderPositionIdentity(to),to.table)) return;
     diningCourses(to).forEach(function(c){
       if (c.entremets || c.mode==='entremets') c.pending=false;
       if (c.later || c.mode==='later') applyNoneToDiningCourse(c,{later:true});
@@ -11038,6 +11076,7 @@ function confirmDessert(orderId){
   });
   var dessertAllergens=(opt.allergens||[]).slice();
   scoopAllergens.forEach(function(a){ if(dessertAllergens.indexOf(a)<0) dessertAllergens.push(a); });
+  if(manualMenuAllergyWarning([{name:opt.name,allergens:dessertAllergens}].concat(diningCourses(to).filter(isEntremetCourse)),orderPositionIdentity(to),to.table)) return;
   diningCourses(to).forEach(function(c){
     if (c.entremets || c.mode==='entremets'){
       c.pending=false;
@@ -11386,6 +11425,5 @@ if ('serviceWorker' in navigator) {
   }).catch(function(){});
 }
 </script>
-<script src="manual-mobile.js"></script>
 </body>
 </html>

@@ -1,3 +1,7 @@
+# Current corrective allergy review
+
+[Boundaries, coverage, reproducible tests and BLOCKED categories](docs/ALLERGY-BOUNDARY-REVIEW.md). Same review branch; mobile presentation explicitly lab-only. No allergy override is authorized. Earlier delivery notes and counts below are historical.
+
 # Current mobile ordering screen revision
 
 Use [iteration1 Mac/iPhone instructions, verification and limits](docs/MOBILE-ORDERING-ITERATION1.md). Branch `review/manual-pos-mobile-ordering-iteration1` retains FOOD/DRINKS, pins the live check and guest allergies during selection, restores category navigation, hides development controls and blocks known PF/tasting conflicts before adding. Physical owner testing pending. Earlier delivery notes follow.

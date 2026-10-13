@@ -1,7 +1,7 @@
 /* Mobile manual ordering presentation. Catalog and order mutations remain in the real POS. */
 (function(){
  'use strict';
- if(window.EPICUREAN_LAB_MANUAL===false)return;
+ if(window.EPICUREAN_LAB_MANUAL!==true||window.EPICUREAN_LAB_SCREEN_ONLY!==true||window.EPICUREAN_LAB_MOBILE_UI!==true)return;
  const dev=new URLSearchParams(location.search).get('devControls')==='1';
  if(!dev){const hidden=document.createElement('style');hidden.id='manual-development-controls';hidden.textContent='.voice-test{display:none!important}';document.head.appendChild(hidden);}
  if(innerWidth>767&&!/iPhone/.test(navigator.userAgent))return;

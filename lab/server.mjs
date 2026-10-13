@@ -7,8 +7,8 @@ export function isolatedHtml(source,token,screenOnly=false,manual=false){
  let html=source.replace(/<script\b[^>]*src=["']https?:\/\/[^>]*>[\s\S]*?<\/script>/gi,'').replace(/<link\b[^>]*(?:href=["']https?:\/\/|rel=["']manifest)[^>]*>/gi,'');
  html=html.replace(/var firebaseConfig = \{[\s\S]*?\};/,"var firebaseConfig = {projectId:'demo-epicurean-lab',apiKey:'fixture-only'};");
  html=html.replace("window.EPICUREAN_VOICE_TRANSCRIBE_URL='https://us-central1-epicurean-house-at-the-choc-st.cloudfunctions.net/voiceTranscribe';","window.EPICUREAN_VOICE_TRANSCRIBE_URL='/lab/transcribe';");
- html=html.replace('</head>',`<script>window.EPICUREAN_LAB_MANUAL=${manual};window.EPICUREAN_LAB_SCREEN_ONLY=${screenOnly};window.EPICUREAN_LAB_TOKEN=${JSON.stringify(token)};</script><script src="/lab/containment.js"></script></head>`);
- return html.replace('</body>','<script src="/lab/bootstrap.js"></script><script src="/lab/suite.js"></script></body>');
+ html=html.replace('</head>',`<script>window.EPICUREAN_LAB_MANUAL=${manual};window.EPICUREAN_LAB_MOBILE_UI=${manual};window.EPICUREAN_LAB_SCREEN_ONLY=${screenOnly};window.EPICUREAN_LAB_TOKEN=${JSON.stringify(token)};</script><script src="/lab/containment.js"></script></head>`);
+ return html.replace('</body>',(manual?'<script src="/manual-mobile.js"></script>':'')+'<script src="/lab/bootstrap.js"></script><script src="/lab/suite.js"></script></body>');
 }
 export async function startLab({port=0,host='127.0.0.1',tls=null,ownerApproval=null,artifactDir=resolve(root,'lab/artifacts'),screenOnly=false,manual=false,sessionMs=3600000}={}){
  if(manual)screenOnly=true;

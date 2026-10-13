@@ -1,3 +1,5 @@
+> Historical f13ebfa delivery. Current corrective coverage and limits: [allergy-boundary review](ALLERGY-BOUNDARY-REVIEW.md). The mobile presentation is now explicitly isolated-lab-only; f13ebfa did not cover all add/edit paths.
+
 # Mobile ordering — iteration 1
 
 Review branch: `review/manual-pos-mobile-ordering-iteration1`, based on `f4346d7`. Actual POS with unchanged, hash-verified BOH snapshots; no deployment or live service. Owner physical verification is pending.
@@ -62,7 +64,7 @@ Results and actual browser screenshots: `lab/docs/evidence/mobile-ordering-itera
 
 - Standalone À la carte/appetizers/mains/sides/desserts/specials and cocktails/non-alcoholic/coffee/tea exports are missing. PF course choices remain available within the priced menu. Spirits with coffee-like names are not presented as coffee/non-alcoholic products. Champagne/Sparkling uses available BOH category/type/region metadata; wines without that classification remain reachable in Wine List/by the Glass. No new wine identity, dish, price or allergen was created. Mobile individual-item search uses published catalog records; it does not expose the legacy extra-plate fee path as a substitute for missing à-la-carte prices.
 - Coconut–lime sorbet remains **entremet-only**, excluded from the extra-dessert sale list. BOH records/prices are unchanged. Free-text substitutions remain kitchen instructions, not certified allergen removal.
-- No current physical Safari certification, durable DB/multi-client recovery, kitchen acknowledgment, manager audit, tax/tip acceptance or real checkout claim. Formal acceptance remains0/60. Existing Voice source-freeze failure remains documented; no Voice feature development resumed. Voice Test/Pricing Basis are hidden in normal server views; underlying functions remain. Explicit `devControls=1` is a developer opt-in, not permission to access providers.
+- No current physical Safari certification, durable DB/multi-client recovery, kitchen acknowledgment, manager audit, tax/tip acceptance or real checkout claim. Formal acceptance remains0/60. Existing Voice source-freeze failure remains documented; no Voice feature development resumed. Voice Test/Pricing Basis are hidden in the opted-in isolated manual lab; the normal POS does not load this presentation module; underlying functions remain. Explicit `devControls=1` is a developer opt-in, not permission to access providers.
 - Next iteration should resolve the owner's observed navigation/keyboard/course-edit defects in this concrete build. The third iteration should verify complete manual workflows and remaining safety gates, subject to authentic catalog availability and separate authorization for any isolated backend testing. Three iterations are a target, not an acceptance guarantee.
 
 Stop after publishing this first delivery for owner testing. No production, live Firebase, emulator, kitchen transaction, device access or expense occurred.

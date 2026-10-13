@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "milestone": "Manual POS first 60",
   "baselineCommit": "2ff42a75fc84762854e73854e4ac88abe196005d",
-  "phase": "mobile manual ordering iteration1 candidate; owner and independent verification pending",
+  "phase": "corrective allergy-boundary candidate on existing mobile review branch; independent review pending",
   "criticalTarget": 52,
   "minorTarget": 8,
   "formalAccepted": 0,
@@ -1030,5 +1030,17 @@
     "physical": "NOT_RUN",
     "formalAccepted": 0,
     "evidence": "../../lab/docs/evidence/mobile-ordering-iteration1/"
+  },
+  "allergyBoundaryReview": {
+    "baseCommit": "f13ebfa",
+    "sourceBackedPathGroups": 11,
+    "simulatedPairingMetadataGroups": 1,
+    "authenticPairingAcceptance": "BLOCKED: no published pairing records",
+    "standaloneFoodAcceptance": "BLOCKED: missing published standalone records/prices",
+    "physical": "NOT_RUN",
+    "durableDatabase": "NOT_TESTED",
+    "formalAccepted": 0,
+    "coverage": "../../lab/docs/ALLERGY-BOUNDARY-REVIEW.md",
+    "evidence": "../../lab/docs/evidence/allergy-boundary-review/"
   }
 }
