@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "milestone": "Manual POS first 60",
   "baselineCommit": "2ff42a75fc84762854e73854e4ac88abe196005d",
-  "phase": "corrective safety review; C1 repair candidate, C2/C3 unresolved; formal0",
+  "phase": "C2/C3 isolated repair candidate from 1cd022e; independent and durable verification pending; formal0",
   "criticalTarget": 52,
   "minorTarget": 8,
   "formalAccepted": 0,
@@ -28,7 +28,7 @@
       "severity": "critical",
       "finding": "Allergy editor enumerates numeric seats, not separate explicit 2/2A",
       "code": "index.html:10133",
-      "status": "C1 modifier candidate passes; composite allergy safety remains failed due C2/C3",
+      "status": "C1/C2/C3 local repair candidates pass; complete M30 acceptance remains blocked",
       "cyclesObserved": 2,
       "evidence": "../../lab/docs/evidence/manual-owner-revisions/results.json"
     },
@@ -76,14 +76,14 @@
       "id": "C2",
       "severity": "critical",
       "finding": "persistCheck omits allergies; ingestOpenChecks does not restore them",
-      "status": "UNRESOLVED; reproduced local serialization/ingest, not live Firebase test",
+      "status": "Local JSON checkpoint/new-runtime restore PASS candidate; database durability and concurrent clients NOT_TESTED",
       "cyclesObserved": 1
     },
     {
       "id": "C3",
       "severity": "critical",
       "finding": "Substitution editor numeric-only and 2A lookup uses2 note; kernel allergy note flattened by globalflags",
-      "status": "UNRESOLVED; editor/lookup reproduced; note payload source-inspected, no SEND called",
+      "status": "Exact editor/substitution/course context/pure kitchen-note builder PASS candidate; transport and physical verification NOT_RUN",
       "cyclesObserved": 1
     }
   ],
@@ -479,17 +479,17 @@
       "name": "Complete exact-position allergy safety and recovery",
       "severity": "critical",
       "acceptance": "Separate2/2A/3 editor+modifier warnings; every transition resets suffix and rejects phantom; table restrictions and legacy map retained; removal/reopen/reload/cold recovery preserves allergies; substitutions and kitchen allergy notes retain exact guest identity. C1 pass alone cannot accept row while C2/C3 fail.",
-      "automated": "FAIL",
+      "automated": "PARTIAL",
       "physical": "NOT_RUN",
-      "independent": "Internal verifier reproduced C1 pass and C2/C3 failures; external Claude PENDING",
-      "gate": "C2 projection/restore and C3 exact substitutions/notes still fail; no formal acceptance",
+      "independent": "External Claude PENDING",
+      "gate": "Local components pass; durable recovery, complete transport/post-SEND and physical criteria unverified; formal0",
       "firstCycle": 1,
-      "evidence": "../../lab/docs/evidence/manual-corrective-safety/INVESTIGATIONS.json",
+      "evidence": "../../lab/docs/evidence/allergy-recovery-notes/results.json",
       "simulatedTransport": "NOT_RUN",
       "components": {
         "C1": "PASS unit/browser candidate",
-        "C2": "FAIL local serialization/ingest",
-        "C3": "FAIL editor and lookup; note payload source gap",
+        "C2": "PASS local JSON checkpoint/new runtime only",
+        "C3": "PASS exact substitutions/course contexts/pure note builder; no delivery claim",
         "durableTransport": "BLOCKED",
         "physical": "NOT_RUN"
       }
@@ -906,7 +906,7 @@
     "criticalTarget": 52,
     "criticalFailed": 1,
     "criticalBlocked": 21,
-    "note": "M30 composite FAIL with C2/C3 unresolved even if four browser components pass; no formal acceptance"
+    "note": "Historical base result: M30 composite FAIL; current local candidate is PARTIAL/BLOCKED per allergyRecoveryRevision; no formal acceptance"
   },
   "initialManualAudit": {
     "profile": "actual POS + tracked BOH fixtures; no live backend",
@@ -973,6 +973,17 @@
     "C1": "baseline2ffFAIL; candidate unit/browser PASS; internally reproduced",
     "C2": "UNRESOLVED local roundtrip FAIL",
     "C3": "UNRESOLVED local editor/lookup FAIL; note payload source-inspected",
+    "physical": "NOT_RUN",
+    "simulatedTransport": "NOT_RUN",
+    "formalAccepted": 0,
+    "historicalEvidenceNote": "These results describe base 1cd022e; current candidate is allergyRecoveryRevision below."
+  },
+  "allergyRecoveryRevision": {
+    "baseCommit": "1cd022e",
+    "C1": "PASS permanent reproduction",
+    "C2": "PASS isolated local record recovery; durable DB NOT_TESTED",
+    "C3": "PASS exact-position substitution/course context/pure note content",
+    "evidence": "../../lab/docs/evidence/allergy-recovery-notes/results.json",
     "physical": "NOT_RUN",
     "simulatedTransport": "NOT_RUN",
     "formalAccepted": 0

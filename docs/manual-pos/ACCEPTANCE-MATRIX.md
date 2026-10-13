@@ -1,6 +1,6 @@
 # Consolidated60 acceptance tests — corrective safety revision
 
-Single authority:SCORECARD.json;60unique rows,52critical/8minor,formal0/60. M30 is FAIL until all allergy criteria including recovery/substitutions pass. Missing authentic catalog is BLOCKED. Automated/simulated transport/physical/independent outcomes separate. All subscenarios required for a grouped row.
+Single authority:SCORECARD.json;60unique rows,52critical/8minor,formal0/60. M30 remains PARTIAL/BLOCKED: isolated C1/C2/C3 components pass, but durable recovery, complete transport/post-SEND and physical criteria remain unverified. Missing authentic catalog is BLOCKED. Automated/simulated transport/physical/independent outcomes separate. All subscenarios required for a grouped row.
 
 Classification change:mandatory disclaimer M18 promoted to critical; M47 narrowed to visual-only usability and minor. All removed safety assertions retained in criticalM23/M28/M45/M60. No safety requirement downgraded.
 

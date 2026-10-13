@@ -1981,6 +1981,11 @@ function persistCheck(check){
     check.guestCount=sessionOf(check.table).guestCount||check.guestCount;
     check.seatedAt=sessionOf(check.table).seatedAt||check.seatedAt;
     check.femalePositions=Object.assign({}, femalePositionsOf(check.table));
+    // Safety data is part of the saved check, not only volatile table-session memory.
+    var safety=sessionOf(check.table);
+    check.allergies=JSON.parse(JSON.stringify(safety.allergies||{table:[]}));
+    check.kitchenNote=String(safety.kitchenNote||'');
+    check.positionSubs=JSON.parse(JSON.stringify(safety.positionSubs||{}));
   }
   check.updatedAt=Date.now();
   STATE.checks[check.id]=check;
@@ -2004,6 +2009,10 @@ function ingestOpenChecks(list){
     sess.checkId=ch.id;
     if (ch.seatedAt && !sess.seatedAt) sess.seatedAt=ch.seatedAt;
     if (ch.guestCount) sess.guestCount=ch.guestCount;
+    // Restore only fields present: a legacy record cannot silently clear restrictions.
+    if(ch.allergies&&typeof ch.allergies==='object'&&!Array.isArray(ch.allergies)) sess.allergies=JSON.parse(JSON.stringify(ch.allergies));
+    if(ch.kitchenNote!=null) sess.kitchenNote=String(ch.kitchenNote);
+    if(ch.positionSubs&&typeof ch.positionSubs==='object'&&!Array.isArray(ch.positionSubs)) sess.positionSubs=JSON.parse(JSON.stringify(ch.positionSubs));
     if (ch.femalePositions && typeof ch.femalePositions==='object') {
       sess.femalePositions=sess.femalePositions||{};
       Object.keys(ch.femalePositions).forEach(function(k){
@@ -2369,7 +2378,7 @@ function normSeatKey(seat){
   if (seat==='table' || seat==='TABLE' || seat==null || seat==='') return 'table';
   return String(seat);
 }
-function orderPositionIdentity(line){ return String(line.seat)+(line.seatPriority!=null?(line.seatPriority?'A':''):(isPriorityPosition(line.seat)?'A':'')); }
+function orderPositionIdentity(line){ var seat=String(line.seat);if(seat==='table'||/^\d+A$/.test(seat)) return seat;return seat+(line.seatPriority!=null?(line.seatPriority?'A':''):(isPriorityPosition(line.seat)?'A':'')); }
 function checkPositionIdentities(){
   var check=STATE.checks[activeCheckId()];
   if(check && Array.isArray(check.positionIdentities)) return check.positionIdentities.slice();
@@ -6007,7 +6016,7 @@ function collectWorkingCheckGroups(){
         seat:to.seat, priority:to.seatPriority, temp:'',
         selectKey:diningLineKey(to.id, welcomeIdx),
         status:welcomeStatus, kind:'welcome',
-        note:positionSubForSeat('welcome', to.seat),
+        note:positionSubForSeat('welcome', to.seat, to.seatPriority),
         ticketPos:defaultTicketPosForKind('welcome'),
         rowFire:true
       });
@@ -6016,7 +6025,7 @@ function collectWorkingCheckGroups(){
       if (isWelcomeTrioCourse(c)) return;
       if (hideEntremetUntilDessert(c, to)) return;
       if (isEntremetCourse(c)) {
-        var entremetName=positionSubForSeat('entremet', to.seat) || operationalDishName(c.choice||c.name||'', c);
+        var entremetName=positionSubForSeat('entremet', to.seat, to.seatPriority) || operationalDishName(c.choice||c.name||'', c);
         addPlate({
           bucket:'entremet',
           opName:entremetName || 'Entremet',
@@ -6024,7 +6033,7 @@ function collectWorkingCheckGroups(){
           seat:to.seat, priority:to.seatPriority, temp:'',
           selectKey:diningLineKey(to.id, i),
           status:c.fired?'sent':(c.skipped?'held':'unsent'),
-          note:positionSubForSeat('entremet', to.seat) && entremetName!==positionSubForSeat('entremet', to.seat) ? positionSubForSeat('entremet', to.seat) : '',
+          note:positionSubForSeat('entremet', to.seat, to.seatPriority) && entremetName!==positionSubForSeat('entremet', to.seat, to.seatPriority) ? positionSubForSeat('entremet', to.seat, to.seatPriority) : '',
           kind:'entremet',
           ticketPos:diningCourseTicketPos(c,i),
           rowFire:true
@@ -8857,8 +8866,16 @@ function suggestedAllergyNote(flags){
   if (flags.some(function(a){ return /nut/.test(a); })) notes.push('ALLERGY NUTS — no nut garnish on entremet.');
   return notes.join(' ');
 }
-function courseAllergyKitchenNote(c){
-  var flags=flaggedAllergies();
+function exactPositionAllergyContext(identity, table){
+  table=table==null?STATE.selectedTable:table;identity=String(identity);
+  var sess=sessionOf(table),check=STATE.checks[String(table)===String(STATE.selectedTable)?activeCheckId():sess.checkId];
+  var key=identity;
+  if(!(check&&Array.isArray(check.positionIdentities))&&/^\d+A$/.test(key)) key=String(parseInt(key,10));
+  var own=asList(sess.allergies&&sess.allergies[key]),shared=asList(sess.allergies&&sess.allergies.table);
+  return {position:identity,table:String(table),allergens:own,tableAllergies:shared,effectiveAllergens:Array.from(new Set(shared.concat(own)))};
+}
+function courseAllergyKitchenNote(c, identity, table){
+  var flags=identity==null?flaggedAllergies():exactPositionAllergyContext(identity,table).effectiveAllergens;
   var name=String((c&&(c.choice||c.name||c.course))||'').toLowerCase();
   var notes=[];
   function has(a){ return flags.some(function(x){ return String(x).toLowerCase()===a; }); }
@@ -8867,7 +8884,7 @@ function courseAllergyKitchenNote(c){
   if (has('gluten') && /zucchini/.test(name)) notes.push('ALLERGY GLUTEN — replace breaded zucchini.');
   if (has('shellfish') && /shrimp/.test(name)) notes.push('ALLERGY SHELLFISH — replace shrimp.');
   if ((has('tree nut')||has('nuts')) && /coconut|sorbet|entremet/.test(name)) notes.push('ALLERGY NUTS — no nut garnish.');
-  return notes.join(' ');
+  return notes.length ? (identity==null?'':'Position '+identity+' — ')+notes.join(' ') : '';
 }
 function dessertHasBeenChosen(to){
   if (to && to.dessertChosen) return true;
@@ -8887,6 +8904,8 @@ function hideEntremetUntilDessert(c, to){
   return !dessertHasBeenChosen(to);
 }
 function mergedPositionSubs(kind){
+  var saved=sessionOf(STATE.selectedTable).positionSubs;
+  if(saved&&Object.prototype.hasOwnProperty.call(saved,kind)) return Object.assign({},saved[kind]);
   var map={};
   tableDiningOrders().forEach(function(to){
     var src=(to.positionSubs && to.positionSubs[kind]) || {};
@@ -8900,19 +8919,22 @@ function mergedPositionSubs(kind){
   });
   return map;
 }
-function positionSubForSeat(kind, seat){
-  var map=mergedPositionSubs(kind);
-  var key=String(seat);
-  return map[key] || map[positionLabel(seat)] || '';
+function positionSubForSeat(kind, seat, priority){
+  var map=mergedPositionSubs(kind),identity=String(seat),check=STATE.checks[activeCheckId()];
+  var exact=check&&Array.isArray(check.positionIdentities);
+  if(!exact&&map[String(parseInt(identity,10))]) return map[String(parseInt(identity,10))];
+  if(/^\d+$/.test(identity)) identity+=priority!=null?(priority?'A':''):(exact&&checkPositionIdentities().includes(identity)?'':(isPriorityPosition(seat)?'A':''));
+  return map[identity]||'';
 }
 function diningPositionSubNote(to, c){
   if (!to || !c) return '';
   var kind=isWelcomeTrioCourse(c)?'welcome':(isEntremetCourse(c)?'entremet':'');
   if (!kind) return '';
   var map=(c.positionSubs && Object.keys(c.positionSubs).length)?c.positionSubs:((to.positionSubs&&to.positionSubs[kind])||{});
-  var text=map[String(to.seat)] || map[positionLabel(to.seat)] || '';
+  var identity=orderPositionIdentity(to),check=STATE.checks[to.checkId||activeCheckId()];
+  var text=map[identity]||(!(check&&Array.isArray(check.positionIdentities))?map[String(parseInt(identity,10))]:'')||'';
   if (!text) return '';
-  return positionLabel(to.seat)+' — '+text;
+  return identity+' — '+text;
 }
 function openPositionSubSheet(kind){
   var n=sessionOf(STATE.selectedTable).guestCount||2;
@@ -8920,35 +8942,39 @@ function openPositionSubSheet(kind){
   var title=kind==='entremet'?'Pre-dessert substitution':'Complimentary substitution';
   var std=kind==='entremet'?'Coconut-lime sorbet with rum glazed pineapple':'Salmon · Zucchini Milanese · Shrimp';
   var html='<h2>'+esc(title)+'</h2><p class="sheet-sub">Standard: '+esc(std)+'. Short replacement per position — does not rename the master dish.</p>';
-  for (var i=1;i<=n;i++){
-    html+='<label class="sheet-sub" style="display:block;margin:0.45rem 0 0.15rem">'+esc(positionLabel(i))+'</label>';
-    html+='<input class="search-box pos-sub-input" data-seat="'+i+'" value="'+esc(map[String(i)]||'')+'" placeholder="e.g. Salad instead of Zucchini">';
-  }
+  checkPositionIdentities().forEach(function(identity){
+    html+='<label class="sheet-sub" style="display:block;margin:0.45rem 0 0.15rem">'+esc(identity)+'</label>';
+    html+='<input class="search-box pos-sub-input" data-seat="'+esc(identity)+'" value="'+esc(map[identity]||'')+'" placeholder="Position-specific substitution note">';
+  });
   html+='<button class="primary-btn" onclick=\'savePositionSubs('+JSON.stringify(String(kind))+')\'>Save</button>';
   html+='<button class="ghost-btn" onclick="closeSheet()">Cancel</button>';
   openSheet(html);
 }
 function savePositionSubs(kind){
+  if(kind!=='welcome'&&kind!=='entremet') return;
   var map={};
   document.querySelectorAll('.pos-sub-input').forEach(function(el){
     var seat=String(el.getAttribute('data-seat')||'');
     var v=String(el.value||'').trim();
-    if (seat && v) map[seat]=v;
+    if (checkPositionIdentities().includes(seat) && v) map[seat]=v;
   });
+  var session=sessionOf(STATE.selectedTable);session.positionSubs=session.positionSubs||{};session.positionSubs[kind]=Object.assign({},map);
   tableDiningOrders().forEach(function(to){
     to.positionSubs=to.positionSubs||{};
+    var oldOrderMap=Object.assign({},to.positionSubs[kind]||{});
     to.positionSubs[kind]=Object.assign({}, map);
     diningCourses(to).forEach(function(c){
       if (kind==='welcome' && !isWelcomeTrioCourse(c)) return;
       if (kind==='entremet' && !isEntremetCourse(c)) return;
+      var oldMap=c.positionSubs&&Object.keys(c.positionSubs).length?c.positionSubs:oldOrderMap;
+      var priorLabels=Object.keys(oldMap).flatMap(function(k){return [k,positionLabel(parseInt(k,10))].map(function(label){return label+' — '+oldMap[k];});});
       c.positionSubs=Object.assign({}, map);
       var sub=diningPositionSubNote(to, c);
-      var keep=String(c.modNote||'').split(' · ').filter(function(p){
-        return p && p.indexOf('ALLERGY')>-1;
-      });
+      var keep=String(c.modNote||'').split(' · ').filter(function(p){return p&&priorLabels.indexOf(p)<0;});
       c.modNote=[sub].concat(keep).filter(Boolean).join(' · ');
     });
   });
+  applyDiningAllergyNotes();
   closeSheet();
   STATE.selectedLineIds={};
   persistCheck(ensureOpenCheck(STATE.selectedTable));
@@ -8972,14 +8998,16 @@ function applyDiningAllergyNotes(){
   var tableNote=String(sessionOf(STATE.selectedTable).kitchenNote||'').trim();
   tableDiningOrders().forEach(function(to){
     diningCourses(to).forEach(function(c){
-      var auto=courseAllergyKitchenNote(c);
+      var identity=orderPositionIdentity(to);
+      c.allergyContext=exactPositionAllergyContext(identity,to.table);
+      var auto=courseAllergyKitchenNote(c,identity,to.table);
       var keep=String(c.modNote||'');
       var bits=[];
       var sub=diningPositionSubNote(to, c);
-      if (sub) bits.push(sub);
-      if (keep && keep.indexOf('ALLERGY')<0 && keep!==tableNote && keep!==sub) bits.push(keep);
-      if (auto) bits.push(auto);
-      if (tableNote) bits.push(tableNote);
+      var previous=(c.generatedSafetyNotes||[]).concat([courseAllergyKitchenNote(c),auto,sub,tableNote]);
+      keep.split(' · ').forEach(function(note){if(note&&previous.indexOf(note)<0) bits.push(note);});
+      c.generatedSafetyNotes=[sub,auto,tableNote].filter(Boolean);
+      bits=bits.concat(c.generatedSafetyNotes);
       var seen={};
       c.modNote=bits.filter(function(b){ if (!b || seen[b]) return false; seen[b]=1; return true; }).join(' · ');
     });
@@ -8989,18 +9017,26 @@ function saveAllergyKitchenNote(){
   var el=document.getElementById('allergy-kitchen-note');
   if (el) sessionOf(STATE.selectedTable).kitchenNote=String(el.value||'').trim();
   applyDiningAllergyNotes();
+  persistCheck(STATE.checks[activeCheckId()]||ensureOpenCheck(STATE.selectedTable));
+}
+function buildKitchenAllergyNote(){
+  var check=STATE.checks[activeCheckId()],table=String(STATE.selectedTable),sess=sessionOf(table);
+  if(!check||check.status!=='open'||String(check.table)!==table) return null;
+  var tableAllergies=asList(sess.allergies&&sess.allergies.table);
+  var positions=checkPositionIdentities().map(function(identity){
+    var allergens=asList(seatAllergies(identity));
+    return {position:identity,allergens:allergens,effectiveAllergens:Array.from(new Set(tableAllergies.concat(allergens))),substitutions:{welcome:positionSubForSeat('welcome',identity),entremet:positionSubForSeat('entremet',identity)}};
+  });
+  var body=['Table restrictions: '+(tableAllergies.join(', ')||'none')].concat(positions.map(function(p){
+    return 'Position '+p.position+' — guest restrictions: '+(p.allergens.join(', ')||'none')+'; effective restrictions: '+(p.effectiveAllergens.join(', ')||'none')+Object.keys(p.substitutions).filter(function(k){return p.substitutions[k];}).map(function(k){return '; '+k+': '+p.substitutions[k];}).join('');
+  }));
+  if(sess.kitchenNote) body.push('Table note: '+String(sess.kitchenNote));
+  return {table:STATE.selectedTable,checkId:check.id,server:STATE.currentServer?STATE.currentServer.name:'Unknown',allergyContext:{version:1,table:table,checkId:check.id,tableAllergies:tableAllergies,positions:positions,kitchenNote:String(sess.kitchenNote||'')},items:[{id:'note_'+Date.now(),name:'KITCHEN NOTE — allergies',station:'Expo',cookTime:0,modifiers:[],selectedMod:body.join(' · '),notes:body.join(' · ')}],status:'new',sentAt:Date.now(),clearedAt:null,isKitchenNote:true};
 }
 function sendKitchenAllergyNote(){
   saveAllergyKitchenNote();
-  var flags=flaggedAllergies();
-  var sess=sessionOf(STATE.selectedTable);
-  var body=[suggestedAllergyNote(flags), String(sess.kitchenNote||'').trim(), flags.length?('Flags: '+flags.join(', ')):'No allergy flags'].filter(Boolean).join(' · ');
-  var order={
-    table: STATE.selectedTable,
-    server: STATE.currentServer?STATE.currentServer.name:'Unknown',
-    items:[{id:'note_'+Date.now(), name:'KITCHEN NOTE — allergies', station:'Expo', cookTime:0, modifiers:[], selectedMod:body, notes:body}],
-    status:'new', sentAt:Date.now(), clearedAt:null, isKitchenNote:true
-  };
+  var sess=sessionOf(STATE.selectedTable),order=buildKitchenAllergyNote();
+  if(!order){toast('Open the correct check before sending notes');return;}
   var local=Object.assign({id:genId()}, order);
   STATE.orders.push(local);
   if (!STATE._localOrders) STATE._localOrders=[];
@@ -9174,7 +9210,7 @@ function confirmPrixFixe(pfId) {
   if (noteEl) kitchenNote=String(noteEl.value||'').trim();
   if (kitchenNote) selections.forEach(function(s){ s.modNote=s.modNote||kitchenNote; });
   selections.forEach(function(s){
-    var auto=courseAllergyKitchenNote(s);
+    var auto=courseAllergyKitchenNote(s,selectedPositionIdentity());
     if (auto && String(s.modNote||'').indexOf(auto)<0) s.modNote=s.modNote ? (s.modNote+' · '+auto) : auto;
   });
   var totalUpcharge=selections.reduce(function(s,x){ return s+(x.pending?0:(Number(x.upcharge)||0)); },0);
@@ -9866,6 +9902,7 @@ function transferCheckTo(newTable){
   dest.kitchenNote=sess.kitchenNote||'';
   dest.kitchenNoteSent=!!sess.kitchenNoteSent;
   dest.allergies=JSON.parse(JSON.stringify(sess.allergies||{table:[]}));
+  dest.positionSubs=JSON.parse(JSON.stringify(sess.positionSubs||{}));
   dest.femalePositions=Object.assign({}, sess.femalePositions||{});
   dest.positionStates=JSON.parse(JSON.stringify(sess.positionStates||{}));
   dest.checkId=sess.checkId||null;
@@ -10198,6 +10235,7 @@ function toggleAllergy(seat, name, stay){
   var i=list.indexOf(name);
   if (i>-1) list.splice(i,1); else list.push(name);
   applyDiningAllergyNotes();
+  persistCheck(STATE.checks[activeCheckId()]||ensureOpenCheck(STATE.selectedTable));
   if (stay) { renderOrder(); return; }
   openAllergyEditor();
 }
@@ -10286,6 +10324,7 @@ function startDiningFromCheckLine(ti){
       seat:ti.seat||STATE.activeSeat||'table',
       sentAt:Date.now(),
       seatPriority:ti.seatPriority!=null?ti.seatPriority:isPriorityPosition(ti.seat),
+      checkId:ti.checkId||activeCheckId(),
       _boundLine:ti.lineId
     };
   } else {
@@ -10311,6 +10350,7 @@ function startDiningFromCheckLine(ti){
       seat:ti.seat||STATE.activeSeat||'table',
       sentAt:Date.now(),
       seatPriority:ti.seatPriority!=null?ti.seatPriority:isPriorityPosition(ti.seat),
+      checkId:ti.checkId||activeCheckId(),
       _boundLine:ti.lineId
     };
     if (dessertHasBeenChosen(dining)) dining.dessertChosen=true;
@@ -10449,7 +10489,7 @@ function fireDiningCourse(to, quiet, idx){
   if (subNote && String(nextCourse.modNote||'').indexOf(subNote)<0) {
     nextCourse.modNote=nextCourse.modNote ? (nextCourse.modNote+' · '+subNote) : subNote;
   }
-  var allergyNote=courseAllergyKitchenNote(nextCourse);
+  var allergyNote=courseAllergyKitchenNote(nextCourse,orderPositionIdentity(to),to.table);
   var tableNote=String(sessionOf(to.table||STATE.selectedTable).kitchenNote||'').trim();
   if (allergyNote && notes.indexOf(allergyNote)<0) notes.push(allergyNote);
   if (tableNote && notes.indexOf(tableNote)<0) notes.push(tableNote);
@@ -10460,8 +10500,13 @@ function fireDiningCourse(to, quiet, idx){
   var courseOrder={
     table: to.table,
     server: to.server,
+    position:orderPositionIdentity(to),
+    checkId:to.checkId||activeCheckId(),
+    lineId:to._boundLine||null,
     tastingCourse:{
       type:isPf?'prix_fixe':'tasting',
+      position:orderPositionIdentity(to),
+      allergyContext:exactPositionAllergyContext(orderPositionIdentity(to),to.table),
       menuName:menuName,
       courseNum:i+1,
       totalCourses:courses.length,
