@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "milestone": "Manual POS first 60",
   "baselineCommit": "2ff42a75fc84762854e73854e4ac88abe196005d",
-  "phase": "C2/C3 isolated repair candidate from 1cd022e; independent and durable verification pending; formal0",
+  "phase": "manual table-safety and hands-on pilot candidate; independent/physical/durable acceptance pending",
   "criticalTarget": 52,
   "minorTarget": 8,
   "formalAccepted": 0,
@@ -987,5 +987,27 @@
     "physical": "NOT_RUN",
     "simulatedTransport": "NOT_RUN",
     "formalAccepted": 0
+  },
+  "tableSafetyPilot": {
+    "baseCommit": "0545f74",
+    "branch": "review/manual-pos-table-safety-pilot",
+    "localSuites": {
+      "passed": 10,
+      "failed": 0
+    },
+    "screenScenarios": {
+      "passed": 5,
+      "failed": 0,
+      "aborted": 0,
+      "interaction": "synthetic DOM Chromium emulation"
+    },
+    "handsOnLaunch": "PASS trusted Chromium clicks; not physical",
+    "splitAllergy": "PASS local latest revision and exact 2/2A",
+    "lateMenuSubstitution": "PASS local inheritance",
+    "tableMerge": "PASS local collision remap, restrictions and legacy aliases",
+    "physical": "NOT_RUN",
+    "durableDatabase": "NOT_TESTED",
+    "formalAccepted": 0,
+    "evidence": "../../lab/docs/evidence/table-safety-pilot/results.json"
   }
 }

@@ -1,0 +1,2 @@
+Lab session expired: listener and connections closed.
+PASS: local-only assets/CSP, fixture provenance, no SDK/provider fallback, exact origin/token, payload limits, evidence rejection and unauthorized/expired LAN guards. No device or provider accessed.

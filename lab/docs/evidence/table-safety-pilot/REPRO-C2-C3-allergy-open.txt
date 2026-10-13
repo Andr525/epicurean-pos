@@ -1,0 +1,48 @@
+{
+  "mode": "source-backed local investigation",
+  "cases": [
+    {
+      "id": "C2-local-check-roundtrip",
+      "status": "passed",
+      "persistedAllergies": {
+        "2": [
+          "Fish"
+        ],
+        "3": [],
+        "table": [],
+        "2A": [
+          "Dairy"
+        ]
+      },
+      "restored": {
+        "2": [
+          "Fish"
+        ],
+        "3": [],
+        "table": [],
+        "2A": [
+          "Dairy"
+        ]
+      },
+      "limitation": "Actual persistCheck serialization + ingestOpenChecks; no live Firebase or physical reload"
+    },
+    {
+      "id": "C3-substitution-editor",
+      "status": "passed",
+      "controls": [
+        "1",
+        "2",
+        "2A",
+        "3"
+      ]
+    },
+    {
+      "id": "C3-exact-substitution-lookup",
+      "status": "passed",
+      "actual": "2A — LAB NOTE FOR 2A",
+      "expected": "2A — LAB NOTE FOR 2A"
+    }
+  ],
+  "kitchenActions": 0,
+  "firebaseWrites": 0
+}

@@ -1298,8 +1298,9 @@ body.tableside .app-content, body.hh-table .app-content { padding-bottom:calc(92
 }
 @media (max-width:767px) {
   body.hh-on.hh-table .app-content { overflow-y:auto; -webkit-overflow-scrolling:touch; }
-  body.hh-on.hh-table .ts-console { height:auto; overflow:visible; }
-  body.hh-on.hh-table .add-items-pane { flex:1 0 auto; min-height:52vh; }
+  body.hh-on.hh-table .ts-console { height:auto; overflow:visible; flex-shrink:0; }
+  body.hh-on.hh-table .ts-console.toast-go.has-dining .add-items-pane,
+  body.hh-on.hh-table .add-items-pane { flex:0 0 auto; min-height:52vh; }
   body.hh-on.voice-live .voice-test, body.hh-on.voice-live .allergy-strip { display:none; }
 }
 .voice-dock button {
@@ -1981,16 +1982,22 @@ function persistCheck(check){
     check.guestCount=sessionOf(check.table).guestCount||check.guestCount;
     check.seatedAt=sessionOf(check.table).seatedAt||check.seatedAt;
     check.femalePositions=Object.assign({}, femalePositionsOf(check.table));
-    // Safety data is part of the saved check, not only volatile table-session memory.
-    var safety=sessionOf(check.table);
-    check.allergies=JSON.parse(JSON.stringify(safety.allergies||{table:[]}));
-    check.kitchenNote=String(safety.kitchenNote||'');
-    check.positionSubs=JSON.parse(JSON.stringify(safety.positionSubs||{}));
   }
+  // Safety data is part of the saved check, not only volatile table-session memory.
+  var safety=sessionOf(check.table);
+  check.allergies=JSON.parse(JSON.stringify(safety.allergies||{table:[]}));
+  check.kitchenNote=String(safety.kitchenNote||'');
+  check.positionSubs=JSON.parse(JSON.stringify(safety.positionSubs||{}));
+  check.safetyRevision=safety.safetyRevision||0;
   check.updatedAt=Date.now();
   STATE.checks[check.id]=check;
   if (!fbReady) return;
   fbDb.collection('checks').doc(check.id).set(check).catch(function(e){ console.warn('Check save:', e); });
+}
+function persistTableSafety(){
+  var sess=sessionOf(STATE.selectedTable);
+  sess.safetyRevision=Math.max(Date.now(),(sess.safetyRevision||0)+1);
+  tableCheckIds(STATE.selectedTable).forEach(function(id){persistCheck(STATE.checks[id]);});
 }
 function closeOpenCheck(table, status){
   var sess=sessionOf(table);
@@ -2010,9 +2017,11 @@ function ingestOpenChecks(list){
     if (ch.seatedAt && !sess.seatedAt) sess.seatedAt=ch.seatedAt;
     if (ch.guestCount) sess.guestCount=ch.guestCount;
     // Restore only fields present: a legacy record cannot silently clear restrictions.
-    if(ch.allergies&&typeof ch.allergies==='object'&&!Array.isArray(ch.allergies)) sess.allergies=JSON.parse(JSON.stringify(ch.allergies));
-    if(ch.kitchenNote!=null) sess.kitchenNote=String(ch.kitchenNote);
-    if(ch.positionSubs&&typeof ch.positionSubs==='object'&&!Array.isArray(ch.positionSubs)) sess.positionSubs=JSON.parse(JSON.stringify(ch.positionSubs));
+    var restoreSafety=(ch.safetyRevision||0)>=(sess.safetyRevision||0);
+    if(restoreSafety) sess.safetyRevision=ch.safetyRevision||0;
+    if(restoreSafety&&ch.allergies&&typeof ch.allergies==='object'&&!Array.isArray(ch.allergies)) sess.allergies=JSON.parse(JSON.stringify(ch.allergies));
+    if(restoreSafety&&ch.kitchenNote!=null) sess.kitchenNote=String(ch.kitchenNote);
+    if(restoreSafety&&ch.positionSubs&&typeof ch.positionSubs==='object'&&!Array.isArray(ch.positionSubs)) sess.positionSubs=JSON.parse(JSON.stringify(ch.positionSubs));
     if (ch.femalePositions && typeof ch.femalePositions==='object') {
       sess.femalePositions=sess.femalePositions||{};
       Object.keys(ch.femalePositions).forEach(function(k){
@@ -8977,7 +8986,7 @@ function savePositionSubs(kind){
   applyDiningAllergyNotes();
   closeSheet();
   STATE.selectedLineIds={};
-  persistCheck(ensureOpenCheck(STATE.selectedTable));
+  ensureOpenCheck(STATE.selectedTable);persistTableSafety();
   renderOrder();
   toast('Substitution saved');
 }
@@ -9017,7 +9026,7 @@ function saveAllergyKitchenNote(){
   var el=document.getElementById('allergy-kitchen-note');
   if (el) sessionOf(STATE.selectedTable).kitchenNote=String(el.value||'').trim();
   applyDiningAllergyNotes();
-  persistCheck(STATE.checks[activeCheckId()]||ensureOpenCheck(STATE.selectedTable));
+  ensureOpenCheck(STATE.selectedTable);persistTableSafety();
 }
 function buildKitchenAllergyNote(){
   var check=STATE.checks[activeCheckId()],table=String(STATE.selectedTable),sess=sessionOf(table);
@@ -9703,6 +9712,7 @@ function createSisterCheck(table){
     },
     updatedAt:Date.now()
   };
+  if(Array.isArray(primary.positionIdentities)) check.positionIdentities=primary.positionIdentities.slice();
   STATE.checks[id]=check;
   sess.checkIds=tableCheckIds(table);
   if (sess.checkIds.indexOf(id)<0) sess.checkIds.push(id);
@@ -9710,6 +9720,7 @@ function createSisterCheck(table){
   return check;
 }
 function assignLineToCheck(lineId, checkId){
+  (STATE.activeTastingOrders||[]).forEach(function(to){if(to._boundLine===lineId) to.checkId=checkId;});
   unsentFor().forEach(function(i){ if (i.lineId===lineId) i.checkId=checkId; });
   STATE.orders.forEach(function(o){
     if (String(o.table)!==String(STATE.selectedTable)) return;
@@ -9785,12 +9796,12 @@ function splitBySeat(){
   var n=sessionOf(STATE.selectedTable).guestCount||STATE.guestCount||2;
   var bySeat={};
   unsentFor().forEach(function(i){
-    var sk=String(i.seat==null?'table':i.seat);
+    var sk=i.seat==null?'table':orderPositionIdentity(i);
     (bySeat[sk]=bySeat[sk]||[]).push(i);
   });
   STATE.orders.filter(function(o){ return String(o.table)===String(STATE.selectedTable)&&o.status==='new'; }).forEach(function(o){
     (o.items||[]).forEach(function(i){
-      var sk=String(i.seat==null?'table':i.seat);
+      var sk=i.seat==null?'table':orderPositionIdentity(i);
       (bySeat[sk]=bySeat[sk]||[]).push(i);
     });
   });
@@ -10072,40 +10083,40 @@ function reapplyCombines(){
   });
 }
 function mergeChecksIntoTable(srcTable, destTable){
-  destTable=String(destTable);
-  srcTable=String(srcTable);
-  if (srcTable===destTable) return;
-  var srcIds=tableCheckIds(srcTable);
-  var srcHas = srcIds.length || unsentFor(srcTable).length || tableHasOrder(srcTable);
-  var destHas = tableCheckIds(destTable).length || unsentFor(destTable).length || tableHasOrder(destTable);
-  var srcSess=STATE.tableSessions[srcTable];
-  var destSess=sessionOf(destTable);
-  if (srcSess) {
-    destSess.guestCount=Math.max(destSess.guestCount||0, srcSess.guestCount||0) || destSess.guestCount;
-    destSess.seatedAt=destSess.seatedAt||srcSess.seatedAt;
-    destSess.allergies=destSess.allergies||srcSess.allergies;
+  destTable=String(destTable);srcTable=String(srcTable);
+  if(srcTable===destTable) return;
+  var srcIds=tableCheckIds(srcTable),destIds=tableCheckIds(destTable);
+  var srcSess=sessionOf(srcTable),destSess=sessionOf(destTable);
+  function identities(ids,sess){
+    var out=[],explicit=false;ids.forEach(function(id){if(Array.isArray(STATE.checks[id].positionIdentities)) explicit=true;(STATE.checks[id].positionIdentities||[]).forEach(function(p){if(out.indexOf(p)<0) out.push(p);});});
+    if(!out.length) for(var i=1;i<=(sess.guestCount||2);i++) out.push(String(i)+(sess.femalePositions&&sess.femalePositions[i]?'A':''));
+    Object.keys(sess.allergies||{}).concat(Object.keys((sess.positionSubs||{}).welcome||{}),Object.keys((sess.positionSubs||{}).entremet||{})).forEach(function(p){if(!explicit&&/^\d+$/.test(p)&&sess.femalePositions&&sess.femalePositions[p]) p+='A';if(/^\d+A?$/.test(p)&&out.indexOf(p)<0) out.push(p);});
+    return out;
   }
+  var dstPositions=identities(destIds,destSess),srcPositions=identities(srcIds,srcSess),mapping={},bases={};
+  var next=Math.max.apply(null,[0].concat(dstPositions.concat(srcPositions).map(function(p){return parseInt(p,10)||0;})))+1;
+  srcPositions.forEach(function(p){var base=parseInt(p,10);if(!bases[base]) bases[base]=dstPositions.some(function(d){return parseInt(d,10)===base;})?String(next++):String(base);mapping[p]=bases[base]+(/A$/.test(p)?'A':'');});
+  var all=dstPositions.concat(srcPositions.map(function(p){return mapping[p];}));
+  destSess.allergies=destSess.allergies||{table:[]};
+  destSess.allergies.table=Array.from(new Set(asList(destSess.allergies.table).concat(asList(srcSess.allergies&&srcSess.allergies.table))));
+  srcPositions.forEach(function(p){var explicit=srcIds.some(function(id){return Array.isArray(STATE.checks[id].positionIdentities);});var key=!explicit&&/A$/.test(p)?String(parseInt(p,10)):p;destSess.allergies[mapping[p]]=asList(srcSess.allergies&&srcSess.allergies[key]).slice();});
+  destSess.positionSubs=destSess.positionSubs||{};
+  ['welcome','entremet'].forEach(function(kind){var map=Object.assign({},destSess.positionSubs[kind]||{});Object.keys((srcSess.positionSubs||{})[kind]||{}).forEach(function(p){var identity=mapping[p]?p:(srcSess.femalePositions&&srcSess.femalePositions[p]?p+'A':p);if(mapping[identity]) map[mapping[identity]]=srcSess.positionSubs[kind][p];});destSess.positionSubs[kind]=map;});
+  destSess.kitchenNote=[destSess.kitchenNote,srcSess.kitchenNote?('From table '+srcTable+': '+srcSess.kitchenNote):''].filter(Boolean).join(' · ');
+  destSess.guestCount=all.length;destSess.seatedAt=destSess.seatedAt||srcSess.seatedAt;
+  destSess.safetyRevision=Math.max(Date.now(),(destSess.safetyRevision||0)+1,(srcSess.safetyRevision||0)+1);
+  var previousTable=STATE.selectedTable,previousView=STATE.viewCheckId;
+  STATE.selectedTable=destTable;STATE.viewCheckId=null;
+  var dest=ensureOpenCheck(destTable);destIds.forEach(function(id){STATE.checks[id].positionIdentities=all.slice();});dest.positionIdentities=all;dest.positionMerge={sourceTable:srcTable,positions:mapping};
+  function remap(line){var old=orderPositionIdentity(line),identity=mapping[old];if(identity){line.seat=parseInt(identity,10);line.seatPriority=/A$/.test(identity);}line.table=destTable;line.checkId=dest.id;}
+  STATE.currentOrder.forEach(function(i){if(String(i.table)===srcTable) remap(i);});
+  STATE.orders.forEach(function(o){if(String(o.table)===srcTable&&o.status==='new'){o.table=destTable;o.checkId=dest.id;(o.items||[]).forEach(remap);}});
+  (STATE.activeTastingOrders||[]).forEach(function(to){if(String(to.table)!==srcTable) return;remap(to);to.positionSubs=JSON.parse(JSON.stringify(destSess.positionSubs));diningCourses(to).forEach(function(c){var kind=isWelcomeTrioCourse(c)?'welcome':(isEntremetCourse(c)?'entremet':'');if(kind)c.positionSubs=Object.assign({},destSess.positionSubs[kind]);});});
+  srcIds.forEach(function(id){var ch=STATE.checks[id];if(ch){ch.status='merged';ch.mergedInto=dest.id;persistCheck(ch);}});
   delete STATE.tableSessions[srcTable];
-  if (!srcHas && !destHas) return;
-  var dest=ensureOpenCheck(destTable);
-  srcIds.forEach(function(id){
-    var ch=STATE.checks[id];
-    if (!ch) return;
-    ch.status='merged';
-    ch.mergedInto=dest.id;
-    persistCheck(ch);
-  });
-  STATE.currentOrder.forEach(function(i){
-    if (String(i.table)===srcTable) { i.table=destTable; i.checkId=dest.id; }
-  });
-  STATE.orders.forEach(function(o){
-    if (String(o.table)===srcTable && o.status==='new') {
-      o.table=destTable;
-      o.checkId=dest.id;
-      (o.items||[]).forEach(function(i){ i.checkId=dest.id; });
-    }
-  });
-  persistCheck(dest);
+  STATE.viewCheckId=dest.id;applyDiningAllergyNotes();persistTableSafety();
+  STATE.selectedTable=String(previousTable)===srcTable?destTable:previousTable;
+  STATE.viewCheckId=String(previousTable)===srcTable?dest.id:previousView;
 }
 function combineTables(a, b){
   a=resolveTableNumber(a);
@@ -10131,8 +10142,9 @@ function combineTables(a, b){
   mergeChecksIntoTable(drop, keep);
   var seats=keepObj.seats||2;
   var sess=sessionOf(keep);
-  sess.guestCount=seats;
-  STATE.guestCount=seats;
+  var mergedCheck=STATE.checks[sess.checkId];
+  sess.guestCount=mergedCheck&&mergedCheck.positionIdentities?mergedCheck.positionIdentities.length:seats;
+  STATE.guestCount=sess.guestCount;
   STATE.selectedTable=keep;
   var stayOnOrder=STATE.activeTab==='order';
   closeSheet();
@@ -10235,7 +10247,7 @@ function toggleAllergy(seat, name, stay){
   var i=list.indexOf(name);
   if (i>-1) list.splice(i,1); else list.push(name);
   applyDiningAllergyNotes();
-  persistCheck(STATE.checks[activeCheckId()]||ensureOpenCheck(STATE.selectedTable));
+  ensureOpenCheck(STATE.selectedTable);persistTableSafety();
   if (stay) { renderOrder(); return; }
   openAllergyEditor();
 }
@@ -10356,7 +10368,10 @@ function startDiningFromCheckLine(ti){
     if (dessertHasBeenChosen(dining)) dining.dessertChosen=true;
   }
   if (!STATE.activeTastingOrders) STATE.activeTastingOrders=[];
+  dining.positionSubs=JSON.parse(JSON.stringify(sessionOf(STATE.selectedTable).positionSubs||{}));
+  diningCourses(dining).forEach(function(c){var kind=isWelcomeTrioCourse(c)?'welcome':(isEntremetCourse(c)?'entremet':'');if(kind&&Object.prototype.hasOwnProperty.call(dining.positionSubs,kind)) c.positionSubs=Object.assign({},dining.positionSubs[kind]);});
   STATE.activeTastingOrders.push(dining);
+  applyDiningAllergyNotes();
   ti.diningOrderId=dining.id;
   if (fbReady) fbDb.collection('tasting_orders').add(dining);
   return dining;
@@ -10813,7 +10828,7 @@ function openDiningCourseEditor(toId, idx){
   html+='<div class="pf-course-select"><label>Choose one</label><div class="pf-options">';
   html+=pfNoneRadioHtml('pf-edit-opt', !!(c.noneChoice || /^none$/i.test(current)));
   options.forEach(function(o,oi){
-    var hits=guestAllergyHits(o.allergens);
+    var hits=allergenHits(Object.assign({},o,{seatPriority:to.seatPriority}),to.seat);
     var temps=prixFixeTempOptions(o.askTemp, o);
     var checked=current && String(o.name)===current;
     html+='<label class="pf-opt-label"><input type="radio" name="pf-edit-opt" value="'+oi+'"'+(checked?' checked':'')+'>'+
@@ -10865,6 +10880,7 @@ function confirmDiningCourseEdit(toId, idx){
     extras.temp=tEl.value;
   }
   applyOptionToDiningCourse(c, opt, extras);
+  applyDiningAllergyNotes();
   var line=(STATE.currentOrder||[]).filter(function(i){ return i.diningOrderId===to.id || i.lineId===to._boundLine; })[0];
   if (line && line.selections && line.selections[idx]) line.selections[idx]=Object.assign({}, c);
   closePfSelector();

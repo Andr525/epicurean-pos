@@ -1,3 +1,9 @@
+# Current manual POS hands-on pilot
+
+Start here: [Mac/iPhone opening instructions and testable workflow](docs/MANUAL-IPHONE-PILOT.md). Review branch `review/manual-pos-table-safety-pilot` adds split/late-menu/merge allergy regressions and a five-scenario manual screen audit. Formal acceptance remains0/60; durable database and physical verification pending. [Repair evidence](../docs/manual-pos/TABLE-SAFETY-PILOT.md).
+
+The following sections describe earlier deliveries and their historical results.
+
 # Corrective safety review
 
 Current manual audit runs4components, including exactmodifier2/2A/3 warnings. See [corrective RCA and unresolved defects](../docs/manual-pos/CORRECTIVE-SAFETY-REVISION.md). C1candidatepasses; C2recovery and C3substitutions/notes stillfail, so M30isFAIL and formalacceptance0/60. No emulator/Voice development. Historical counts below refer to earliercommits.
