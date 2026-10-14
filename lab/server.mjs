@@ -8,7 +8,7 @@ export function isolatedHtml(source,token,screenOnly=false,manual=false){
  html=html.replace(/var firebaseConfig = \{[\s\S]*?\};/,"var firebaseConfig = {projectId:'demo-epicurean-lab',apiKey:'fixture-only'};");
  html=html.replace("window.EPICUREAN_VOICE_TRANSCRIBE_URL='https://us-central1-epicurean-house-at-the-choc-st.cloudfunctions.net/voiceTranscribe';","window.EPICUREAN_VOICE_TRANSCRIBE_URL='/lab/transcribe';");
  html=html.replace('</head>',`<script>window.EPICUREAN_LAB_MANUAL=${manual};window.EPICUREAN_LAB_MOBILE_UI=${manual};window.EPICUREAN_LAB_SCREEN_ONLY=${screenOnly};window.EPICUREAN_LAB_TOKEN=${JSON.stringify(token)};</script><script src="/lab/containment.js"></script></head>`);
- return html.replace('</body>',(manual?'<script src="/manual-mobile.js"></script>':'')+'<script src="/lab/bootstrap.js"></script><script src="/lab/suite.js"></script></body>');
+ return html.replace('</body>',(manual?'<script src="/lab/manual-allergy-workflow.js"></script><script src="/manual-mobile.js"></script>':'')+'<script src="/lab/bootstrap.js"></script><script src="/lab/suite.js"></script></body>');
 }
 export async function startLab({port=0,host='127.0.0.1',tls=null,ownerApproval=null,artifactDir=resolve(root,'lab/artifacts'),screenOnly=false,manual=false,sessionMs=3600000}={}){
  if(manual)screenOnly=true;
@@ -32,7 +32,7 @@ export async function startLab({port=0,host='127.0.0.1',tls=null,ownerApproval=n
    requests.push({method:req.method,path});if(requests.length>2000)requests.shift();
    if(req.method==='GET'&&path==='/'){res.setHeader('Content-Type','text/html; charset=utf-8');res.end(isolatedHtml(readFileSync(resolve(root,'index.html'),'utf8'),token,screenOnly,manual));return;}
    if(req.method==='GET'&&path==='/lab/fixture'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({manifest:data.manifest,menu:data.menu,entries:data.entries,revision:data.revision,check:data.check,...(manual?{manualCatalog:data.manualCatalog}:{})}));return;}
-   if(req.method==='GET'&&(/^\/lab\/(containment|bootstrap|suite)\.js$/.test(path)||assets.has(path.slice(1)))){
+   if(req.method==='GET'&&(/^\/lab\/(containment|bootstrap|suite|manual-allergy-workflow)\.js$/.test(path)||assets.has(path.slice(1)))){
     const name=path==='/cellar.js'&&manual?resolve(root,'lab/fixtures/cellar.js'):path==='/scalini-dining.js'?resolve(root,'lab/fixtures/scalini-dining.js'):path.startsWith('/lab/')?resolve(root,path.slice(1)):resolve(root,path.slice(1));
     res.setHeader('Content-Type',path.endsWith('.js')?'application/javascript':'image/png');res.end(readFileSync(name));return;
    }

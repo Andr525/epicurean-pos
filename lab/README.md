@@ -1,3 +1,5 @@
+Latest isolated allergy-modification and simulated kitchen review candidate: [workflow, reproducible tests and limits](docs/MANUAL-ALLERGY-REVIEW.md). Pending Claude review; formal acceptance remains 0/60.
+
 # Current corrective allergy review
 
 [Boundaries, coverage, reproducible tests and BLOCKED categories](docs/ALLERGY-BOUNDARY-REVIEW.md). Same review branch; mobile presentation explicitly lab-only. No allergy override is authorized. Earlier delivery notes and counts below are historical.

@@ -1,0 +1,31 @@
+{
+  "results": [
+    {
+      "label": "Position 2 compatible menu unaffected by position 2A Nuts",
+      "result": "PASS"
+    },
+    {
+      "label": "Selected dish saved as unsent exact-position request",
+      "result": "PASS"
+    },
+    {
+      "label": "Rejection and BOH replacement keep menu pricing",
+      "result": "PASS"
+    },
+    {
+      "label": "Preparation cancellation needs simulated kitchen acknowledgment",
+      "result": "PASS"
+    },
+    {
+      "label": "Conflicting replacement restarts review",
+      "result": "PASS"
+    },
+    {
+      "label": "2/2A audit isolation; no external requests or sent orders",
+      "result": "PASS"
+    }
+  ],
+  "external": [],
+  "errors": [],
+  "physicalDeviceTested": false
+}

@@ -1,0 +1,18 @@
+{
+  "parent": "aff7137f892675138fd94e506c65b35c5421ff0b",
+  "node": "24.19.0",
+  "scope": "isolated actual POS + authentic frozen BOH snapshots + simulated kitchen decisions",
+  "formalAcceptance": "0/60",
+  "physicalDeviceTested": false,
+  "sourceHashes": {
+    "index.html": "1fa7bc696f209763026114084740b19338617d73cd3743f9599134d517b2fc6f",
+    "manual-mobile.js": "0235f991888d9ab9583705cfcee04c82e2e9eec2a95249aa3492a1bb8073268c",
+    "lab/manual-allergy-workflow.js": "b364845655075176f57914e995b2fdfdf869435afd09f9f38914946a2849f125",
+    "lab/server.mjs": "4cbf40193be76b29098011d7ab1849dfe3dc64827f9c02ff6bd1b5015df2a63d",
+    "lab/bootstrap.js": "9920e5318668b174791242ea0c61e7b9bb382134f41efba4ffe6c8ee405d17f0",
+    "lab/suite.js": "d79eceadd258f453cda202e9cb6651103e970fe7b05652ed807d41cd7b648ac3",
+    "test/manual-allergy-review.mjs": "d3621a29b3262379e20348fe7eb7fd27d94a7abb9375155c8213f05c4aba5a05",
+    "lab/test/allergy-review.mjs": "554996b99df9f64f9d24a9d20b060eca01a9d4e1dcf7deffc4dd4b17b64ae104",
+    "lab/test/manual-mobile.mjs": "e2a139fa2b76e44db6ce4bedecf8988eb22d9d2d90a92a0ba0d8cb93501b5df6"
+  }
+}

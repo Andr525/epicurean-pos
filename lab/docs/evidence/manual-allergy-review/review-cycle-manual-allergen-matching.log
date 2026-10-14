@@ -1,0 +1,570 @@
+{
+  "results": [
+    {
+      "guest": "Nuts",
+      "item": "Tree Nut",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Tree Nut",
+      "item": "Nuts",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Nuts",
+      "item": "Peanut",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Peanut",
+      "item": "Nuts",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Nut",
+      "item": "Tree Nuts",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "tree-nut(s)",
+      "item": "NUTS",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Nuts",
+      "item": "Groundnuts",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Peanuts",
+      "item": "peanut",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "TREE_NUTS",
+      "item": "Tree Nut",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Eggs",
+      "item": "Egg",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Sulphites",
+      "item": "Sulfite",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Nuts",
+      "item": "hazelnut",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "hazelnut",
+      "item": "Nuts",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Tree Nut",
+      "item": "hazelnut",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "hazelnut",
+      "item": "Tree Nut",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Nuts",
+      "item": "Hazelnuts",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Hazelnuts",
+      "item": "Nuts",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Tree Nut",
+      "item": "Hazelnuts",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Hazelnuts",
+      "item": "Tree Nut",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Nuts",
+      "item": "almond",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "almond",
+      "item": "Nuts",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Tree Nut",
+      "item": "almond",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "almond",
+      "item": "Tree Nut",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Nuts",
+      "item": "Almonds",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Almonds",
+      "item": "Nuts",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Tree Nut",
+      "item": "Almonds",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Almonds",
+      "item": "Tree Nut",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Nuts",
+      "item": "walnut",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "walnut",
+      "item": "Nuts",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Tree Nut",
+      "item": "walnut",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "walnut",
+      "item": "Tree Nut",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Nuts",
+      "item": "Walnuts",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Walnuts",
+      "item": "Nuts",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Tree Nut",
+      "item": "Walnuts",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Walnuts",
+      "item": "Tree Nut",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Nuts",
+      "item": "cashew",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "cashew",
+      "item": "Nuts",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Tree Nut",
+      "item": "cashew",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "cashew",
+      "item": "Tree Nut",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Nuts",
+      "item": "pecans",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "pecans",
+      "item": "Nuts",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Tree Nut",
+      "item": "pecans",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "pecans",
+      "item": "Tree Nut",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Nuts",
+      "item": "pistachios",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "pistachios",
+      "item": "Nuts",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Tree Nut",
+      "item": "pistachios",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "pistachios",
+      "item": "Tree Nut",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Nuts",
+      "item": "macadamia",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "macadamia",
+      "item": "Nuts",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Tree Nut",
+      "item": "macadamia",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "macadamia",
+      "item": "Tree Nut",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Nuts",
+      "item": "Brazil nuts",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Brazil nuts",
+      "item": "Nuts",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Tree Nut",
+      "item": "Brazil nuts",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Brazil nuts",
+      "item": "Tree Nut",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Nuts",
+      "item": "Pine nuts",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Pine nuts",
+      "item": "Nuts",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Tree Nut",
+      "item": "Pine nuts",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Pine nuts",
+      "item": "Tree Nut",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Nuts",
+      "item": "Tree Nut (hazelnut)",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Tree Nut (hazelnut)",
+      "item": "Nuts",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Tree Nut",
+      "item": "Tree Nut (hazelnut)",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Tree Nut (hazelnut)",
+      "item": "Tree Nut",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Nuts",
+      "item": "Tree Nuts (almonds, walnuts)",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Tree Nuts (almonds, walnuts)",
+      "item": "Nuts",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Tree Nut",
+      "item": "Tree Nuts (almonds, walnuts)",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Tree Nuts (almonds, walnuts)",
+      "item": "Tree Nut",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Nuts",
+      "item": "Peanut (roasted)",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Peanut (roasted)",
+      "item": "Nuts",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Nuts",
+      "item": "Unknown nuts",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Unknown nuts",
+      "item": "Nuts",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Tree Nut",
+      "item": "Unknown nuts",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Unknown nuts",
+      "item": "Tree Nut",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Nuts",
+      "item": "mysterynut",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "mysterynut",
+      "item": "Nuts",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Tree Nut",
+      "item": "mysterynut",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "mysterynut",
+      "item": "Tree Nut",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Nuts",
+      "item": "Nut ingredient (unclassified)",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Nut ingredient (unclassified)",
+      "item": "Nuts",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Tree Nut",
+      "item": "Nut ingredient (unclassified)",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Nut ingredient (unclassified)",
+      "item": "Tree Nut",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Peanut",
+      "item": "Unknown nuts",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Tree Nut",
+      "item": "Peanut",
+      "result": "PASS",
+      "evidence": "specific categories remain separate"
+    },
+    {
+      "guest": "Tree Nuts",
+      "item": "Groundnuts",
+      "result": "PASS",
+      "evidence": "specific categories remain separate"
+    },
+    {
+      "guest": "Peanut",
+      "item": "Tree Nut",
+      "result": "PASS",
+      "evidence": "specific categories remain separate"
+    },
+    {
+      "guest": "Fish",
+      "item": "Shellfish",
+      "result": "PASS",
+      "evidence": "specific categories remain separate"
+    },
+    {
+      "guest": "Nutmeg",
+      "item": "Nuts",
+      "result": "PASS",
+      "evidence": "specific categories remain separate"
+    },
+    {
+      "guest": "Nuts",
+      "item": "Donut",
+      "result": "PASS",
+      "evidence": "specific categories remain separate"
+    },
+    {
+      "guest": "Nuts",
+      "item": "Doughnuts",
+      "result": "PASS",
+      "evidence": "specific categories remain separate"
+    },
+    {
+      "guest": "Tree Nut",
+      "item": "Nutmeg",
+      "result": "PASS",
+      "evidence": "specific categories remain separate"
+    },
+    {
+      "guest": "Tree Nut",
+      "item": "Peanut (roasted)",
+      "result": "PASS",
+      "evidence": "specific categories remain separate"
+    },
+    {
+      "guest": "Peanut",
+      "item": "Tree Nut (hazelnut)",
+      "result": "PASS",
+      "evidence": "specific categories remain separate"
+    },
+    {
+      "guest": "Peanut",
+      "item": "Almonds",
+      "result": "PASS",
+      "evidence": "specific categories remain separate"
+    },
+    {
+      "result": "PASS",
+      "evidence": "authentic compatible beverage added at 2A with original BOH price"
+    }
+  ],
+  "limitations": [
+    "Label variants use synthetic metadata only; no authentic peanut-bearing published dish supplied",
+    "No database, kitchen transport or physical device test"
+  ]
+}

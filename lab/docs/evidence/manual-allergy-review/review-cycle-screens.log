@@ -1,0 +1,31 @@
+{
+  "output": "/workspace/epicurean-pos/lab/artifacts/screen-1792009017735",
+  "summary": {
+    "passed": 5,
+    "failed": 0,
+    "aborted": 0
+  },
+  "cases": [
+    {
+      "id": "manual-catalog",
+      "status": "passed"
+    },
+    {
+      "id": "manual-allergy-identity",
+      "status": "passed"
+    },
+    {
+      "id": "manual-modifier-position",
+      "status": "passed"
+    },
+    {
+      "id": "manual-menu",
+      "status": "passed"
+    },
+    {
+      "id": "manual-hands-on-order",
+      "status": "passed"
+    }
+  ],
+  "safety": "no external requests or sent orders"
+}

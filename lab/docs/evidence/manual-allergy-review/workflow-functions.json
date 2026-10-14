@@ -1,0 +1,67 @@
+{
+  "mode": "real POS with isolated simulated kitchen adapter",
+  "results": [
+    {
+      "id": "Adapter is absent from normal page and inactive without both explicit lab flags",
+      "result": "PASS"
+    },
+    {
+      "id": "Only selected PF dishes; deferred dessert/entremet and exact guest warnings",
+      "result": "PASS"
+    },
+    {
+      "id": "Selected nut dish queues exact per-dish modification; no safety certification",
+      "result": "PASS"
+    },
+    {
+      "id": "Kitchen rejection and audited replacement retain exact course/price/position",
+      "result": "PASS"
+    },
+    {
+      "id": "Preparation cancellation requires acknowledgment; replacement allergy is rechecked",
+      "result": "PASS"
+    },
+    {
+      "id": "Dessert checks chosen dessert and activated entremet separately; repeated prices do not accumulate",
+      "result": "PASS"
+    },
+    {
+      "id": "Allergy change invalidates approval; stale request and no-note requests do not mutate order",
+      "result": "PASS"
+    },
+    {
+      "id": "Extra dish modifiers and replacing an ordinary line keep full original audit",
+      "result": "PASS"
+    },
+    {
+      "id": "Tasting modifications stay queued and cannot begin before review",
+      "result": "PASS"
+    },
+    {
+      "id": "Compatible-item allergy instructions queue review and direct preparation edits cannot bypass acknowledgment",
+      "result": "PASS"
+    },
+    {
+      "id": "Direct compatible course mutation after preparation starts is rolled back",
+      "result": "PASS"
+    },
+    {
+      "id": "BOH replacement upcharge and repeated kitchen decisions preserve totals and audit integrity",
+      "result": "PASS"
+    },
+    {
+      "id": "Menu relocation keeps exact guest ownership and newly conflicting courses require review",
+      "result": "PASS"
+    },
+    {
+      "id": "Adapter opt-in; unsupported direct course guard still blocks; no live mode",
+      "result": "PASS"
+    }
+  ],
+  "limitations": [
+    "No real kitchen policy, authorization or transport integration",
+    "No live Firebase or durable database recovery",
+    "No physical iPhone acceptance",
+    "BOH snapshot only; missing catalog categories remain unavailable"
+  ]
+}

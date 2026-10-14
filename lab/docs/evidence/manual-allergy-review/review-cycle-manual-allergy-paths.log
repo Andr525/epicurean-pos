@@ -1,0 +1,154 @@
+{
+  "mode": "source-backed local boundary regression",
+  "results": [
+    {
+      "guestNutLabel": "Tree Nut",
+      "id": "a-la-carte/direct-add-and-replace-boundary",
+      "result": "PASS",
+      "evidenceKind": "source-backed local function regression"
+    },
+    {
+      "guestNutLabel": "Tree Nut",
+      "id": "shared-plate-and-stale-held-buffer-recheck",
+      "result": "PASS",
+      "evidenceKind": "source-backed local function regression"
+    },
+    {
+      "guestNutLabel": "Tree Nut",
+      "id": "position-relocation-and-positive-quantity-recheck",
+      "result": "PASS",
+      "evidenceKind": "source-backed local function regression"
+    },
+    {
+      "guestNutLabel": "Tree Nut",
+      "id": "prix-fixe-extra-direct-commit",
+      "result": "PASS",
+      "evidenceKind": "source-backed local function regression"
+    },
+    {
+      "guestNutLabel": "Tree Nut",
+      "id": "included-dessert-and-none-entremet-activation",
+      "result": "PASS",
+      "evidenceKind": "source-backed local function regression"
+    },
+    {
+      "guestNutLabel": "Tree Nut",
+      "id": "included-dessert-selected-scoop-allergens",
+      "result": "PASS",
+      "evidenceKind": "source-backed local function regression"
+    },
+    {
+      "guestNutLabel": "Tree Nut",
+      "id": "prix-fixe-and-tasting-add",
+      "result": "PASS",
+      "evidenceKind": "source-backed local function regression"
+    },
+    {
+      "guestNutLabel": "Tree Nut",
+      "id": "course-edit-and-direct-option-mutation",
+      "result": "PASS",
+      "evidenceKind": "source-backed local function regression"
+    },
+    {
+      "guestNutLabel": "Tree Nut",
+      "id": "tasting-note-and-temperature-edits",
+      "result": "PASS",
+      "evidenceKind": "source-backed local function regression"
+    },
+    {
+      "guestNutLabel": "Tree Nut",
+      "id": "pairing-missing-authentic-record-and-metadata-fails-closed",
+      "result": "PASS",
+      "evidenceKind": "source-backed local function regression"
+    },
+    {
+      "guestNutLabel": "Tree Nut",
+      "id": "pairing-tree-nut-guard-SIMULATED-TRANSPORT-NOT-CATALOG-ACCEPTANCE",
+      "result": "PASS",
+      "evidenceKind": "simulated-transport metadata (no real pairing publication)"
+    },
+    {
+      "guestNutLabel": "Tree Nut",
+      "id": "exact-substitutions-on-permitted-priced-beverage-and-menu-creation",
+      "result": "PASS",
+      "evidenceKind": "source-backed local function regression"
+    },
+    {
+      "guestNutLabel": "Nuts",
+      "id": "a-la-carte/direct-add-and-replace-boundary",
+      "result": "PASS",
+      "evidenceKind": "source-backed local function regression"
+    },
+    {
+      "guestNutLabel": "Nuts",
+      "id": "shared-plate-and-stale-held-buffer-recheck",
+      "result": "PASS",
+      "evidenceKind": "source-backed local function regression"
+    },
+    {
+      "guestNutLabel": "Nuts",
+      "id": "position-relocation-and-positive-quantity-recheck",
+      "result": "PASS",
+      "evidenceKind": "source-backed local function regression"
+    },
+    {
+      "guestNutLabel": "Nuts",
+      "id": "prix-fixe-extra-direct-commit",
+      "result": "PASS",
+      "evidenceKind": "source-backed local function regression"
+    },
+    {
+      "guestNutLabel": "Nuts",
+      "id": "included-dessert-and-none-entremet-activation",
+      "result": "PASS",
+      "evidenceKind": "source-backed local function regression"
+    },
+    {
+      "guestNutLabel": "Nuts",
+      "id": "included-dessert-selected-scoop-allergens",
+      "result": "PASS",
+      "evidenceKind": "source-backed local function regression"
+    },
+    {
+      "guestNutLabel": "Nuts",
+      "id": "prix-fixe-and-tasting-add",
+      "result": "PASS",
+      "evidenceKind": "source-backed local function regression"
+    },
+    {
+      "guestNutLabel": "Nuts",
+      "id": "course-edit-and-direct-option-mutation",
+      "result": "PASS",
+      "evidenceKind": "source-backed local function regression"
+    },
+    {
+      "guestNutLabel": "Nuts",
+      "id": "tasting-note-and-temperature-edits",
+      "result": "PASS",
+      "evidenceKind": "source-backed local function regression"
+    },
+    {
+      "guestNutLabel": "Nuts",
+      "id": "pairing-missing-authentic-record-and-metadata-fails-closed",
+      "result": "PASS",
+      "evidenceKind": "source-backed local function regression"
+    },
+    {
+      "guestNutLabel": "Nuts",
+      "id": "pairing-tree-nut-guard-SIMULATED-TRANSPORT-NOT-CATALOG-ACCEPTANCE",
+      "result": "PASS",
+      "evidenceKind": "simulated-transport metadata (no real pairing publication)"
+    },
+    {
+      "guestNutLabel": "Nuts",
+      "id": "exact-substitutions-on-permitted-priced-beverage-and-menu-creation",
+      "result": "PASS",
+      "evidenceKind": "source-backed local function regression"
+    }
+  ],
+  "limitations": [
+    "No authentic standalone-food or pairing publication supplied; à-la-carte conflicts use authentic PF dish metadata with no invented standalone price",
+    "Pairing catalog acceptance BLOCKED; missing-record/missing-metadata rejection and synthetic conflicting transport metadata tested, no authentic pairing created",
+    "No database, kitchen transport or physical iPhone test"
+  ]
+}
