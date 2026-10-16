@@ -1541,6 +1541,17 @@ function createNamedFirestoreAdapter(){
   function listDocs(collection){
     return request('GET',FIRESTORE_ROOT+'/'+encodeURIComponent(collection)+'?pageSize=1000').then(function(json){return (json.documents||[]).map(function(doc){return docFrom(doc);});});
   }
+  // Phase 0: a complete, paginated one-shot read (used to verify a table move against the cloud).
+  function listAllDocs(collection){
+    var out=[];
+    function page(token){
+      return request('GET',FIRESTORE_ROOT+'/'+encodeURIComponent(collection)+'?pageSize=300'+(token?'&pageToken='+encodeURIComponent(token):'')).then(function(json){
+        (json.documents||[]).forEach(function(doc){ out.push(docFrom(doc)); });
+        return json.nextPageToken ? page(json.nextPageToken) : out;
+      });
+    }
+    return page('');
+  }
   function snapshot(docs){
     return {docs:docs,size:docs.length,empty:docs.length===0,forEach:function(callback,context){docs.forEach(function(doc){callback.call(context,doc);});}};
   }
@@ -1587,6 +1598,7 @@ function createNamedFirestoreAdapter(){
     var ref={
       doc:function(id){return {get:function(){return getDoc(name,id);},set:function(data,options){return setDoc(name,id,data,options);},update:function(data){return updateDoc(name,id,data);},onSnapshot:function(callback,onError){return watchDoc(name,id,callback,onError);}};},
       add:function(data){return addDoc(name,data);},
+      get:function(){return listAllDocs(name).then(snapshot);},
       onSnapshot:function(callback,onError){return watchCollection(name,null,callback,onError);},
       where:function(field,op,value){return {onSnapshot:function(callback,onError){return watchCollection(name,{field:field,op:op,value:value},callback,onError);}};}
     };
@@ -2699,7 +2711,8 @@ function posLineMoney(n){
   return String(n);
 }
 function posTotalMoney(n){
-  return String(Math.round(Number(n)||0));
+  // Phase 0: money is shown to the cent (a $1.50 check is never "Pay 2").
+  return '$'+(Math.round((Number(n)||0)*100)/100).toFixed(2);
 }
 function posStopWord(w){
   return !w || w.length<2 || /^(the|and|di|del|della|dei|al|alla|con|with|of|a|an|in|on|for|by|de|du|le|la|il|los|aux|et|or|to|from|our|is|el)$/.test(w);
@@ -9949,40 +9962,19 @@ function openMoveTableSheet(){
 }
 /* Phase 0: the REST adapter has no where().get(); retarget the tickets this device already
    knows (moved in memory by transferCheckTo) by document id, then the kitchen feed. */
-function retargetKitchenTickets(oldTable, newTable, movedOrders, movedDining){
-  if (!fbReady || !fbDb || !fbDb.collection) return;
-  (movedOrders||[]).forEach(function(o){
-    var id=orderDocId(o);
-    if (!id || ((STATE._localOrders||[]).indexOf(o)>-1 && !o.fbId)) { o._pendingItems=true; return; }
-    fbDb.collection('orders').doc(id).update({table:String(newTable)}).catch(function(e){ console.warn('Ticket move:', e); });
-  });
-  (movedDining||[]).forEach(function(d){
-    if (d.fbId) fbDb.collection('tasting_orders').doc(d.fbId).update({table:String(newTable)}).catch(function(e){ console.warn('Dining move:', e); });
-  });
-  activeOrdersWrite = activeOrdersWrite.then(function(){
-    var feed=fbDb.collection('boh_shared').doc('active_orders');
-    return feed.get().then(function(doc){
-      if (!doc.exists) return null;
-      var data=doc.data()||{};
-      var list=Array.isArray(data.list)?data.list.map(function(item){
-        if (!item || String(item.table)!==String(oldTable)) return item;
-        if (item.status==='paid' || item.status==='cleared' || item.status==='void') return item;
-        var copy=Object.assign({}, item);
-        copy.table=String(newTable);
-        return copy;
-      }):[];
-      return feed.set({list:list, updatedAt:Date.now()});
-    });
-  }).catch(function(e){ console.warn('Kitchen feed move:', e); });
+function moveIsOpenDoc(o){ return !!o && o.status!=='paid' && o.status!=='cleared' && o.status!=='void' && o.status!=='closed'; }
+// Phase 0: a move is verified against a fresh, complete cloud read (orders sent from other
+// devices may not have reached this device yet: reads poll every 60 s).
+function transferReadAll(){
+  if (!fbReady || !fbDb || !fbDb.collection) return Promise.reject(new Error('cloud unavailable'));
+  function all(name){
+    var col=fbDb.collection(name);
+    if (typeof col.get!=='function') return Promise.reject(new Error('cloud list read unavailable'));
+    return col.get().then(function(snap){ var out=[]; snap.forEach(function(d){ out.push(Object.assign({}, d.data()||{}, {id:d.id})); }); return out; });
+  }
+  return Promise.all([all('orders'), all('tasting_orders'), all('checks')]).then(function(r){ return {orders:r[0], tasting:r[1], checks:r[2]}; });
 }
-function transferCheckTo(newTable){
-  var old=String(STATE.selectedTable||'');
-  newTable=String(resolveTableNumber(newTable)||newTable||'');
-  if (!old || !newTable || old===newTable) return;
-  var srcState=tableServiceState(old);
-  if (srcState==='empty') { toast('Nothing to move'); return; }
-  if (srcState==='paid') { toast('This check is closed'); return; }
-  if (tableServiceState(newTable)!=='empty') { toast('Table '+newTable+' is occupied'); return; }
+function applyLocalTransfer(old, newTable){
   var sess=sessionOf(old);
   var dest=sessionOf(newTable);
   dest.guestCount=sess.guestCount||dest.guestCount||2;
@@ -10002,20 +9994,9 @@ function transferCheckTo(newTable){
     dest.checkId=dest.checkIds[0]||null;
   }
   STATE.currentOrder.forEach(function(i){ if (i && String(i.table)===old) i.table=newTable; });
-  var movedOrders=[], movedDining=[];
-  STATE.orders.forEach(function(o){
-    if (!o || String(o.table)!==old) return;
-    if (o.status==='paid' || o.status==='cleared' || o.status==='void') return;
-    o.table=newTable;
-    movedOrders.push(o);
-  });
-  (STATE._localOrders||[]).forEach(function(o){ if (o && String(o.table)===old && movedOrders.indexOf(o)<0 && o.status!=='paid') { o.table=newTable; movedOrders.push(o); } });
-  (STATE.activeTastingOrders||[]).forEach(function(o){
-    if (!o || String(o.table)!==old) return;
-    if (o.status==='paid' || o.status==='closed' || o.status==='void') return;
-    o.table=newTable;
-    movedDining.push(o);
-  });
+  STATE.orders.forEach(function(o){ if (o && String(o.table)===old && moveIsOpenDoc(o)) o.table=newTable; });
+  (STATE._localOrders||[]).forEach(function(o){ if (o && String(o.table)===old && o.status!=='paid') o.table=newTable; });
+  (STATE.activeTastingOrders||[]).forEach(function(o){ if (o && String(o.table)===old && moveIsOpenDoc(o)) o.table=newTable; });
   STATE.selectedTable=newTable;
   STATE.tableChosen=true;
   (STATE.parkedLines||[]).forEach(function(l){ if (l && String(l.table)===old) l.table=newTable; });
@@ -10030,11 +10011,130 @@ function transferCheckTo(newTable){
   });
   delete STATE.tableSessions[old];
   STATE.viewCheckId=dest.checkId;
-  retargetKitchenTickets(old, newTable, movedOrders, movedDining);
-  closeSheet();
-  renderOrder();
-  paintChrome();
-  toast('Moved to table '+newTable);
+}
+// Moves every open cloud document of the old table (from a fresh read) and waits for each write.
+function moveCloudDocs(old, newTable, fresh){
+  var jobs=[];
+  fresh.orders.forEach(function(o){
+    if (String(o.table)!==old || !moveIsOpenDoc(o)) return;
+    jobs.push(fbDb.collection('orders').doc(o.id).update({table:String(newTable)}));
+  });
+  fresh.tasting.forEach(function(d){
+    if (String(d.table)!==old || !moveIsOpenDoc(d)) return;
+    jobs.push(fbDb.collection('tasting_orders').doc(d.id).update({table:String(newTable)}));
+  });
+  var checkIds={};
+  fresh.checks.forEach(function(c){ if (String(c.table)===old && c.status==='open') checkIds[c.id]=1; });
+  Object.keys(STATE.checks||{}).forEach(function(id){ var ch=STATE.checks[id]; if (ch && String(ch.table)===String(newTable) && ch.status==='open') checkIds[id]=1; });
+  Object.keys(checkIds).forEach(function(id){
+    var ch=STATE.checks[id];
+    jobs.push(ch ? fbDb.collection('checks').doc(id).set(Object.assign({}, ch, {table:String(newTable)})) : fbDb.collection('checks').doc(id).update({table:String(newTable)}));
+  });
+  var feedJob = activeOrdersWrite.then(function(){
+    var feed=fbDb.collection('boh_shared').doc('active_orders');
+    return feed.get().then(function(doc){
+      if (!doc.exists) return null;
+      var data=doc.data()||{};
+      var list=Array.isArray(data.list)?data.list.map(function(item){
+        if (!item || String(item.table)!==old || !moveIsOpenDoc(item)) return item;
+        return Object.assign({}, item, {table:String(newTable)});
+      }):[];
+      return feed.set({list:list, updatedAt:Date.now()});
+    });
+  });
+  activeOrdersWrite = feedJob.catch(function(e){ console.warn('Kitchen feed move:', e); });
+  jobs.push(feedJob);
+  return Promise.all(jobs.map(function(j){ return Promise.resolve(j).then(function(){ return null; }, function(e){ return e; }); })).then(function(errs){
+    return errs.filter(Boolean);
+  });
+}
+function verifyTransfer(old, newTable){
+  return transferReadAll().then(function(fresh){
+    var left=[];
+    fresh.orders.forEach(function(o){ if (String(o.table)===old && moveIsOpenDoc(o)) left.push('ticket '+((o.items||[]).map(function(i){ return i.name; }).join(', ')||o.id)); });
+    fresh.tasting.forEach(function(d){ if (String(d.table)===old && moveIsOpenDoc(d)) left.push('dining order '+(d.name||d.id)); });
+    fresh.checks.forEach(function(c){ if (String(c.table)===old && c.status==='open') left.push('check '+c.id); });
+    var feed=null;
+    return fbDb.collection('boh_shared').doc('active_orders').get().then(function(doc){
+      feed=doc.exists ? (doc.data()||{}).list||[] : [];
+      feed.forEach(function(item){ if (item && String(item.table)===old && moveIsOpenDoc(item)) left.push('kitchen display entry '+(item.name||item.id||'')); });
+      return left;
+    });
+  });
+}
+function reportTransfer(old, newTable, writeErrors, left){
+  if (!writeErrors.length && left && !left.length) {
+    closeSheet(); renderOrder(); paintChrome();
+    toast('Moved to table '+newTable);
+    return;
+  }
+  var items=left ? left : ['the move could not be confirmed (cloud read failed)'];
+  var html='<h2>Move not complete</h2><p class="sheet-sub">The party is on table '+esc(String(newTable))+' on this device, but '+items.length+' item(s) are still on table '+esc(String(old))+' in the cloud. The kitchen and other devices may still show table '+esc(String(old))+'.</p><ul>';
+  items.slice(0, 12).forEach(function(t){ html+='<li>'+esc(t)+'</li>'; });
+  html+='</ul><button class="primary-btn" onclick=\'retryTableMove('+JSON.stringify(String(old))+','+JSON.stringify(String(newTable))+')\'>Retry move</button><button class="ghost-btn" onclick="closeSheet()">Close</button>';
+  renderOrder(); paintChrome();
+  openSheet(html);
+  toast('Move incomplete — '+items.length+' item(s) still on table '+old);
+}
+function finishCloudMove(old, newTable, fresh){
+  // Tickets the cloud knows about but this device had not polled yet now show on the new table too.
+  fresh.orders.forEach(function(fo){
+    if (String(fo.table)!==old || !moveIsOpenDoc(fo)) return;
+    if (STATE.orders.some(function(o){ return orderDocId(o)===fo.id; })) return;
+    STATE.orders.push(Object.assign({}, fo, {table:String(newTable)}));
+  });
+  return moveCloudDocs(old, newTable, fresh).then(function(errs){
+    return verifyTransfer(old, newTable).then(function(left){ reportTransfer(old, newTable, errs, left); }, function(){ reportTransfer(old, newTable, errs, null); });
+  });
+}
+function retryTableMove(old, newTable){
+  if (STATE._moving) return;
+  STATE._moving=true;
+  transferReadAll().then(function(fresh){ return finishCloudMove(String(old), String(newTable), fresh); }, function(){
+    toast('Cloud still unreachable — move not confirmed; tickets may remain on table '+old);
+  }).catch(function(e){ console.warn('Move retry:', e); toast('Move not confirmed: '+(e && e.message || e)); }).then(function(){ STATE._moving=false; });
+}
+function transferCheckTo(newTable, opts){
+  opts=opts||{};
+  var old=String(STATE.selectedTable||'');
+  newTable=String(resolveTableNumber(newTable)||newTable||'');
+  if (!old || !newTable || old===newTable) return;
+  var srcState=tableServiceState(old);
+  if (srcState==='empty') { toast('Nothing to move'); return; }
+  if (srcState==='paid') { toast('This check is closed'); return; }
+  if (tableServiceState(newTable)!=='empty') { toast('Table '+newTable+' is occupied'); return; }
+  if (STATE._moving) return;
+  var cloud = fbReady && fbDb && fbDb.collection && typeof fbDb.collection('orders').get==='function';
+  if (!cloud) {
+    // Phase 0: without the cloud this device cannot see tickets other devices sent to this table.
+    if (!opts.offlineOk) {
+      openSheet('<h2>Cloud offline</h2><p class="sheet-sub">This device can\'t check for tickets other devices sent to table '+esc(old)+'. Nothing has been moved.</p><button class="ghost-btn" onclick=\'transferCheckTo('+JSON.stringify(newTable)+',{offlineOk:true})\'>Move only this device\'s orders (not verified)</button><button class="ghost-btn" onclick="closeSheet()">Cancel</button>');
+      toast('Cloud offline — move not done');
+      return;
+    }
+    applyLocalTransfer(old, newTable);
+    closeSheet(); renderOrder(); paintChrome();
+    toast('Moved this device\'s orders to table '+newTable+' — NOT verified (cloud offline)');
+    return;
+  }
+  STATE._moving=true;
+  toast('Checking every ticket for table '+old+'…');
+  transferReadAll().then(function(fresh){
+    var busy=fresh.orders.some(function(o){ return String(o.table)===newTable && moveIsOpenDoc(o); }) ||
+      fresh.checks.some(function(c){ return String(c.table)===newTable && c.status==='open'; }) ||
+      fresh.tasting.some(function(d){ return String(d.table)===newTable && moveIsOpenDoc(d); });
+    if (busy) { toast('Table '+newTable+' has an open check on another device — move not done'); return; }
+    var unconfirmed=(STATE._localOrders||[]).filter(function(lo){
+      return lo && String(lo.table)===old && lo.status!=='paid' && !lo.fbId && !fresh.orders.some(function(fo){ return fo.sentAt===lo.sentAt && String(fo.table)===old; });
+    });
+    if (unconfirmed.length) { toast('A ticket for table '+old+' is still being sent — move not done. Try again in a moment.'); return; }
+    applyLocalTransfer(old, newTable);
+    closeSheet(); renderOrder(); paintChrome();
+    return finishCloudMove(old, newTable, fresh);
+  }, function(){
+    openSheet('<h2>Move not done</h2><p class="sheet-sub">Can\'t confirm every order for table '+esc(old)+' (cloud unreachable). Nothing was moved — try again when the connection is back.</p><button class="ghost-btn" onclick="closeSheet()">OK</button>');
+    toast('Can\'t confirm every order for table '+old+' — move not done');
+  }).catch(function(e){ console.warn('Move:', e); toast('Move not confirmed: '+(e && e.message || e)); }).then(function(){ STATE._moving=false; });
 }
 function clearAccidentalTable(tNum){
   tNum=String(tNum||STATE.selectedTable||'');
@@ -11134,8 +11234,8 @@ function openPayment(subtotal) {
   if (!STATE.payEven) STATE.payEven = 1;
   var even = STATE.payEven || 1;
   var share = payShare(subtotal);
-  var tip = Math.round(share * STATE.tipPercent) / 100;
-  var total = share + tip;
+  var tip = tipCentsFor(Math.round(share*100), STATE.tipPercent) / 100;
+  var total = (Math.round(share*100) + Math.round(tip*100)) / 100;
 
   var html = '<h2>Payment</h2>';
   html += '<p class="pay-subtitle">Table '+STATE.selectedTable+' — '+(STATE.currentServer?STATE.currentServer.name:'')+'</p>';
@@ -11203,16 +11303,25 @@ function evenSplitOf(cid){
   var ch=STATE.checks[cid||activeCheckId()];
   return ch && ch.status==='open' && ch.evenSplit && ch.evenSplit.n>1 ? ch.evenSplit : null;
 }
-function payShare(subtotal){
+// Phase 0: shares are computed in integer cents. Every share but the last is rounded down;
+// the last share takes the exact remainder, so the shares always add up to the check.
+function payShareCents(subtotalCents, cid){
   var even=Math.max(1, Number(STATE.payEven)||1);
-  if (even<=1) return subtotal;
-  var es=evenSplitOf();
+  if (even<=1) return subtotalCents;
+  var es=evenSplitOf(cid);
+  var total=subtotalCents, paid=0, left=even;
   if (es && es.n===even) {
-    var paid=(es.paid||[]).reduce(function(a,b){ return a+b; },0);
-    var left=Math.max(1, es.n-(es.paid||[]).length);
-    return Math.round((es.totalCents-paid)/left)/100;
+    total=es.totalCents;
+    paid=(es.paid||[]).reduce(function(a,b){ return a+b; },0);
+    left=Math.max(1, es.n-(es.paid||[]).length);
   }
-  return Math.round(subtotal*100/even)/100;
+  return left<=1 ? total-paid : Math.floor((total-paid)/left);
+}
+function payShare(subtotal){
+  return payShareCents(Math.round((Number(subtotal)||0)*100))/100;
+}
+function tipCentsFor(shareCents, pct){
+  return Math.round(shareCents*(Number(pct)||0)/100);
 }
 function setPayEven(n, subtotal){
   var es=evenSplitOf();
@@ -11225,8 +11334,8 @@ function setTip(pct, subtotal) {
   STATE.tipPercent = pct;
   STATE.customTip = 0;
   var share = payShare(subtotal);
-  var tip = Math.round(share * pct) / 100;
-  var total = share + tip;
+  var tip = tipCentsFor(Math.round(share*100), pct) / 100;
+  var total = (Math.round(share*100) + Math.round(tip*100)) / 100;
   document.getElementById('pay-total-display').textContent = '$'+total.toFixed(2);
   var chargeBtn = document.getElementById('charge-btn');
   chargeBtn.textContent = 'Charge $'+total.toFixed(2);
@@ -11239,7 +11348,7 @@ function setCustomTip(val, subtotal) {
   var tipAmt = parseFloat(val) || 0;
   STATE.customTip = tipAmt;
   STATE.tipPercent = 0;
-  var total = payShare(subtotal) + tipAmt;
+  var total = (Math.round(payShare(subtotal)*100) + Math.round(tipAmt*100)) / 100;
   document.getElementById('pay-total-display').textContent = '$'+total.toFixed(2);
   var chargeBtn = document.getElementById('charge-btn');
   chargeBtn.textContent = 'Charge $'+total.toFixed(2);
@@ -11250,14 +11359,17 @@ function setCustomTip(val, subtotal) {
 function unpaidSentLinesOf(cid){
   return guestCheckItems(cid).filter(function(r){ return r.status==='sent'; });
 }
-function markCheckLinesPaid(cid, paymentId){
+function markCheckLinesPaid(cid, paymentId, lineIds){
+  var only=null;
+  if (Array.isArray(lineIds)) { only={}; lineIds.forEach(function(id){ only[id]=1; }); }
   STATE.orders.forEach(function(o){
     if (String(o.table)!==String(STATE.selectedTable) || (o.status!=='new' && o.status!=='held')) return;
     var touched=false;
-    (o.items||[]).forEach(function(i){
+    (o.items||[]).forEach(function(i, idx){
       if (i.paid) return;
       var itemCid=i.checkId||o.checkId||primaryCheckId(o.table);
       if (String(itemCid||'')!==String(cid||'')) return;
+      if (only && !only[i.lineId||('sent_'+o.id+'_'+(i.id||idx))]) return; // Phase 0: only the lines this payment covered
       i.paid=true; i.paidCheckId=cid; i.paymentId=paymentId||null; touched=true;
     });
     if (!touched) return;
@@ -11281,31 +11393,59 @@ function closeCheckById(cid, status){
   if (sess.checkId===cid && others.length) sess.checkId=others[0];
   if (STATE.viewCheckId===cid) STATE.viewCheckId=others[0]||null;
 }
+function payKeyHash(text){
+  var h=0; text=String(text||'');
+  for (var i=0;i<text.length;i++) { h=((h<<5)-h+text.charCodeAt(i))|0; }
+  return (h>>>0).toString(36);
+}
 async function processPayment(subtotal) {
   var chargeBtn = document.getElementById('charge-btn');
   var cid = activeCheckId();
   var check = STATE.checks[cid];
+  STATE._payInFlight = STATE._payInFlight || {};
+  STATE._paidKeys = STATE._paidKeys || {};
+  // Phase 0: one charge at a time per check; a stale Charge (after success, or for a check that
+  // is no longer the one on the payment screen) never charges anything.
+  if (STATE._payInFlight[cid]) return;
+  if (!check || check.status !== 'open' || STATE._payCheckId !== cid || !chargeBtn) { toast('This check is no longer open for payment — nothing was charged'); return; }
   // Phase 0: unsent items cannot be paid (they have no kitchen ticket and would be lost when the check closes).
   if (unsentFor().some(function(i){ return lineBelongsToCheck(i, cid); })) { toast('Send or remove unsent items before charging this check'); return; }
+  // Phase 0: the amount is recomputed from the check itself, in cents, at the moment of charging.
+  var subtotalCents = Math.round((Number(checkTotals().grand)||0) * 100);
+  if (subtotal != null && Math.round((Number(subtotal)||0) * 100) !== subtotalCents) { toast('This check changed — review the new amount before charging'); openPayment(subtotalCents/100); return; }
+  var lineIds = unpaidSentLinesOf(cid).map(function(r){ return r.lineId; }).sort();
+  if (subtotalCents <= 0) { toast('Nothing to charge on this check'); return; }
+  var even = Math.max(1, Number(STATE.payEven)||1);
+  var es = evenSplitOf(cid);
+  if (even > 1 && es && es.n === even && (es.totalCents !== subtotalCents || (es.lineIds && es.lineIds.join('|') !== lineIds.join('|')))) {
+    toast('This check changed after the split started (paid '+es.paid.length+' of '+es.n+'). The remaining shares cannot cover different items — settle the original split amount or move new items to another check.');
+    return;
+  }
+  var shareIndex = (es && es.n === even) ? (es.paid||[]).length : 0;
+  var shareCents = payShareCents(subtotalCents, cid);
+  var tipCents = STATE.customTip ? Math.round(Number(STATE.customTip) * 100) : tipCentsFor(shareCents, STATE.tipPercent);
+  var totalCents = shareCents + tipCents;
+  // Deterministic idempotency key: same check, same split share, same lines → same payment record.
+  var payKey = 'pay_' + cid + '_' + even + '_' + shareIndex + '_' + payKeyHash(lineIds.join('|') + '#' + subtotalCents);
+  if (STATE._paidKeys[payKey]) { toast('This payment was already processed — not charged again'); return; }
+
+  STATE._payInFlight[cid] = true;
   chargeBtn.disabled = true;
   chargeBtn.textContent = 'Processing…';
-
-  var even = Math.max(1, Number(STATE.payEven)||1);
-  var share = payShare(subtotal);
-  var tip = STATE.customTip || (Math.round(share * STATE.tipPercent) / 100);
-  var totalCents = Math.round((share + tip) * 100);
-
   try {
+    if (fbReady) {
+      var prior = await fbDb.collection('payments').doc(payKey).get(); // a failed read aborts: never charge blind
+      if (prior && prior.exists) { STATE._paidKeys[payKey] = 1; throw Object.assign(new Error('This payment was already processed — not charged again'), {duplicate:true}); }
+    }
     if (!squareCard) throw new Error('Card form not ready');
     var tokenResult = await squareCard.tokenize();
     if (tokenResult.status !== 'OK') throw new Error(tokenResult.errors?tokenResult.errors[0].message:'Tokenization failed');
 
-    // In production, you'd send this token to your server to create a payment.
+    // In production, you'd send this token (and payKey as the processor idempotency key) to your server.
     // For sandbox testing, we simulate a successful payment.
-    var paymentId = 'pay_' + genId();
-    var lineIds = unpaidSentLinesOf(cid).map(function(r){ return r.lineId; });
     var paymentData = {
-      paymentId: paymentId,
+      paymentId: payKey,
+      idempotencyKey: payKey,
       token: tokenResult.token,
       amount: totalCents,
       currency: 'USD',
@@ -11313,43 +11453,47 @@ async function processPayment(subtotal) {
       checkId: cid || null,
       lineIds: lineIds,
       server: STATE.currentServer?STATE.currentServer.name:'Unknown',
-      tip: Math.round(tip*100),
-      subtotal: Math.round(share*100),
-      checkSubtotal: Math.round(subtotal*100),
+      tip: tipCents,
+      subtotal: shareCents,
+      checkSubtotal: subtotalCents,
       split: even,
+      shareIndex: shareIndex,
       timestamp: Date.now()
     };
-    if (fbReady) await fbDb.collection('payments').add(paymentData);
+    if (fbReady) await fbDb.collection('payments').doc(payKey).set(paymentData);
+    STATE._paidKeys[payKey] = 1;
 
     var settled = true;
-    if (even > 1 && check) {
-      var es = evenSplitOf(cid);
-      if (!es || es.n !== even) es = { n: even, totalCents: Math.round(subtotal*100), paid: [] };
-      es.paid = (es.paid||[]).concat([Math.round(share*100)]);
+    if (even > 1) {
+      if (!es || es.n !== even) es = { n: even, totalCents: subtotalCents, lineIds: lineIds, paid: [] };
+      es.paid = (es.paid||[]).concat([shareCents]);
       check.evenSplit = es;
       var paidSum = es.paid.reduce(function(a,b){ return a+b; },0);
-      settled = es.paid.length >= es.n || paidSum >= es.totalCents;
+      settled = paidSum >= es.totalCents;
       if (!settled) persistCheck(check);
     }
     if (settled) {
-      // Phase 0: only this check's lines are marked paid, and only this check is closed.
+      // Phase 0: only this check's paid lines are marked paid, and only this check is closed.
       closeCheckById(cid, 'paid');
-      markCheckLinesPaid(cid, paymentId);
+      markCheckLinesPaid(cid, payKey, lineIds);
       STATE.payEven = 1;
       STATE._payCheckId = null;
     }
 
-    showPaymentSuccess(share + tip);
+    showPaymentSuccess(totalCents/100);
     if (!settled) {
-      var esLeft = evenSplitOf(cid), leftC = esLeft ? esLeft.totalCents - esLeft.paid.reduce(function(a,b){ return a+b; },0) : 0;
+      var leftC = es.totalCents - es.paid.reduce(function(a,b){ return a+b; },0);
       var card = document.querySelector('#payment-card .payment-success');
-      if (card) card.insertAdjacentHTML('beforeend', '<p>Remaining on this check: $'+(leftC/100).toFixed(2)+' ('+(esLeft.n-esLeft.paid.length)+' share(s) left)</p>');
+      if (card) card.insertAdjacentHTML('beforeend', '<p>Remaining on this check: $'+(leftC/100).toFixed(2)+' ('+(es.n-es.paid.length)+' share(s) left)</p>');
+      STATE._payCheckId = null; // the next share opens a fresh payment screen
     }
 
   } catch(e) {
-    chargeBtn.disabled = false;
-    chargeBtn.textContent = 'Charge $'+(share+tip).toFixed(2);
-    toast('⚠ Payment failed: '+e.message);
+    var btn = document.getElementById('charge-btn');
+    if (btn) { btn.disabled = false; btn.textContent = 'Charge $'+(totalCents/100).toFixed(2); }
+    toast(e.duplicate ? e.message : '⚠ Payment failed: '+e.message);
+  } finally {
+    delete STATE._payInFlight[cid];
   }
 }
 

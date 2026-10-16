@@ -96,6 +96,42 @@ await T('D3d', 3, 'A sent line moved to another check stays there after the next
   const after = await u.ev(() => guestCheckItems().map(i => i.name));
   return {pass: before.join() === 'Seared Tuna' && after.join() === 'Seared Tuna', evidence: `new check before poll=${before}; after poll=${after}`};
 });
+// ---- 3 (conditions). Exact cents, correct lines, no duplicate processing ----
+await T('D3e', 3, 'A stale second Charge after a successful payment never creates a second payment', async (u, p) => {
+  await u.pin('3001'); await u.seat('1'); await u.openCategory('c_des'); await u.tile('Chocolate Studio Torte'); await u.send(); await u.tapTable('1');
+  await p.locator('button[onclick^="openPayment"]').first().click(); await p.waitForTimeout(400);
+  const stale = await p.locator('#charge-btn').getAttribute('onclick');
+  // Two activations of the Charge handler in the same tick (double tap racing the disable), then the stale handler again after success.
+  await u.ev(h => { const f = new Function(h); f(); f(); }, stale); await p.waitForTimeout(1500);
+  await u.ev(h => { new Function(h)(); }, stale); await p.waitForTimeout(1500);
+  const d = await u.db(); const pays = Object.values(d.payments || {});
+  return {pass: pays.length === 1 && pays[0].amount === 1416 && pays[0].checkId && (pays[0].lineIds || []).length === 1, evidence: `payments=${JSON.stringify(pays.map(x => ({amount: x.amount, checkId: x.checkId, lines: (x.lineIds || []).length, key: x.idempotencyKey || null})))}; toast="${(await u.toast()).slice(0, 70)}"`};
+}, {card: true});
+await T('D3f', 3, 'Even split $10.00 /3: shares 3.33 / 3.33 / 3.34 in exact cents; the check closes at $0', async (u, p) => {
+  await u.pin('3001'); await u.seat('1'); await u.openCategory('c_des'); await u.tile('Chocolate Studio Torte'); await u.send(); await u.tapTable('1');
+  const labels = [];
+  for (let k = 0; k < 3; k++) { const r = await u.pay({even: 3}); labels.push(r.label); if (k < 2) { await u.floor(); await u.tapTable('1'); } }
+  const d = await u.db(); const pays = Object.values(d.payments || {}).sort((a, b) => a.timestamp - b.timestamp);
+  const subs = pays.map(x => x.subtotal); const tipsOk = pays.every(x => Number.isInteger(x.amount) && x.amount === x.subtotal + x.tip && x.tip === Math.round(x.subtotal * 18 / 100));
+  const chk = Object.values(d.checks || {}).find(c => String(c.table) === '1' && (c.guest && c.guest.items || []).length);
+  return {pass: subs.length === 3 && subs.reduce((a, b) => a + b, 0) === 1000 && subs.slice().sort().join() === '333,333,334' && tipsOk && chk && chk.status === 'paid', evidence: `labels=${labels}; share subtotals=${subs}; amounts=${pays.map(x => x.amount)}; check=${chk && chk.status}`};
+}, {card: true, seed: d => { d.boh_shared.menu.items.find(i => /Torte/.test(i.name)).price = 10; return d; }});
+await T('D3g', 3, 'Pay and Balance Due show exact cents (burger + cheese = $25.50, not 26)', async (u, p) => {
+  await u.pin('3001'); await u.seat('1'); await burger(u, ['Extra Cheese']); await u.addToOrder().catch(() => {}); await u.send(); await u.tapTable('1');
+  const pay = (await p.locator('button[onclick^="openPayment"]:visible').first().innerText()).trim();
+  const due = await u.ev(() => (document.querySelector('.toast-totals .due') || {}).innerText || '');
+  return {pass: /25\.50/.test(pay) && /25\.50/.test(due), evidence: `pay button="${pay}"; balance="${due}"`};
+});
+await T('D3h', 3, 'A line sent after an even split started is never marked paid by the remaining share', async (u, p) => {
+  await u.pin('3001'); await u.seat('1'); await u.openCategory('c_des'); await u.tile('Chocolate Studio Torte'); await u.send(); await u.tapTable('1');
+  const r1 = await u.pay({even: 2}); await u.floor(); await u.tapTable('1');
+  await u.openCategory('c_ent'); await u.tile('Seared Tuna'); await u.choose('Medium Rare'); await u.send(); await u.tapTable('1');
+  const r2 = await u.pay({even: 2}).catch(e => ({label: 'ERR ' + e.message.slice(0, 60), screen: '', after: ''}));
+  const t = await u.toast(); const d = await u.db();
+  const items = Object.values(d.orders || {}).flatMap(o => (o.items || []).map(i => i.name + ':' + (i.paid ? 'paid' : 'unpaid')));
+  const pays = Object.values(d.payments || {}).map(x => x.subtotal);
+  return {pass: items.includes('Seared Tuna:unpaid') && pays.reduce((a, b) => a + b, 0) <= 1200, evidence: `share1 ${r1.label}; share2 ${r2.label}; toast="${t.slice(0, 70)}"; payments(subtotal)=${pays}; items=${items}`};
+}, {card: true});
 // ---- 4. Tasting tile ----
 await T('D4', 4, 'Tasting tile (touch) adds the tasting menu and opens temperatures', async (u, p) => {
   await u.pin('3001'); await u.seat('1'); const plus = p.locator('button', {hasText: '+ Item'}); if (await plus.count()) await plus.first().click();
@@ -118,6 +154,34 @@ await T('D5', 5, 'Move table 1→2 moves sent tickets, guests, allergies and pos
   const items2 = await u.ev(() => { STATE.selectedTable = '2'; return guestCheckItems().map(i => i.name + ':' + i.status); });
   const feed = JSON.stringify((d.boh_shared || {}).active_orders || {});
   return {pass: orders.length > 0 && orders.every(t => String(t) === '2') && s && s.guests === 3 && (s.allergies['1'] || []).includes('Fish') && items2.includes('Chocolate Studio Torte:sent') && items2.includes('Seared Tuna:unsent') && !/"table":"1"/.test(feed), evidence: `ticket tables=${orders}; session2=${JSON.stringify(s)}; table 2 check=${items2}; Move button ${how}; toast=${(await u.toast()).slice(0, 60)}`};
+});
+async function moveTo(u, p, n) { await u.tap('button[onclick="openMoveTableSheet()"]:visible'); await p.waitForTimeout(500); await p.locator('[onclick*="transferCheckTo"]').filter({hasText: new RegExp('^\\s*(Table\\s*)?' + n + '\\b')}).first().click(); await p.waitForTimeout(1500); }
+const otherDeviceTicket = {table: '1', status: 'new', server: 'Paco Arias', source: 'other-device', timestamp: 1, items: [{id: 'c_des_x', name: 'Espresso (sent from another handheld)', price: 4, qty: 1, seat: 1, lineId: 'other_dev_line_1', status: 'new'}]};
+await T('D5b', 5, 'Move table: a ticket another device sent (not yet polled here) moves too', async (u, p) => {
+  await u.pin('3001'); await u.seat('1'); await u.openCategory('c_des'); await u.tile('Chocolate Studio Torte'); await u.send(); await u.tapTable('1');
+  await u.ev(t => __MOCK_DB__.__rawSet('orders', 'other_device_order', t), otherDeviceTicket);
+  await moveTo(u, p, 2); const t = await u.toast();
+  const d = await u.db(); const tabs = Object.entries(d.orders || {}).map(([k, o]) => k + ':' + o.table);
+  return {pass: Object.values(d.orders || {}).every(o => String(o.table) === '2') && /Moved to table 2/.test(t), evidence: `orders=${tabs}; toast="${t.slice(0, 80)}"`};
+});
+await T('D5c', 5, 'Move table with the cloud unreachable: refused, nothing moved, no success message', async (u, p) => {
+  await u.pin('3001'); await u.seat('1'); await u.openCategory('c_des'); await u.tile('Chocolate Studio Torte'); await u.send(); await u.tapTable('1');
+  await u.ev(() => { window.__MOCK_FAIL_READS__ = true; });
+  await moveTo(u, p, 2); const t = (await u.toast()) + ' ' + (await u.sheetText());
+  await u.ev(() => { window.__MOCK_FAIL_READS__ = false; });
+  const d = await u.db(); const sel = await u.ev(() => String(STATE.selectedTable)); const s1 = await u.ev(() => !!(STATE.tableSessions || {})['1']);
+  return {pass: Object.values(d.orders || {}).every(o => String(o.table) === '1') && !/Moved to table 2/.test(t) && /not done|can.t confirm|cannot confirm/i.test(t) && sel === '1' && s1, evidence: `orders=${Object.values(d.orders || {}).map(o => o.table)}; selected=${sel}; table1 session kept=${s1}; message="${t.slice(0, 120)}"`};
+});
+await T('D5d', 5, 'Move table with one ticket write failing: no success message; Retry completes the move', async (u, p) => {
+  await u.pin('3001'); await u.seat('1'); await u.openCategory('c_des'); await u.tile('Chocolate Studio Torte'); await u.send(); await u.tapTable('1');
+  const oid = await u.ev(() => Object.keys(__MOCK_DB__.__dump().orders)[0]);
+  await u.ev(k => { window.__MOCK_FAIL_WRITES__ = ['orders/' + k]; }, oid);
+  await moveTo(u, p, 2); const t1 = (await u.toast()) + ' ' + (await u.sheetText());
+  const mid = Object.values((await u.db()).orders || {}).map(o => o.table);
+  await u.ev(() => { window.__MOCK_FAIL_WRITES__ = null; });
+  const retry = p.getByRole('button', {name: /Retry move/i}); const had = await retry.count(); if (had) { await retry.first().click(); await p.waitForTimeout(1500); }
+  const t2 = await u.toast(); const fin = Object.values((await u.db()).orders || {}).map(o => o.table);
+  return {pass: !/Moved to table 2/.test(t1) && /still on table 1|not complete|incomplete/i.test(t1) && mid.every(x => String(x) === '1') && had && fin.every(x => String(x) === '2') && /Moved to table 2/.test(t2), evidence: `first="${t1.slice(0, 110)}"; tickets mid=${mid}; retry button=${had}; after retry=${fin} toast="${t2.slice(0, 60)}"`};
 });
 // ---- 6. Allergies ----
 await T('D6a', 6, 'Fish flag + Ceviche: warning, override recorded on line, check and kitchen ticket', async (u, p) => {

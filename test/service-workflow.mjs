@@ -387,7 +387,11 @@ w.STATE.activeTastingOrders = [{ id: 't1', table: '4', status: 'active', selecti
 w.clearAccidentalTable('4');
 assert.equal(w.STATE.currentOrder.length, 1);
 assert.equal(w.tableServiceState('4'), 'unsent');
+// Phase 0 (#5): offline, a move is refused until the user explicitly confirms an unverified local-only move.
 w.transferCheckTo('9');
+assert.equal(String(w.STATE.selectedTable), '4');
+assert.equal(w.STATE.orders[0].table, '4');
+w.transferCheckTo('9', { offlineOk: true });
 assert.equal(String(w.STATE.selectedTable), '9');
 assert.equal(w.STATE.currentOrder[0].table, '9');
 assert.equal(w.STATE.orders[0].table, '9');
@@ -398,11 +402,11 @@ assert.equal(w.STATE.tableSessions['9'].femalePositions['2'], true);
 assert.equal(w.STATE.tableSessions['9'].positionStates['2'].pass, true);
 assert.equal(w.STATE.tableSessions['4'], undefined);
 w.sessionOf('8').seatedAt = Date.now();
-w.transferCheckTo('8');
+w.transferCheckTo('8', { offlineOk: true });
 assert.equal(String(w.STATE.selectedTable), '9');
 assert.equal(w.STATE.orders[0].table, '9');
 w.STATE.orders.push({ id: 'paid1', table: '9', status: 'paid', server: 'Test' });
-w.transferCheckTo('7');
+w.transferCheckTo('7', { offlineOk: true });
 assert.equal(String(w.STATE.selectedTable), '7');
 assert.equal(w.STATE.orders.find((o) => o.id === 'paid1').table, '9');
 assert.equal(w.STATE.orders.find((o) => o.id === 'o1').table, '7');
