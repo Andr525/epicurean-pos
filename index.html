@@ -1910,7 +1910,7 @@ function guestCheckItems(checkId){
     rows.push({
       lineId:i.lineId, name:i.name, qty:parseInt(i.qty,10)||1, price:Number(i.price)||0,
       seat:i.seat||'table', course:i.course||null, notes:i.notes||'', mods:i.selectedMod||'',
-      status:i.held?'held':'unsent', checkId:i.checkId||cid,
+      status:i.held?'held':'unsent', checkId:i.checkId||cid, allergyOverride:i.allergyOverride||null,
       extraPlate:!!i.extraPlate, pfExtra:!!i.pfExtra, pfCourseKind:i.pfCourseKind||null,
       ticketPos:i.ticketPos!=null?Number(i.ticketPos):null,
       serviceCourse:i.serviceCourse!=null?Number(i.serviceCourse):(i.course||null)
@@ -1919,16 +1919,20 @@ function guestCheckItems(checkId){
   var sentMap={};
   STATE.orders.filter(function(o){ return String(o.table)===String(table)&&(o.status==='new'||o.status==='held'); }).forEach(function(o){
     (o.items||[]).forEach(function(i, idx){
+      if (i.paid) return; // Phase 0: paid lines leave the check; unpaid lines on the same ticket stay.
       var itemCid=i.checkId||o.checkId||primaryCheckId(table);
       if (String(itemCid||'')!==String(cid||'')) return;
-      var found=(STATE.menuItems.length?STATE.menuItems:SEED_ITEMS).find(function(mi){return mi.id===i.id;});
       var lid=i.lineId||('sent_'+o.id+'_'+(i.id||idx));
+      // Phase 0: bill the price that was sent (with its modifiers). Only legacy lines without a price fall back to the menu.
+      var sentPrice=Number(i.price);
+      var legacy=!(i.price!=null && isFinite(sentPrice));
+      var found=legacy ? (STATE.menuItems.length?STATE.menuItems:SEED_ITEMS).find(function(mi){return mi.id===i.id;}) : null;
       if (!sentMap[lid]) {
         sentMap[lid]={
-          lineId:lid, name:i.name, qty:0,
-          price:found?Number(found.price)||Number(i.price)||0:Number(i.price)||0,
+          lineId:lid, name:i.name, qty:0, legacyPrice:legacy,
+          price:legacy ? (found?Number(found.price)||0:0) : sentPrice,
           seat:i.seat||'table', course:i.course||null, notes:i.notes||'', mods:i.selectedMod||'',
-          status:'sent', checkId:itemCid,
+          status:'sent', checkId:itemCid, allergyOverride:i.allergyOverride||null,
           extraPlate:!!i.extraPlate, pfExtra:!!i.pfExtra, pfCourseKind:i.pfCourseKind||null,
           ticketPos:i.ticketPos!=null?Number(i.ticketPos):null,
           serviceCourse:i.serviceCourse!=null?Number(i.serviceCourse):(i.course||null)
@@ -1968,15 +1972,60 @@ function ensureOpenCheck(table){
   persistCheck(check);
   return check;
 }
+/* Phase 0: unsent lines belong to the employee who entered them. On logout (or switch user)
+   they are saved on the check and parked; they come back only for that employee. Never discarded. */
+function unsentLinesForDoc(check){
+  var mine=unsentFor(check.table).filter(function(i){ return lineBelongsToCheck(i, check.id, check.table); });
+  var parked=(STATE.parkedLines||[]).filter(function(l){ return String(l.table)===String(check.table) && lineBelongsToCheck(l, check.id, check.table); });
+  return JSON.parse(JSON.stringify(mine.concat(parked)));
+}
+function stampLineOwners(){
+  var me=STATE.currentServer; if (!me) return;
+  (STATE.currentOrder||[]).forEach(function(l){ if (l && !l.ownerCode) { l.ownerCode=String(me.code||''); l.ownerName=me.name||''; } });
+}
+function parkCurrentLines(){
+  stampLineOwners();
+  var tables={};
+  (STATE.currentOrder||[]).forEach(function(l){ if (l) tables[String(l.table)]=1; });
+  STATE.parkedLines=(STATE.parkedLines||[]).concat(STATE.currentOrder||[]);
+  STATE.currentOrder=[];
+  Object.keys(tables).forEach(function(t){
+    var sess=sessionOf(t);
+    (sess.checkIds||[sess.checkId]).concat([sess.checkId]).forEach(function(id){ var ch=id && STATE.checks[id]; if (ch && ch.status==='open') persistCheck(ch); });
+  });
+}
+function rehydrateMyLines(){
+  var me=STATE.currentServer; if (!me) return;
+  var code=String(me.code||''), keep=[];
+  (STATE.parkedLines||[]).forEach(function(l){
+    if (l && String(l.ownerCode||'')===code && !(STATE.currentOrder||[]).some(function(x){ return x.lineId===l.lineId; })) STATE.currentOrder.push(l);
+    else keep.push(l);
+  });
+  STATE.parkedLines=keep;
+}
+function noticeParkedLines(t){
+  var me=STATE.currentServer, code=me?String(me.code||''):'';
+  var others=(STATE.parkedLines||[]).filter(function(l){ return l && String(l.table)===String(t) && String(l.ownerCode||'')!==code; });
+  if (!others.length) return;
+  var names=others.map(function(l){ return l.ownerName||l.ownerCode||'another employee'; }).filter(function(n,i,a){ return a.indexOf(n)===i; });
+  setTimeout(function(){ toast(others.length+' unsent item(s) on table '+t+' held by '+names.join(', ')); }, 900);
+}
 function persistCheck(check){
   if (!check) return;
   check.guest=check.guest||{ items:[], totals:{ subtotal:0 } };
-  if (String(check.table)===String(STATE.selectedTable)) {
+  if (String(check.table)===String(STATE.selectedTable) && check.status==='open') {
     check.guest.items=guestCheckItems(check.id);
     check.guest.totals={ subtotal:checkItemsTotal(check.id) };
     check.guestCount=sessionOf(check.table).guestCount||check.guestCount;
     check.seatedAt=sessionOf(check.table).seatedAt||check.seatedAt;
     check.femalePositions=Object.assign({}, femalePositionsOf(check.table));
+  }
+  // Phase 0: seat allergy flags and the table's kitchen allergy note live on the check (not only in memory).
+  if (check.status==='open') {
+    check.unsentLines=unsentLinesForDoc(check);
+    var aSess=sessionOf(check.table);
+    check.allergies=JSON.parse(JSON.stringify(aSess.allergies||{}));
+    check.kitchenNote=aSess.kitchenNote||'';
   }
   check.updatedAt=Date.now();
   STATE.checks[check.id]=check;
@@ -1992,14 +2041,32 @@ function closeOpenCheck(table, status){
   persistCheck(check);
 }
 function ingestOpenChecks(list){
+  setTimeout(rehydrateMyLines, 0);
   (list||[]).forEach(function(ch){
     if (!ch || !ch.id) return;
     STATE.checks[ch.id]=ch;
     if (ch.status!=='open') return;
     var sess=sessionOf(ch.table);
-    sess.checkId=ch.id;
+    sess.checkIds=sess.checkIds||[];
+    if (sess.checkIds.indexOf(ch.id)<0) sess.checkIds.push(ch.id);
+    var cur=sess.checkId && STATE.checks[sess.checkId];
+    if (!ch.splitFrom || !cur || cur.status!=='open') sess.checkId=ch.id;
     if (ch.seatedAt && !sess.seatedAt) sess.seatedAt=ch.seatedAt;
     if (ch.guestCount) sess.guestCount=ch.guestCount;
+    if (ch.allergies && typeof ch.allergies==='object') {
+      var hasLocal=Object.keys(sess.allergies||{}).some(function(k){ return (sess.allergies[k]||[]).length; });
+      if (!hasLocal) sess.allergies=JSON.parse(JSON.stringify(ch.allergies));
+    }
+    if (ch.kitchenNote && !sess.kitchenNote) sess.kitchenNote=ch.kitchenNote;
+    // Restore unsent lines saved on the check: to their owner if signed in, otherwise parked.
+    (Array.isArray(ch.unsentLines)?ch.unsentLines:[]).forEach(function(l){
+      if (!l || !l.lineId || !l.ownerCode) return;
+      if ((STATE.currentOrder||[]).some(function(x){ return x.lineId===l.lineId; })) return;
+      if ((STATE.parkedLines||[]).some(function(x){ return x.lineId===l.lineId; })) return;
+      if ((STATE._sentLineIds||{})[l.lineId]) return;
+      if (STATE.orders.some(function(o){ return (o.items||[]).some(function(i){ return i.lineId===l.lineId; }); })) return;
+      STATE.parkedLines=(STATE.parkedLines||[]).concat([l]);
+    });
     if (ch.femalePositions && typeof ch.femalePositions==='object') {
       sess.femalePositions=sess.femalePositions||{};
       Object.keys(ch.femalePositions).forEach(function(k){
@@ -2553,6 +2620,44 @@ function backToFloor(){
   STATE.hhMode='service';
   switchTab('tables');
 }
+/* Phase 0 allergy rules.
+   - Matching is case-insensitive and treats the nut family ("Nuts", "Tree Nut", "Peanut") and simple plurals as the same.
+   - An item is "verified" only when BOH marked it verified AND lists its allergens. Anything else is unverified:
+     an empty or unverified list is never treated as safe. */
+function allergenKey(a){
+  var k=String(a||'').trim().toLowerCase().replace(/s$/,'');
+  if (/nut|peanut/.test(k)) return 'nut';
+  return k;
+}
+function itemAllergensVerified(item){
+  return !!(item && item.verified===true && asList(item.allergens).length);
+}
+function itemAllergenStatus(item){
+  if (itemAllergensVerified(item)) return 'verified';
+  return asList(item && item.allergens).length ? 'declared-unverified' : 'unknown';
+}
+function flagsForSeat(seat, table){
+  var sess=sessionOf(table==null?STATE.selectedTable:table), all=sess.allergies||{}, out=[];
+  function add(list){ (list||[]).forEach(function(a){ if (out.indexOf(a)<0) out.push(a); }); }
+  if (seat==null || String(seat)==='table') Object.keys(all).forEach(function(k){ add(all[k]); }); // shared plates reach every guest
+  else { add(all[String(seat)]); add(all.table); }
+  return out;
+}
+function allergenRisk(item, seat, table){
+  var flags=flagsForSeat(seat, table);
+  var listed=asList(item && item.allergens);
+  var conflicts=listed.filter(function(x){ return flags.some(function(f){ return allergenKey(f)===allergenKey(x); }); });
+  return { flags:flags, conflicts:conflicts, unverified:!itemAllergensVerified(item), status:itemAllergenStatus(item) };
+}
+function seatAllergyMap(table){
+  var all=sessionOf(table==null?STATE.selectedTable:table).allergies||{}, out={};
+  Object.keys(all).forEach(function(k){ if ((all[k]||[]).length) out[k]=all[k].slice(); });
+  return out;
+}
+function allergyOverrideRecord(risk, seat){
+  return { seat:String(seat==null?'table':seat), flags:risk.flags.slice(), conflicts:risk.conflicts.slice(), unverified:!!risk.unverified,
+    by:STATE.currentServer?STATE.currentServer.name:'', byCode:STATE.currentServer?String(STATE.currentServer.code||''):'', at:Date.now() };
+}
 function allergenHits(item, seat){
   var listed=asList(item && item.allergens);
   var a=listed.map(function(x){return String(x).toLowerCase();});
@@ -2931,7 +3036,11 @@ function attachFoodModifiers(mapped, it){
     mapped.modifiers = it.modGroupIds.map(function(gid){
       var g = STATE.modGroups.filter(function(x){ return x.id===gid; })[0];
       if (!g) return null;
-      return {group:g.name, options:(g.options||[]).map(function(o){ return o.name+(o.up?(' +$'+o.up):''); })};
+      // Phase 0: keep the display strings, and carry BOH's structured rules and upcharges.
+      var choices=(g.options||[]).map(function(o){ var up=Number(o.up)||0; return {id:String(o.id!=null?o.id:o.name), name:o.name, up:up, label:o.name+(up?(' +$'+up):'')}; });
+      var min=(g.min!=null&&isFinite(Number(g.min)))?Number(g.min):(g.required?1:0);
+      var max=(g.max!=null&&isFinite(Number(g.max)))?Number(g.max):(g.multi?choices.length:1);
+      return {group:g.name, groupId:g.id, options:choices.map(function(c){ return c.label; }), choices:choices, min:Math.max(0,min), max:Math.max(1,max), multi:max>1};
     }).filter(Boolean);
   }
   return mapped;
@@ -3535,6 +3644,15 @@ function loadData() {
 
   fbDb.collection('orders').onSnapshot(snap=>{
     var fbOrders=[]; snap.forEach(d=>fbOrders.push({id:d.id,...d.data()}));
+    // Phase 0: a check move or payment made before the cloud copy arrived is re-applied, never dropped.
+    (STATE._localOrders||[]).forEach(function(lo){
+      if (!lo._pendingItems) return;
+      var fo=fbOrders.filter(function(x){ return x.sentAt===lo.sentAt && String(x.table)===String(lo.table); })[0];
+      if (!fo) return;
+      fo.items=lo.items; fo.checkId=lo.checkId; fo.table=lo.table; if (lo.status==='paid') { fo.status='paid'; fo.paidAt=lo.paidAt; }
+      lo._pendingItems=false;
+      fbDb.collection('orders').doc(fo.id).update({items:fo.items, checkId:fo.checkId||null, status:fo.status, table:String(fo.table)}).catch(function(e){ console.warn('Order update:', e); });
+    });
     // Merge: keep locally-pushed orders that haven't appeared in Firebase yet
     var localOnly=(STATE._localOrders||[]).filter(lo=>!fbOrders.some(fo=>fo.sentAt===lo.sentAt&&fo.table===lo.table));
     STATE._localOrders=localOnly;
@@ -3697,6 +3815,7 @@ function finishLogin(staff){
   var err=document.getElementById('pin-error');
   if (err) err.textContent='';
   STATE.currentServer=staff;
+  rehydrateMyLines();
   STATE.floorUserPicked=false;
   STATE.floorFilter=defaultFloorFilter();
   STATE.floorFitDone=false;
@@ -3737,6 +3856,9 @@ function attemptLogin() {
 function logout() {
   try { closeOverflow(); } catch (e) {}
   try { closeSheet(); } catch (e) {}
+  parkCurrentLines(); // Phase 0: the next employee never inherits these lines
+  STATE.tableChosen=false;
+  STATE.viewCheckId=null;
   STATE.currentServer=null;
   STATE._loginBusy=false;
   STATE.floorFitDone=false;
@@ -3748,6 +3870,12 @@ function logout() {
 
 // ─── Tabs ───────────────────────────────────────────────────────
 function switchTab(tab) {
+  // Phase 0: never open an order on a default table; the employee chooses one first.
+  if (tab==='order' && !STATE.tableChosen) {
+    toast('Choose a table first');
+    if (STATE.currentServer) openTableService();
+    return;
+  }
   STATE.activeTab=tab;
   if (tab!=='order') STATE.hhMode='service';
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
@@ -3919,7 +4047,10 @@ function hubPinKey(k){
     if (code && s.buf===code) {
       var staff=s.row.staff || allStaffForLogin().find(function(x){ return String(x.code)===code; });
       if (!staff) { toast('No login for that station'); return; }
+      parkCurrentLines();
+      STATE.tableChosen=false;
       STATE.currentServer=staff;
+      rehydrateMyLines();
       STATE.floorFilter=defaultFloorFilter();
       STATE.floorFitDone=false;
       document.getElementById('user-name').textContent=staff.name;
@@ -5429,6 +5560,8 @@ function selectTable(t) {
   t = resolveTableNumber(t);
   var obj=findFloorTable(t);
   STATE.selectedTable = t;
+  STATE.tableChosen = true;
+  noticeParkedLines(t);
   if (fbReady) {
     STATE.calls.filter(function(cl){ return String(cl.table)===String(t) && cl.status==='active'; }).forEach(function(cl){
       fbDb.collection('calls').doc(cl.id).update({status:'acknowledged'});
@@ -5517,6 +5650,7 @@ function chooseGuestCount(n){
   seatSess.guestCount=n;
   seatSess.seatedAt=Date.now();
   STATE.selectedTable=t;
+  STATE.tableChosen=true;
   STATE.guestCount=n;
   STATE.activeSeat=1;
   STATE.hhMode='service';
@@ -5670,7 +5804,7 @@ function renderMenuRows(filtered, q){
       (item.photo?'<img class="item-thumb" src="'+esc(item.photo)+'" alt="">':'')+
       '<div class="item-info"><div class="item-name">'+esc(item.name)+(item.eightySixed?' <span class="item-86">86</span>':'')+'</div>'+
       '<div class="item-meta">'+esc(meta.join(' · '))+'</div>'+
-      (hasDesc ? '<div class="item-desc-toggle" onclick="event.stopPropagation();toggleItemDesc('+JSON.stringify(String(item.id))+')">details</div>' : '')+
+      (hasDesc ? '<div class="item-desc-toggle" onclick="event.stopPropagation();toggleItemDesc('+esc(JSON.stringify(String(item.id)))+')">details</div>' : '')+
       '</div>'+
       '<div class="item-price">'+posLineMoney(Number(item.price)||0)+'</div>'+
     '</div>';
@@ -5678,7 +5812,7 @@ function renderMenuRows(filtered, q){
       html+='<div class="item-desc-expanded">';
       if (item.description || item.desc) html+='<div>'+esc(item.description||item.desc)+'</div>';
       if (allergens.length) html+='<div class="desc-allergens">⚠ Allergens: '+esc(allergens.join(', '))+'</div>';
-      if (diet.length) html+='<div class="desc-dietary">'+esc(diet.join(' · '))+'</div>';
+      if (diet.length) html+='<div class="desc-dietary">'+(itemAllergensVerified(item)?'':'(unverified) ')+esc(diet.join(' · '))+'</div>';
       html+='</div>';
     }
   });
@@ -5695,7 +5829,7 @@ function renderPrixFixeRows(q){
   });
   (STATE.tastingMenus||[]).forEach(function(tm){
     if (q && !itemMatchesSearch(tm, q)) return;
-    html+='<div class="menu-item-row tasting-row" onclick="addTastingMenu('+JSON.stringify(String(tm.id))+')">'+
+    html+='<div class="menu-item-row tasting-row" onclick="addTastingMenu('+esc(JSON.stringify(String(tm.id)))+')">'+
       '<div class="item-info"><div class="item-name">✦ '+esc(tm.name)+'</div>'+
       '<div class="item-meta">'+(tm.courses?tm.courses.length:0)+' courses · Fire one by one</div></div>'+
       '<div class="item-price">'+posLineMoney(Number(tm.price)||0)+'</div></div>';
@@ -6807,7 +6941,8 @@ function voicePlaceHigh(item, parsed, preset){
     voicePushDraft(Object.assign({}, parsed, { confidence:'MISSING', kind:'draft', need:missing.join(', '), itemId:item.id, name:item.name }));
     return;
   }
-  if (allergenHits(item, seat).length) {
+  var vRisk=allergenRisk(item, seat);
+  if (vRisk.flags.length && (vRisk.conflicts.length || vRisk.unverified)) {
     voicePushDraft(Object.assign({}, parsed, { confidence:'MISSING', kind:'draft', need:'allergy', itemId:item.id, name:item.name }));
     return;
   }
@@ -6822,7 +6957,8 @@ function voicePlaceHigh(item, parsed, preset){
         STATE.pendingItem.selectedMod=Object.keys(STATE.pendingItem.mods).map(function(g){ return g+': '+STATE.pendingItem.mods[g]; }).join(', ');
       }
       if (preset.notes) STATE.pendingItem.notes=preset.notes;
-      if (!modifiersReady(STATE.pendingItem) || allergenHits(STATE.pendingItem, STATE.pendingItem.seat).length) {
+      var pRisk=allergenRisk(STATE.pendingItem, STATE.pendingItem.seat);
+      if (!modifiersReady(STATE.pendingItem) || (pRisk.flags.length && (pRisk.conflicts.length || pRisk.unverified))) {
         closeSheet();
         voicePushDraft(Object.assign({}, parsed, { confidence:'MISSING', kind:'draft', need:'modifier', itemId:item.id, name:item.name }));
         return;
@@ -8163,7 +8299,7 @@ function renderMenuGrid(){
     });
   } else if (STATE.orderCat==='__tasting__') {
     (STATE.tastingMenus||[]).forEach(function(tm){
-      tiles.push('<button type="button" class="ts-tile prix" onclick="addTastingMenu('+JSON.stringify(String(tm.id))+')">'+esc(tm.name)+'<span class="price">'+posLineMoney(Number(tm.price)||0)+'</span></button>');
+      tiles.push('<button type="button" class="ts-tile prix" onclick="addTastingMenu('+esc(JSON.stringify(String(tm.id)))+')">'+esc(tm.name)+'<span class="price">'+posLineMoney(Number(tm.price)||0)+'</span></button>');
     });
   } else {
     var catItems=items.filter(function(i){
@@ -8447,7 +8583,7 @@ function openTastingTempSheet(to){
     });
     html+='</div>';
   });
-  html+='<button class="primary-btn" onclick="confirmTastingTemps('+JSON.stringify(String(to.id))+')">Confirm</button>';
+  html+='<button class="primary-btn" onclick="confirmTastingTemps('+esc(JSON.stringify(String(to.id)))+')">Confirm</button>';
   html+='<button class="ghost-btn" onclick="closeSheet()">Cancel</button>';
   openSheet(html);
 }
@@ -8482,7 +8618,7 @@ function openTastingCourseModifySheet(toId, idx){
   }
   html+='<div class="tasting-section-label">Substitution / note</div>';
   html+='<input class="search-box" id="tm-mod-note" value="'+esc(c.modNote||'')+'" placeholder="Allergy, substitution, kitchen note">';
-  html+='<button class="primary-btn" onclick="saveTastingCourseModify('+JSON.stringify(String(toId))+','+idx+')">Save</button>';
+  html+='<button class="primary-btn" onclick="saveTastingCourseModify('+esc(JSON.stringify(String(toId)))+','+idx+')">Save</button>';
   html+='<button class="ghost-btn" onclick="closeSheet()">Cancel</button>';
   openSheet(html);
 }
@@ -9283,6 +9419,8 @@ function beginAddItem(itemId) {
     extraPlate:dining,
     extraFee:extraFee,
     itemSurcharge:surcharge,
+    baseSurcharge:surcharge,
+    basePrice:price,
     id:item.id,
     name:item.name,
     price:price,
@@ -9298,6 +9436,7 @@ function beginAddItem(itemId) {
       return mods;
     })(),
     allergens:item.allergens||[],
+    verified:item.verified===true,
     dietaryFlags:item.dietaryFlags||item.dietary||[],
     description:item.description||item.desc||'',
     source:item.source||'menu',
@@ -9365,15 +9504,21 @@ function renderModifierSheet(){
   html+='<button type="button" onclick="STATE.pendingItem.qty=(STATE.pendingItem.qty||1)+1;renderModifierSheet()">+</button></div>';
   (p.modifiers||[]).forEach(function(mod,mi){
     var chosen=p.mods[mod.group];
-    html+='<div class="tasting-section-label">'+mod.group+' <span style="color:var(--danger)">*</span></div><div class="chip-row">';
+    var structured=!!(mod.choices&&mod.choices.length);
+    var required=structured ? mod.min>0 : true;
+    var picked=modPicks(p, mod);
+    var hint=structured ? (mod.max>1 ? (required?' · choose '+mod.min+(mod.max>mod.min?'–'+mod.max:''):' · optional, up to '+mod.max) : (required?'':' · optional')) : '';
+    html+='<div class="tasting-section-label">'+mod.group+(required?' <span style="color:var(--danger)">*</span>':'')+'<span style="font-weight:400;opacity:.75">'+hint+'</span></div><div class="chip-row">';
     (mod.options||[]).forEach(function(opt){
-      html+="<button type=\"button\" class=\"chip"+(chosen===opt?' active':'')+(!chosen?' required-miss':'')+"\" onclick='pickMod("+mi+","+JSON.stringify(String(opt))+")'>"+opt+"</button>";
+      var on=picked.indexOf(opt)>-1;
+      html+="<button type=\"button\" class=\"chip"+(on?' active':'')+(required&&!picked.length?' required-miss':'')+"\" onclick='pickMod("+mi+","+JSON.stringify(String(opt))+")'>"+opt+"</button>";
     });
     html+='</div>';
   });
-  if (p.allergens&&p.allergens.length) html+='<div class="warn-banner">⚠ ALLERGENS: '+p.allergens.join(', ')+'</div>';
-  else html+='<p class="sheet-sub">Allergens: none listed</p>';
-  if (p.dietaryFlags&&p.dietaryFlags.length) html+='<p class="sheet-sub">Dietary: '+p.dietaryFlags.join(' · ')+'</p>';
+  var aVer=itemAllergensVerified(p);
+  if (p.allergens&&p.allergens.length) html+='<div class="warn-banner">⚠ ALLERGENS'+(aVer?'':' (unverified)')+': '+esc(asList(p.allergens).join(', '))+'</div>';
+  else html+='<div class="warn-banner">⚠ Allergens unknown — not verified by BOH. Do not treat as allergen-free.</div>';
+  if (p.dietaryFlags&&p.dietaryFlags.length) html+='<p class="sheet-sub">Dietary'+(aVer?'':' (unverified — not an allergen-free claim)')+': '+esc(asList(p.dietaryFlags).join(' · '))+'</p>';
   html+='<div class="tasting-section-label">Notes</div>';
   html+='<input class="search-box" id="mod-notes" value="'+(p.notes||'').replace(/"/g,'&quot;')+'" placeholder="Special instructions" oninput="STATE.pendingItem.notes=this.value">';
   var ready=modifiersReady(p);
@@ -9394,46 +9539,112 @@ function setPendingCourse(cn){
   }
   renderModifierSheet();
 }
+function modPicks(p, mod){
+  var v=p && p.mods ? p.mods[mod.group] : null;
+  if (v==null || v==='') return [];
+  return Array.isArray(v) ? v.slice() : [v];
+}
+function modSelectionText(p){
+  return Object.keys(p.mods||{}).filter(function(g){ var v=p.mods[g]; return Array.isArray(v) ? v.length : !!v; })
+    .map(function(g){ var v=p.mods[g]; return g+': '+(Array.isArray(v)?v.join(' + '):v); }).join(', ');
+}
+/* Phase 0: a structured (BOH) modifier ADDS its upcharge to the item's base price.
+   Legacy string-only groups (e.g. wine pours, where the option IS the price) keep their old rule. */
+function applyModPricing(p){
+  if (!p || !(p.modifiers||[]).some(function(m){ return m && m.choices && m.choices.length; })) return;
+  var deltaCents=0, sel=[];
+  (p.modifiers||[]).forEach(function(m){
+    if (!m || !m.choices || !m.choices.length) return;
+    modPicks(p, m).forEach(function(label){
+      var c=m.choices.filter(function(x){ return x.label===label || x.name===label; })[0];
+      if (!c) return;
+      deltaCents+=Math.round((Number(c.up)||0)*100);
+      sel.push({groupId:m.groupId||'', group:m.group, optionId:c.id, name:c.name, up:Number(c.up)||0});
+    });
+  });
+  p.modifierSelections=sel;
+  if (p.basePrice==null) p.basePrice=Number(p.price)||0;
+  if (p.extraPlate) {
+    if (p.baseSurcharge==null) p.baseSurcharge=Number(p.itemSurcharge)||0;
+    p.itemSurcharge=(Math.round((Number(p.baseSurcharge)||0)*100)+deltaCents)/100;
+    p.price=(Math.round((Number(p.extraFee)||0)*100)+Math.round(p.itemSurcharge*100))/100;
+  } else {
+    p.price=(Math.round((Number(p.basePrice)||0)*100)+deltaCents)/100;
+  }
+}
+function modAutoAdds(p){
+  return (p.modifiers||[]).every(function(m){ return !(m.choices&&m.choices.length) || (m.min>=1 && m.max===1); });
+}
 function pickMod(mi, opt){
   var p=STATE.pendingItem; if(!p) return;
-  var group=(p.modifiers[mi]||{}).group;
-  p.mods[group]=opt;
-  var dollar=String(opt).match(/\$(\d+(?:\.\d+)?)/);
-  if (dollar) {
-    var add=Number(dollar[1]);
-    if (p.extraPlate) {
-      p.itemSurcharge=(Number(p.itemSurcharge)||0)+add;
-      p.price=(Number(p.extraFee)||0)+p.itemSurcharge;
+  var mod=p.modifiers[mi]||{};
+  var group=mod.group;
+  if (mod.choices && mod.choices.length) {
+    if (mod.max>1) {
+      var cur=modPicks(p, mod), at=cur.indexOf(opt);
+      if (at>-1) cur.splice(at,1);
+      else if (cur.length<mod.max) cur.push(opt);
+      else { toast('Up to '+mod.max+' for '+group); return; }
+      p.mods[group]=cur;
+    } else if (p.mods[group]===opt && mod.min<1) {
+      delete p.mods[group];
     } else {
-      p.price=add;
+      p.mods[group]=opt;
+    }
+    applyModPricing(p);
+  } else {
+    p.mods[group]=opt;
+    var dollar=String(opt).match(/\$(\d+(?:\.\d+)?)/);
+    if (dollar) {
+      var add=Number(dollar[1]);
+      if (p.extraPlate) {
+        p.itemSurcharge=(Number(p.itemSurcharge)||0)+add;
+        p.price=(Number(p.extraFee)||0)+p.itemSurcharge;
+      } else {
+        p.price=add;
+      }
     }
   }
-  p.selectedMod=Object.keys(p.mods).map(function(g){return g+': '+p.mods[g];}).join(', ');
-  if (modifiersReady(p)) maybeAllergyThenAdd();
+  p.selectedMod=modSelectionText(p);
+  if (modifiersReady(p) && modAutoAdds(p)) maybeAllergyThenAdd();
   else renderModifierSheet();
 }
 function modifiersReady(p){
   if (!p.modifiers || !p.modifiers.length) return true;
-  return p.modifiers.every(function(m){ return p.mods[m.group]; });
+  return p.modifiers.every(function(m){
+    if (m && m.choices && m.choices.length) { var n=modPicks(p, m).length; return n>=m.min && n<=m.max; }
+    return p.mods[m.group];
+  });
 }
 function maybeAllergyThenAdd(){
   var p=STATE.pendingItem; if(!p) return;
-  var hits=allergenHits(p, p.seat);
-  if (hits.length) {
+  var risk=allergenRisk(p, p.seat);
+  if (risk.flags.length && (risk.conflicts.length || risk.unverified)) {
+    var msg=risk.conflicts.length
+      ? seatName(p.seat)+' flagged: '+esc(risk.conflicts.join(', '))+'. This item lists those allergens.'
+      : seatName(p.seat)+' flagged: '+esc(risk.flags.join(', '))+'. This item\'s allergens are NOT VERIFIED by BOH'+(asList(p.allergens).length?' (listed: '+esc(asList(p.allergens).join(', '))+')':' (none listed — unknown)')+'. Do not assume it is safe.';
+    if (risk.conflicts.length && risk.unverified) msg+=' Allergen data is not verified.';
     openSheet(
       '<h2>Allergy warning</h2>'+
-      '<div class="warn-banner">'+seatName(p.seat)+' flagged: '+hits.join(', ')+'. This item lists those allergens.</div>'+
-      '<p class="sheet-sub">'+p.name+' will not be added unless you confirm.</p>'+
-      '<button class="primary-btn" style="background:var(--danger);color:#fff;" onclick="commitPendingItem()">Send anyway</button>'+
+      '<div class="warn-banner">'+msg+'</div>'+
+      '<p class="sheet-sub">'+esc(p.name)+' will not be added unless you confirm. Your name and time are recorded on the check and kitchen ticket.</p>'+
+      '<button class="primary-btn" style="background:var(--danger);color:#fff;" onclick="confirmAllergyOverride()">Send anyway</button>'+
       '<button class="ghost-btn" onclick="closeSheet()">Cancel</button>'
     );
     return;
   }
   commitPendingItem();
 }
+function confirmAllergyOverride(){
+  var p=STATE.pendingItem; if(!p) return;
+  p.allergyOverride=allergyOverrideRecord(allergenRisk(p, p.seat), p.seat);
+  commitPendingItem();
+}
 function commitPendingItem(){
   var p=STATE.pendingItem; if(!p) return;
   if (!modifiersReady(p)) { toast('Choose required modifiers'); return; }
+  applyModPricing(p);
+  if ((p.modifiers||[]).some(function(m){ return m && m.choices && m.choices.length; })) p.selectedMod=modSelectionText(p)||(p.extraPlate?'Extra plate':null);
   if (STATE._voiceCommit) p.voiceOrigin=true;
   settleVoiceDraftForItem(p.id);
   if (p.serviceCourse==null) p.serviceCourse=p.course||defaultCourse(p);
@@ -9560,12 +9771,22 @@ function createSisterCheck(table){
   persistCheck(check);
   return check;
 }
+function orderDocId(o){ return (o && (o.fbId || o.id)) || null; }
+function writeOrderItems(o, extra){
+  if (!fbReady || !o) return;
+  var id=orderDocId(o);
+  // A local copy whose cloud id is not known yet: the change is kept locally and re-applied when the cloud copy arrives.
+  if (!id || ((STATE._localOrders||[]).indexOf(o)>-1 && !o.fbId)) { o._pendingItems=true; return; }
+  fbDb.collection('orders').doc(id).update(Object.assign({items:o.items, checkId:o.checkId||null}, extra||{})).catch(function(e){ console.warn('Order update:', e); });
+}
 function assignLineToCheck(lineId, checkId){
   unsentFor().forEach(function(i){ if (i.lineId===lineId) i.checkId=checkId; });
   STATE.orders.forEach(function(o){
     if (String(o.table)!==String(STATE.selectedTable)) return;
-    (o.items||[]).forEach(function(i){ if (i.lineId===lineId) i.checkId=checkId; });
+    var touched=false;
+    (o.items||[]).forEach(function(i){ if (i.lineId===lineId && i.checkId!==checkId) { i.checkId=checkId; touched=true; } });
     if (o.checkId && (o.items||[]).every(function(i){ return i.checkId===checkId; })) o.checkId=checkId;
+    if (touched) writeOrderItems(o); // Phase 0: persist so the move survives the next orders refresh.
   });
 }
 function moveSelectedToCheck(checkId){
@@ -9646,14 +9867,24 @@ function splitBySeat(){
     });
   });
   var primary=ensureOpenCheck(STATE.selectedTable);
+  var seatChecks={};
+  tableCheckIds(STATE.selectedTable).forEach(function(id){ var c=STATE.checks[id]; if (c && c.seatKey!=null) seatChecks[String(c.seatKey)]=c; });
+  var seats=Object.keys(bySeat).filter(function(sk){ return sk!=='table'; });
   Object.keys(bySeat).forEach(function(sk){
     if (sk==='table') {
-      bySeat[sk].forEach(function(i){ if (i.lineId) assignLineToCheck(i.lineId, primary.id); });
+      bySeat[sk].forEach(function(i){ if (i.lineId && !i.paid) assignLineToCheck(i.lineId, primary.id); });
       return;
     }
-    var ch=createSisterCheck(STATE.selectedTable);
-    bySeat[sk].forEach(function(i){ if (i.lineId) assignLineToCheck(i.lineId, ch.id); });
+    // Phase 0: reuse the seat's existing check, so repeating "by seat" never duplicates checks.
+    // The first seat stays on the primary check unless the primary already belongs to another seat.
+    var ch=seatChecks[sk];
+    if (!ch && primary.seatKey==null && sk===seats[0]) { primary.seatKey=sk; ch=primary; }
+    if (!ch) { ch=createSisterCheck(STATE.selectedTable); ch.seatKey=sk; }
+    seatChecks[sk]=ch;
+    bySeat[sk].forEach(function(i){ if (i.lineId && !i.paid) assignLineToCheck(i.lineId, ch.id); });
+    persistCheck(ch);
   });
+  persistCheck(primary);
   STATE.viewCheckId=primary.id;
   toast('Split by seat');
   openSplitOverlay();
@@ -9686,6 +9917,7 @@ function openLookupCheck(){
 function lookupCheckTable(t){
   closeSheet();
   STATE.selectedTable=t;
+  STATE.tableChosen=true;
   STATE.viewCheckId=sessionOf(t).checkId;
   STATE.menuNav={level:'cats', family:'food'};
   STATE.menuFamily='food';
@@ -9715,28 +9947,33 @@ function openMoveTableSheet(){
   html+='</div><button class="ghost-btn" onclick="closeSheet()">Cancel</button>';
   openSheet(html);
 }
-function retargetKitchenTickets(oldTable, newTable){
+/* Phase 0: the REST adapter has no where().get(); retarget the tickets this device already
+   knows (moved in memory by transferCheckTo) by document id, then the kitchen feed. */
+function retargetKitchenTickets(oldTable, newTable, movedOrders, movedDining){
   if (!fbReady || !fbDb || !fbDb.collection) return;
-  fbDb.collection('orders').where('table','==',oldTable).get().then(function(snap){
-    snap.forEach(function(doc){
+  (movedOrders||[]).forEach(function(o){
+    var id=orderDocId(o);
+    if (!id || ((STATE._localOrders||[]).indexOf(o)>-1 && !o.fbId)) { o._pendingItems=true; return; }
+    fbDb.collection('orders').doc(id).update({table:String(newTable)}).catch(function(e){ console.warn('Ticket move:', e); });
+  });
+  (movedDining||[]).forEach(function(d){
+    if (d.fbId) fbDb.collection('tasting_orders').doc(d.fbId).update({table:String(newTable)}).catch(function(e){ console.warn('Dining move:', e); });
+  });
+  activeOrdersWrite = activeOrdersWrite.then(function(){
+    var feed=fbDb.collection('boh_shared').doc('active_orders');
+    return feed.get().then(function(doc){
+      if (!doc.exists) return null;
       var data=doc.data()||{};
-      if (data.status==='paid' || data.status==='cleared' || data.status==='void') return;
-      doc.ref.update({table:String(newTable)});
+      var list=Array.isArray(data.list)?data.list.map(function(item){
+        if (!item || String(item.table)!==String(oldTable)) return item;
+        if (item.status==='paid' || item.status==='cleared' || item.status==='void') return item;
+        var copy=Object.assign({}, item);
+        copy.table=String(newTable);
+        return copy;
+      }):[];
+      return feed.set({list:list, updatedAt:Date.now()});
     });
-  }).catch(function(){});
-  var feed=fbDb.collection('boh_shared').doc('active_orders');
-  feed.get().then(function(doc){
-    if (!doc.exists) return null;
-    var data=doc.data()||{};
-    var list=Array.isArray(data.list)?data.list.map(function(item){
-      if (!item || String(item.table)!==String(oldTable)) return item;
-      if (item.status==='paid' || item.status==='cleared' || item.status==='void') return item;
-      var copy=Object.assign({}, item);
-      copy.table=String(newTable);
-      return copy;
-    }):[];
-    return feed.set({list:list, updatedAt:Date.now()});
-  }).catch(function(){});
+  }).catch(function(e){ console.warn('Kitchen feed move:', e); });
 }
 function transferCheckTo(newTable){
   var old=String(STATE.selectedTable||'');
@@ -9765,17 +10002,23 @@ function transferCheckTo(newTable){
     dest.checkId=dest.checkIds[0]||null;
   }
   STATE.currentOrder.forEach(function(i){ if (i && String(i.table)===old) i.table=newTable; });
+  var movedOrders=[], movedDining=[];
   STATE.orders.forEach(function(o){
     if (!o || String(o.table)!==old) return;
     if (o.status==='paid' || o.status==='cleared' || o.status==='void') return;
     o.table=newTable;
+    movedOrders.push(o);
   });
+  (STATE._localOrders||[]).forEach(function(o){ if (o && String(o.table)===old && movedOrders.indexOf(o)<0 && o.status!=='paid') { o.table=newTable; movedOrders.push(o); } });
   (STATE.activeTastingOrders||[]).forEach(function(o){
     if (!o || String(o.table)!==old) return;
     if (o.status==='paid' || o.status==='closed' || o.status==='void') return;
     o.table=newTable;
+    movedDining.push(o);
   });
   STATE.selectedTable=newTable;
+  STATE.tableChosen=true;
+  (STATE.parkedLines||[]).forEach(function(l){ if (l && String(l.table)===old) l.table=newTable; });
   var ids={};
   if (dest.checkId) ids[dest.checkId]=1;
   (dest.checkIds||[]).forEach(function(id){ ids[id]=1; });
@@ -9787,7 +10030,7 @@ function transferCheckTo(newTable){
   });
   delete STATE.tableSessions[old];
   STATE.viewCheckId=dest.checkId;
-  retargetKitchenTickets(old, newTable);
+  retargetKitchenTickets(old, newTable, movedOrders, movedDining);
   closeSheet();
   renderOrder();
   paintChrome();
@@ -9796,6 +10039,7 @@ function transferCheckTo(newTable){
 function clearAccidentalTable(tNum){
   tNum=String(tNum||STATE.selectedTable||'');
   if (tableServiceState(tNum)!=='seated') { toast('This table has an order'); return; }
+  if ((STATE.parkedLines||[]).some(function(l){ return l && String(l.table)===tNum; })) { toast('Another employee has unsent items on this table'); return; }
   var sess=tableSession(tNum);
   var ids=[];
   if (sess && sess.checkId) ids.push(sess.checkId);
@@ -10080,6 +10324,8 @@ function toggleAllergy(seat, name, stay){
   var i=list.indexOf(name);
   if (i>-1) list.splice(i,1); else list.push(name);
   applyDiningAllergyNotes();
+  var aSess=sessionOf(STATE.selectedTable);
+  if (aSess.checkId && STATE.checks[aSess.checkId]) persistCheck(STATE.checks[aSess.checkId]);
   if (stay) { renderOrder(); return; }
   openAllergyEditor();
 }
@@ -10114,6 +10360,8 @@ function kitchenItemsFrom(lines){
         modifiers:i.modifiers||[], selectedMod:i.selectedMod||null,
         seat:i.seat||'table', course:course, notes:i.notes||'',
         qty:1, allergens:i.allergens||[], price:Number(i.price)||0,
+        guestAllergies:flagsForSeat(i.seat||'table', i.table), allergenStatus:itemAllergenStatus(i), allergyOverride:i.allergyOverride||null,
+        basePrice:i.basePrice!=null?Number(i.basePrice):null, modifierSelections:i.modifierSelections||[],
         lineId:i.lineId, checkId:i.checkId||cid,
         extraPlate:!!i.extraPlate, pfExtra:!!i.pfExtra, pfCourseKind:i.pfCourseKind||null,
         ticketPos:i.ticketPos!=null?Number(i.ticketPos):null,
@@ -10198,7 +10446,7 @@ function startDiningFromCheckLine(ti){
   if (!STATE.activeTastingOrders) STATE.activeTastingOrders=[];
   STATE.activeTastingOrders.push(dining);
   ti.diningOrderId=dining.id;
-  if (fbReady) fbDb.collection('tasting_orders').add(dining);
+  if (fbReady) fbDb.collection('tasting_orders').add(dining).then(function(ref){ if (ref && ref.id) dining.fbId=ref.id; }).catch(function(e){ console.warn('Tasting order save:', e); });
   return dining;
 }
 
@@ -10236,6 +10484,8 @@ function sendOrder(opts) {
       serverRole: STATE.currentServer?STATE.currentServer.role:'Waiter',
       checkId: check.id,
       items: mapped,
+      seatAllergies: seatAllergyMap(STATE.selectedTable),
+      kitchenNote: String(sessionOf(STATE.selectedTable).kitchenNote||''),
       status:'new',
       sentAt:Date.now(),
       clearedAt:null
@@ -10244,7 +10494,7 @@ function sendOrder(opts) {
     STATE.orders.push(localOrder);
     if (!STATE._localOrders) STATE._localOrders=[];
     STATE._localOrders.push(localOrder);
-    if (fbReady) fbDb.collection('orders').add(order).then(function(ref){ publishActiveOrder(order, ref.id); });
+    if (fbReady) fbDb.collection('orders').add(order).then(function(ref){ localOrder.fbId=ref.id; publishActiveOrder(order, ref.id); });
   }
 
   tastingItems.forEach(function(ti){
@@ -10266,6 +10516,8 @@ function sendOrder(opts) {
   toast(opts.fireCourse!=null?'Course fired to kitchen':(opts.stay?'Sent — staying on table':'Order sent to kitchen'));
   var ids={};
   bundle.forEach(function(i){ ids[i.lineId]=1; });
+  STATE._sentLineIds=STATE._sentLineIds||{};
+  Object.keys(ids).forEach(function(k){ STATE._sentLineIds[k]=1; });
   STATE.currentOrder=STATE.currentOrder.filter(function(i){ return !ids[i.lineId]; });
   STATE.selectedLineIds={};
   persistCheck(check);
@@ -10302,10 +10554,12 @@ function fireDiningCourse(to, quiet, idx){
     return false;
   }
   var hits=guestAllergyHits(nextCourse.allergens);
-  if (hits.length && !nextCourse.allergyConfirmed) {
+  var tableFlags=flagsForSeat('table', to.table||STATE.selectedTable);
+  var courseUnverified=tableFlags.length && !itemAllergensVerified(nextCourse);
+  if ((hits.length || courseUnverified) && !nextCourse.allergyConfirmed) {
     openSheet(
       '<h2>Allergy warning</h2>'+
-      '<div class="warn-banner">This course lists '+esc(hits.join(', '))+'. '+esc(diningCourseTitle(to, nextCourse))+'</div>'+
+      '<div class="warn-banner">'+(hits.length?'This course lists '+esc(hits.join(', '))+'. ':'Table flagged: '+esc(tableFlags.join(', '))+'. This course\'s allergens are NOT VERIFIED by BOH. ')+esc(diningCourseTitle(to, nextCourse))+'</div>'+
       '<p class="sheet-sub">'+(nextCourse.cookNote||nextCourse.desc||'')+'</p>'+
       '<button class="primary-btn" style="background:var(--danger);color:#fff;" onclick=\'confirmDiningAllergyFire('+JSON.stringify(String(to.id))+','+i+')\'>Fire anyway</button>'+
       '<button class="ghost-btn" onclick=\'skipDiningCourse('+JSON.stringify(String(to.id))+','+i+')\'>Skip this course</button>'+
@@ -10349,11 +10603,14 @@ function fireDiningCourse(to, quiet, idx){
       station:nextCourse.station||'Expo',
       description:notes.join(' · '),
       allergens:nextCourse.allergens||[],
+      allergenStatus:itemAllergenStatus(nextCourse),
+      allergyOverride:nextCourse.allergyOverride||null,
       cookNote:nextCourse.cookNote||'',
       modNote:nextCourse.modNote||'',
       choices:(isPf ? courses.filter(function(s){return !s.pending;}).map(function(s){return s.course+': '+s.choice;}).join(' · ') : '')+(subNote?(isPf?' · ':'')+subNote:'')
     },
     status:'new', sentAt:Date.now(), clearedAt:null,
+    seatAllergies: seatAllergyMap(to.table||STATE.selectedTable),
     isTastingCourse:true, courseNum:i+1, tastingName:menuName,
     serviceCourse: nextCourse.serviceCourse!=null?Number(nextCourse.serviceCourse):null,
     ticketPos: diningCourseTicketPos(nextCourse, i)
@@ -10373,7 +10630,12 @@ function confirmDiningAllergyFire(orderId, idx){
   if (!to) return;
   var courses=diningCourses(to);
   var i=(idx==null)?nextDiningFire(to).idx:idx;
-  if (courses[i]) courses[i].allergyConfirmed=true;
+  if (courses[i]) {
+    courses[i].allergyConfirmed=true;
+    var flags=flagsForSeat('table', to.table||STATE.selectedTable);
+    courses[i].allergyOverride={ seat:'table', flags:flags, conflicts:guestAllergyHits(courses[i].allergens), unverified:!itemAllergensVerified(courses[i]),
+      by:STATE.currentServer?STATE.currentServer.name:'', byCode:STATE.currentServer?String(STATE.currentServer.code||''):'', at:Date.now() };
+  }
   closeSheet();
   fireDiningCourse(to, false, i);
   renderOrder();
@@ -10464,7 +10726,7 @@ function extraInvoiceLineHtml(ex){
   var qty=parseInt(ex.qty,10)||1;
   var kind=extraKindOf(ex.src||ex);
   var pos=extraTicketPos(ex.src||ex);
-  return '<div class="ts-line lc-line extra-line '+ex.status+(picked?' picked':'')+'" data-extra-line="'+esc(ex.lineId)+'" data-drop-kind="'+esc(kind)+'" data-drop-pos="'+pos+'" onpointerdown="extraDragStart(event,'+JSON.stringify(String(ex.lineId))+')">'+
+  return '<div class="ts-line lc-line extra-line '+ex.status+(picked?' picked':'')+'" data-extra-line="'+esc(ex.lineId)+'" data-drop-kind="'+esc(kind)+'" data-drop-pos="'+pos+'" onpointerdown="extraDragStart(event,'+esc(JSON.stringify(String(ex.lineId)))+')">'+
     '<div><div class="ts-name">'+esc(ex.name)+'</div>'+
     mods.map(function(m){ return '<div class="ts-mod">'+esc(m)+'</div>'; }).join('')+
     '<div class="ts-meta lc-meta">'+seatName(ex.seat)+' · '+String(ex.status||'').toUpperCase()+'</div></div>'+
@@ -10865,9 +11127,13 @@ function openPayment(subtotal) {
   if (unsentFor().filter(function(i){ return lineBelongsToCheck(i); }).length) toast('Unsent items stay on the check — SEND them before they can be charged');
   STATE.tipPercent = 18;
   STATE.customTip = 0;
+  // Phase 0: the split belongs to this check; a previous table's split never carries over.
+  var es0 = evenSplitOf();
+  if (STATE._payCheckId !== activeCheckId()) STATE.payEven = es0 ? es0.n : 1;
+  STATE._payCheckId = activeCheckId();
   if (!STATE.payEven) STATE.payEven = 1;
   var even = STATE.payEven || 1;
-  var share = subtotal / even;
+  var share = payShare(subtotal);
   var tip = Math.round(share * STATE.tipPercent) / 100;
   var total = share + tip;
 
@@ -10879,6 +11145,12 @@ function openPayment(subtotal) {
     html += '<div><span>'+esc(i.name)+(i.qty>1?' ×'+i.qty:'')+'</span><span>$'+((Number(i.price)||0)*i.qty).toFixed(2)+'</span></div>';
   });
   html += '<div style="border-top:1px solid var(--border);margin-top:0.4rem;padding-top:0.4rem;font-weight:600;"><span>Subtotal</span><span>$'+subtotal.toFixed(2)+'</span></div>';
+  var esShow = evenSplitOf();
+  if (esShow && esShow.n===even) {
+    var paidC=(esShow.paid||[]).reduce(function(a,b){ return a+b; },0);
+    html += '<div style="font-weight:600;"><span>Paid '+(esShow.paid||[]).length+' of '+esShow.n+' shares</span><span>$'+(paidC/100).toFixed(2)+'</span></div>';
+    html += '<div style="font-weight:700;"><span>Remaining</span><span>$'+((esShow.totalCents-paidC)/100).toFixed(2)+'</span></div>';
+  }
   html += '</div>';
 
   html += '<div class="tip-section"><label>Even split</label><div class="even-split">';
@@ -10927,12 +11199,26 @@ async function attachCardForm() {
   }
 }
 
+function evenSplitOf(cid){
+  var ch=STATE.checks[cid||activeCheckId()];
+  return ch && ch.status==='open' && ch.evenSplit && ch.evenSplit.n>1 ? ch.evenSplit : null;
+}
 function payShare(subtotal){
   var even=Math.max(1, Number(STATE.payEven)||1);
-  return subtotal / even;
+  if (even<=1) return subtotal;
+  var es=evenSplitOf();
+  if (es && es.n===even) {
+    var paid=(es.paid||[]).reduce(function(a,b){ return a+b; },0);
+    var left=Math.max(1, es.n-(es.paid||[]).length);
+    return Math.round((es.totalCents-paid)/left)/100;
+  }
+  return Math.round(subtotal*100/even)/100;
 }
 function setPayEven(n, subtotal){
-  STATE.payEven=Math.max(1, Number(n)||1);
+  var es=evenSplitOf();
+  n=Math.max(1, Number(n)||1);
+  if (es && (es.paid||[]).length && n!==es.n) { toast('This check is already being split /'+es.n); return; }
+  STATE.payEven=n;
   openPayment(subtotal);
 }
 function setTip(pct, subtotal) {
@@ -10961,11 +11247,50 @@ function setCustomTip(val, subtotal) {
   document.querySelectorAll('.tip-btn').forEach(function(b){ b.classList.remove('active'); });
 }
 
+function unpaidSentLinesOf(cid){
+  return guestCheckItems(cid).filter(function(r){ return r.status==='sent'; });
+}
+function markCheckLinesPaid(cid, paymentId){
+  STATE.orders.forEach(function(o){
+    if (String(o.table)!==String(STATE.selectedTable) || (o.status!=='new' && o.status!=='held')) return;
+    var touched=false;
+    (o.items||[]).forEach(function(i){
+      if (i.paid) return;
+      var itemCid=i.checkId||o.checkId||primaryCheckId(o.table);
+      if (String(itemCid||'')!==String(cid||'')) return;
+      i.paid=true; i.paidCheckId=cid; i.paymentId=paymentId||null; touched=true;
+    });
+    if (!touched) return;
+    var allPaid=(o.items||[]).every(function(i){ return i.paid; });
+    if (allPaid) { o.status='paid'; o.paidAt=Date.now(); }
+    writeOrderItems(o, allPaid ? {status:'paid', paidAt:o.paidAt} : null);
+  });
+}
+function closeCheckById(cid, status){
+  var check=STATE.checks[cid]; if (!check) return;
+  if (String(check.table)===String(STATE.selectedTable)) {
+    check.guest=check.guest||{};
+    check.guest.items=guestCheckItems(cid);
+    check.guest.totals={ subtotal:checkItemsTotal(cid) };
+  }
+  check.status=status||'paid';
+  check.closedAt=Date.now();
+  persistCheck(check);
+  var sess=sessionOf(check.table);
+  var others=tableCheckIds(check.table).filter(function(id){ return id!==cid; });
+  if (sess.checkId===cid && others.length) sess.checkId=others[0];
+  if (STATE.viewCheckId===cid) STATE.viewCheckId=others[0]||null;
+}
 async function processPayment(subtotal) {
   var chargeBtn = document.getElementById('charge-btn');
+  var cid = activeCheckId();
+  var check = STATE.checks[cid];
+  // Phase 0: unsent items cannot be paid (they have no kitchen ticket and would be lost when the check closes).
+  if (unsentFor().some(function(i){ return lineBelongsToCheck(i, cid); })) { toast('Send or remove unsent items before charging this check'); return; }
   chargeBtn.disabled = true;
   chargeBtn.textContent = 'Processing…';
 
+  var even = Math.max(1, Number(STATE.payEven)||1);
   var share = payShare(subtotal);
   var tip = STATE.customTip || (Math.round(share * STATE.tipPercent) / 100);
   var totalCents = Math.round((share + tip) * 100);
@@ -10977,34 +11302,49 @@ async function processPayment(subtotal) {
 
     // In production, you'd send this token to your server to create a payment.
     // For sandbox testing, we simulate a successful payment.
+    var paymentId = 'pay_' + genId();
+    var lineIds = unpaidSentLinesOf(cid).map(function(r){ return r.lineId; });
     var paymentData = {
+      paymentId: paymentId,
       token: tokenResult.token,
       amount: totalCents,
       currency: 'USD',
       table: STATE.selectedTable,
+      checkId: cid || null,
+      lineIds: lineIds,
       server: STATE.currentServer?STATE.currentServer.name:'Unknown',
       tip: Math.round(tip*100),
-      subtotal: Math.round(subtotal*100),
-      split: STATE.payEven||1,
+      subtotal: Math.round(share*100),
+      checkSubtotal: Math.round(subtotal*100),
+      split: even,
       timestamp: Date.now()
     };
+    if (fbReady) await fbDb.collection('payments').add(paymentData);
 
-    // Save payment record to Firebase
-    if (fbReady) {
-      await fbDb.collection('payments').add(paymentData);
-      // Mark orders as paid
-      var tableOrders = STATE.orders.filter(o=>o.table===STATE.selectedTable&&o.status==='new');
-      if ((STATE.payEven||1)<=1) {
-        for (var o of tableOrders) {
-          await fbDb.collection('orders').doc(o.id).update({status:'paid', paidAt:Date.now()});
-        }
-      }
+    var settled = true;
+    if (even > 1 && check) {
+      var es = evenSplitOf(cid);
+      if (!es || es.n !== even) es = { n: even, totalCents: Math.round(subtotal*100), paid: [] };
+      es.paid = (es.paid||[]).concat([Math.round(share*100)]);
+      check.evenSplit = es;
+      var paidSum = es.paid.reduce(function(a,b){ return a+b; },0);
+      settled = es.paid.length >= es.n || paidSum >= es.totalCents;
+      if (!settled) persistCheck(check);
+    }
+    if (settled) {
+      // Phase 0: only this check's lines are marked paid, and only this check is closed.
+      closeCheckById(cid, 'paid');
+      markCheckLinesPaid(cid, paymentId);
+      STATE.payEven = 1;
+      STATE._payCheckId = null;
     }
 
-    if ((STATE.payEven||1)<=1) closeOpenCheck(STATE.selectedTable, 'paid');
-
-    // Show success
     showPaymentSuccess(share + tip);
+    if (!settled) {
+      var esLeft = evenSplitOf(cid), leftC = esLeft ? esLeft.totalCents - esLeft.paid.reduce(function(a,b){ return a+b; },0) : 0;
+      var card = document.querySelector('#payment-card .payment-success');
+      if (card) card.insertAdjacentHTML('beforeend', '<p>Remaining on this check: $'+(leftC/100).toFixed(2)+' ('+(esLeft.n-esLeft.paid.length)+' share(s) left)</p>');
+    }
 
   } catch(e) {
     chargeBtn.disabled = false;

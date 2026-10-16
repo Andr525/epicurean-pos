@@ -42,8 +42,8 @@ await T('D1c', 1, 'Multi-select add-ons: cheese + bacon = $27.50', async (u) => 
 });
 await T('D1d', 1, 'Required temperature still enforced (Wagyu)', async (u, p) => {
   await u.pin('3001'); await u.seat('1'); await u.openCategory('c_ent'); await u.tile('Wagyu Ribeye');
-  const b = p.getByRole('button', {name: 'Add to order', exact: true}); if (await b.count()) await b.first().click().catch(() => {}); await p.waitForTimeout(200);
-  const before = (await u.lines()).length; await u.choose('Medium Rare'); const b2 = p.getByRole('button', {name: 'Add to order', exact: true}); if (await b2.count()) await b2.first().click(); await p.waitForTimeout(300);
+  const b = p.getByRole('button', {name: /^(Add to order|Add & keep ordering)$/}); if (await b.count()) await b.first().click().catch(() => {}); await p.waitForTimeout(200);
+  const before = (await u.lines()).length; await u.choose('Medium Rare'); const b2 = p.getByRole('button', {name: /^(Add to order|Add & keep ordering)$/}); if (await b2.count()) await b2.first().click(); await p.waitForTimeout(300);
   const l = await u.lines(); return {pass: before === 0 && l.length === 1 && cents(l[0].price) === 5800, evidence: `lines before temperature=${before}; after=${JSON.stringify(l.map(x => x.name + ' $' + x.price + ' [' + x.mods + ']'))}`};
 });
 // ---- 2. Price snapshot after send ----
@@ -57,7 +57,7 @@ await T('D2', 2, 'Sent burger keeps $25.50 after BOH price change to $30', async
 // ---- 3. Split checks and payments ----
 async function torteAndTuna(u) { await u.openCategory('c_des'); await u.tile('Chocolate Studio Torte'); await u.openCategory('c_ent'); await u.tile('Seared Tuna'); await u.choose('Medium Rare'); const b = u; }
 await T('D3a', 3, 'Paying the split-off tuna check leaves the torte unpaid on the other check', async (u, p) => {
-  await u.pin('3001'); await u.seat('1'); await torteAndTuna(u); await p.getByRole('button', {name: 'Add to order', exact: true}).first().click().catch(() => {}); await u.send(); await u.tapTable('1');
+  await u.pin('3001'); await u.seat('1'); await torteAndTuna(u); await p.getByRole('button', {name: /^(Add to order|Add & keep ordering)$/}).first().click().catch(() => {}); await u.send(); await u.tapTable('1');
   await u.selectLine('Seared Tuna'); await u.split(); await p.locator('button[onclick="splitSelected()"]').click(); await p.waitForTimeout(400); await u.closeSheets(); await u.closeOverlays();
   const view = await u.ev(() => ({id: activeCheckId(), items: guestCheckItems().map(i => i.name)}));
   const r = await u.pay();
@@ -89,7 +89,7 @@ await T('D3c', 3, 'Split by seat twice does not duplicate checks', async (u, p) 
   return {pass: a === b && per.filter(n => n > 0).length === 2, evidence: `checks after 1st=${a}, after 2nd=${b}, items per check=${per}`};
 });
 await T('D3d', 3, 'A sent line moved to another check stays there after the next orders poll', async (u, p) => {
-  await u.pin('3001'); await u.seat('1'); await torteAndTuna(u); await p.getByRole('button', {name: 'Add to order', exact: true}).first().click().catch(() => {}); await u.send(); await u.tapTable('1');
+  await u.pin('3001'); await u.seat('1'); await torteAndTuna(u); await p.getByRole('button', {name: /^(Add to order|Add & keep ordering)$/}).first().click().catch(() => {}); await u.send(); await u.tapTable('1');
   await u.selectLine('Seared Tuna'); await u.split(); await p.locator('button[onclick="splitSelected()"]').click(); await p.waitForTimeout(300); await u.closeSheets(); await u.closeOverlays();
   const before = await u.ev(() => guestCheckItems().map(i => i.name));
   await u.ev(() => { const k = Object.keys(__MOCK_DB__.__dump().orders)[0]; return __MOCK_DB__.collection('orders').doc(k).update({kdsPing: Date.now()}); }); await p.waitForTimeout(700);
@@ -102,31 +102,35 @@ await T('D4', 4, 'Tasting tile (touch) adds the tasting menu and opens temperatu
   await p.locator(`button[onclick*="filterCat('__tasting__')"]`).first().click(); await p.waitForTimeout(300);
   await p.locator('[onclick^="addTastingMenu"]').first().click(); await p.waitForTimeout(600);
   const sheet = await u.sheetText(); const l = await u.lines();
-  return {pass: l.some(x => /Tasting|Scalini/i.test(x.name)) && /Temperature/i.test(sheet), evidence: `lines=${JSON.stringify(l.map(x => x.name + ' $' + x.price))}; sheet="${sheet.slice(0, 90)}"`};
+  await p.locator('label.chip', {hasText: /^\s*Medium Rare\s*$/}).first().click().catch(() => {});
+  await p.getByRole('button', {name: 'Confirm', exact: true}).first().click(); await p.waitForTimeout(400);
+  const after = await u.sheetText(); const temps = await u.ev(() => JSON.stringify((STATE.activeTastingOrders || []).map(o => diningCourses(o).filter(c => c.selectedTemp).map(c => c.selectedTemp))));
+  return {pass: l.some(x => /Tasting|Scalini/i.test(x.name)) && /Temperature/i.test(sheet) && !/Temperatures/.test(after) && /Medium Rare/.test(temps), evidence: `lines=${JSON.stringify(l.map(x => x.name + ' $' + x.price))}; sheet="${sheet.slice(0, 60)}"; after Confirm sheet="${after.slice(0, 40)}"; temps=${temps}`};
 });
 // ---- 5. Table transfer ----
 await T('D5', 5, 'Move table 1→2 moves sent tickets, guests, allergies and positions', async (u, p) => {
-  await u.pin('3001'); await u.seat('1', 3); await p.locator('button[onclick*=\'toggleAllergy("1","Fish"\']').first().click(); await u.openCategory('c_des'); await u.tile('Chocolate Studio Torte'); await u.send(); await u.tapTable('1');
-  await p.locator('button[onclick="openMoveTableSheet()"]').first().click(); await p.waitForTimeout(400);
+  await u.pin('3001'); await u.seat('1', 3); await p.locator('button[onclick*=\'toggleAllergy("1","Fish"\']').first().click(); await u.openCategory('c_des'); await u.tile('Chocolate Studio Torte'); await u.sendAnyway(); await u.send(); await u.tapTable('1');
+  await u.openCategory('c_ent'); await u.tile('Seared Tuna'); await u.choose('Medium Rare'); await u.sendAnyway(); // an unsent line too (seat 1 is Fish-flagged: warning confirmed)
+  const how = await u.tap('button[onclick="openMoveTableSheet()"]:visible'); await p.waitForTimeout(300); await p.waitForTimeout(400);
   await p.locator('[onclick*="transferCheckTo"]').filter({hasText: /^\s*(Table\s*)?2\b/}).first().click(); await p.waitForTimeout(800);
   const d = await u.db(); const orders = Object.values(d.orders || {}).map(o => o.table);
   const s = await u.ev(() => { const x = sessionOf('2'); return x && {guests: x.guestCount, allergies: x.allergies}; });
-  const items2 = await u.ev(() => { STATE.selectedTable = '2'; return guestCheckItems().map(i => i.name); });
+  const items2 = await u.ev(() => { STATE.selectedTable = '2'; return guestCheckItems().map(i => i.name + ':' + i.status); });
   const feed = JSON.stringify((d.boh_shared || {}).active_orders || {});
-  return {pass: orders.length > 0 && orders.every(t => String(t) === '2') && s && s.guests === 3 && (s.allergies['1'] || []).includes('Fish') && items2.includes('Chocolate Studio Torte') && !/"table":"1"/.test(feed), evidence: `ticket tables=${orders}; session2=${JSON.stringify(s)}; table 2 check=${items2}; toast=${(await u.toast()).slice(0, 60)}`};
+  return {pass: orders.length > 0 && orders.every(t => String(t) === '2') && s && s.guests === 3 && (s.allergies['1'] || []).includes('Fish') && items2.includes('Chocolate Studio Torte:sent') && items2.includes('Seared Tuna:unsent') && !/"table":"1"/.test(feed), evidence: `ticket tables=${orders}; session2=${JSON.stringify(s)}; table 2 check=${items2}; Move button ${how}; toast=${(await u.toast()).slice(0, 60)}`};
 });
 // ---- 6. Allergies ----
 await T('D6a', 6, 'Fish flag + Ceviche: warning, override recorded on line, check and kitchen ticket', async (u, p) => {
   await u.pin('3001'); await u.seat('1'); await p.locator('button[onclick*=\'toggleAllergy("1","Fish"\']').first().click();
-  await u.openCategory('c_cev'); await u.tile('Peruvian Ceviche'); const add = p.getByRole('button', {name: 'Add to order', exact: true}); if (await add.count()) await add.first().click(); else await u.choose('No Salt');
+  await u.openCategory('c_cev'); await u.tile('Peruvian Ceviche'); const add = p.getByRole('button', {name: /^(Add to order|Add & keep ordering)$/}); if (await add.count()) await add.first().click(); else await u.choose('No Salt');
   await p.waitForTimeout(300); const warn = await u.sheetText(); const ok = await u.sendAnyway(); const l = await u.lines();
   await u.send(); const d = await u.db(); const o = Object.values(d.orders || {}).find(x => (x.items || []).some(i => /Ceviche/.test(i.name)));
   const it = o && o.items.find(i => /Ceviche/.test(i.name)); const chk = Object.values(d.checks || {})[0];
-  return {pass: /Allergy warning/i.test(warn) && ok && l[0] && l[0].override && it && it.allergyOverride && (it.guestAllergies || []).includes('Fish') && o.seatAllergies && chk && chk.allergies && (chk.allergies['1'] || []).includes('Fish'), evidence: `warning="${warn.slice(0, 80)}"; line override=${JSON.stringify(l[0] && l[0].override)}; ticket item=${JSON.stringify(it && {guestAllergies: it.guestAllergies, allergenStatus: it.allergenStatus, override: !!it.allergyOverride})}; ticket seatAllergies=${JSON.stringify(o && o.seatAllergies)}; check allergies=${JSON.stringify(chk && chk.allergies)}`};
+  return {pass: /Allergy warning/i.test(warn) && ok && l[0] && l[0].override && it && it.allergyOverride && (it.guestAllergies || []).includes('Fish') && o.seatAllergies && chk && chk.allergies && (chk.allergies['1'] || []).includes('Fish') && ((chk.guest && chk.guest.items) || []).some(i => /Ceviche/.test(i.name) && i.allergyOverride), evidence: `check item override=${JSON.stringify(((chk && chk.guest && chk.guest.items) || []).filter(i => /Ceviche/.test(i.name)).map(i => !!i.allergyOverride))}; warning="${warn.slice(0, 80)}"; line override=${JSON.stringify(l[0] && l[0].override)}; ticket item=${JSON.stringify(it && {guestAllergies: it.guestAllergies, allergenStatus: it.allergenStatus, override: !!it.allergyOverride})}; ticket seatAllergies=${JSON.stringify(o && o.seatAllergies)}; check allergies=${JSON.stringify(chk && chk.allergies)}`};
 });
 await T('D6b', 6, 'Dairy flag + Wagyu with UNVERIFIED/empty allergens: warns as unverified', async (u, p) => {
   await u.pin('3001'); await u.seat('1'); await p.locator('button[onclick*=\'toggleAllergy("1","Dairy"\']').first().click();
-  await u.openCategory('c_ent'); await u.tile('Wagyu Ribeye'); await u.choose('Medium'); const add = p.getByRole('button', {name: 'Add to order', exact: true}); if (await add.count()) await add.first().click(); else await u.choose('Fries');
+  await u.openCategory('c_ent'); await u.tile('Wagyu Ribeye'); await u.choose('Medium'); const add = p.getByRole('button', {name: /^(Add to order|Add & keep ordering)$/}); if (await add.count()) await add.first().click(); else await u.choose('Fries');
   await p.waitForTimeout(300); const warn = await u.sheetText(); const added = (await u.lines()).length;
   return {pass: /Allergy warning/i.test(warn) && /unverified|not verified/i.test(warn) && added === 0, evidence: `sheet="${warn.slice(0, 140)}"; lines added before confirm=${added}`};
 });

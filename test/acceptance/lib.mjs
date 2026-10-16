@@ -61,7 +61,8 @@ export function ui(page) {
     // Real tap; if another layer (e.g. the voice dock) covers the control, record it and dispatch the click.
     async tap(selector) { const l = page.locator(selector).first(); try { await l.click({timeout: 4000}); return 'tapped'; } catch (e) { const m = String(e.message).match(/<([^>]*)>[^\n]*intercepts pointer events/); await l.dispatchEvent('click'); await page.waitForTimeout(250); return 'covered by ' + (m ? m[0].slice(0, 70) : 'another element') + '; dispatched'; } },
     async chooseRe(re) { await page.getByRole('button', {name: re}).first().click(); await page.waitForTimeout(200); },
-    async addToOrder() { const b = page.getByRole('button', {name: 'Add to order', exact: true}); if (!(await b.count())) throw Error('no "Add to order" button on the modifier sheet'); await b.first().click(); await page.waitForTimeout(300); },
+    // The modifier sheet's existing add button ("Add & keep ordering") appears once the rules are satisfied.
+    async addToOrder() { const b = page.getByRole('button', {name: /^(Add to order|Add & keep ordering)$/}); if (!(await b.count())) throw Error('no add button on the modifier sheet (rules not satisfied?)'); await b.first().click(); await page.waitForTimeout(300); },
     async sendAnyway() { const b = page.getByRole('button', {name: 'Send anyway'}); if (await b.count()) { await b.first().click(); await page.waitForTimeout(300); return true; } return false; },
     async send() { await page.locator('button[onclick="sendOrder({})"]:visible').first().click(); await page.waitForTimeout(600); },
     async selectLine(name) { await page.locator('.ts-line').filter({hasText: name}).first().locator('.pos-token').first().click(); await page.waitForTimeout(200); },

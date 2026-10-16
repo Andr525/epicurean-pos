@@ -589,8 +589,16 @@ assert.equal(w.STATE.currentOrder.length, 0, 'static approved keyword must not o
 
 seedTable(w);
 w.seatAllergies(1).push('Egg');
+// Phase 0 (#6): unverified/empty allergen data is unknown, not safe, for a flagged seat.
+w.applyVoiceCommand('HITACHINO');
+assert.equal(w.STATE.currentOrder.length, 0);
+assert.equal(draft(w).need, 'allergy');
+// A BOH-verified item with no conflicting allergen is still added by voice.
+const hitachino = w.findPosMenuItem('br1');
+hitachino.allergens = ['Gluten']; hitachino.verified = true;
 w.applyVoiceCommand('HITACHINO');
 assert.equal(w.STATE.currentOrder.length, 1);
+delete hitachino.allergens; delete hitachino.verified;
 w.STATE.currentOrder = [];
 const pisco = w.findPosMenuItem('i8');
 assert.ok(pisco);
