@@ -1,0 +1,1059 @@
+{
+  "suite": "phase0-pos-regression-targets",
+  "at": "2026-10-17T07:15:09.687Z",
+  "source": {
+    "root": "/workspace/epicurean-pos/",
+    "revision": "4d3aabedf2b6fc4e45ae293dd8dcbf7b5dae7b7e",
+    "baseline": "4d3aabedf2b6fc4e45ae293dd8dcbf7b5dae7b7e",
+    "indexSha256": "98fec11904a78761db9e75b65cdd1e4f2b7da719b1c1221bf1aff314fd5ba24d",
+    "indexMatchesBaseline": true,
+    "changedTrackedFiles": [],
+    "baselineDeltaOutsideNewSuite": []
+  },
+  "contractSha256": "2bac258f65e8ead62c3f2770b4b96469b2159ad40f4890240e69b043ff512c8c",
+  "testCodeSha256": {
+    "harness.mjs": "e8fa578477947007600695022bc7b21c0e35c87ca88569b37673271dfcfe05ca",
+    "pos.mjs": "514ecc97b9bdf4e5571d92160dfaedbb3cbd70d0f8db6ccb9987bc4ab372d62f",
+    "contract.json": "2bac258f65e8ead62c3f2770b4b96469b2159ad40f4890240e69b043ff512c8c"
+  },
+  "selected": "ALL",
+  "mockOnly": true,
+  "physicalDeviceTested": false,
+  "realPaymentsTested": false,
+  "results": [
+    {
+      "id": "B04",
+      "title": "Transfers preserve fresh remote checks, exact positions and unpaid drafts through partial failure and retry",
+      "status": "FAIL",
+      "durationMs": 13287,
+      "error": null,
+      "assertions": [
+        {
+          "label": "control: ordinary transfer retargets its ticket",
+          "kind": "control",
+          "pass": true,
+          "actual": "2",
+          "expected": "2"
+        },
+        {
+          "label": "move: authoritative allergies survive",
+          "kind": "target",
+          "pass": false,
+          "actual": {
+            "table": []
+          },
+          "expected": {
+            "2": [
+              "Dairy"
+            ],
+            "2A": [
+              "Fish"
+            ]
+          }
+        },
+        {
+          "label": "move: authoritative kitchen note survives",
+          "kind": "target",
+          "pass": false,
+          "actual": "",
+          "expected": "MOCK remote kitchen restriction"
+        },
+        {
+          "label": "move: authoritative guest count survives",
+          "kind": "target",
+          "pass": false,
+          "actual": 2,
+          "expected": 3
+        },
+        {
+          "label": "move: unpaid line retains identity/position/owner/price and follows the table",
+          "kind": "target",
+          "pass": false,
+          "actual": [],
+          "expected": [
+            {
+              "lineId": "remote-unsent",
+              "seat": "2A",
+              "ownerCode": "3001",
+              "price": 12,
+              "table": "2",
+              "checkId": "chk_mvc29d2gmxdx"
+            }
+          ]
+        },
+        {
+          "label": "move: ticket and check are both moved",
+          "kind": "target",
+          "pass": true,
+          "actual": [
+            "2",
+            "2"
+          ],
+          "expected": [
+            "2",
+            "2"
+          ]
+        },
+        {
+          "label": "move: new device restores the draft exactly once on the destination",
+          "kind": "target",
+          "pass": false,
+          "actual": 0,
+          "expected": 1
+        },
+        {
+          "label": "control: partial write failure is not reported as success",
+          "kind": "control",
+          "pass": true,
+          "actual": false,
+          "expected": false
+        },
+        {
+          "label": "partial failure cannot erase remote allergies",
+          "kind": "target",
+          "pass": false,
+          "actual": {
+            "table": []
+          },
+          "expected": {
+            "2": [
+              "Dairy"
+            ],
+            "2A": [
+              "Fish"
+            ]
+          }
+        },
+        {
+          "label": "partial failure cannot erase another owner draft",
+          "kind": "target",
+          "pass": false,
+          "actual": [],
+          "expected": [
+            "remote-unsent"
+          ]
+        },
+        {
+          "label": "retry: authoritative allergies survive",
+          "kind": "target",
+          "pass": false,
+          "actual": {
+            "table": []
+          },
+          "expected": {
+            "2": [
+              "Dairy"
+            ],
+            "2A": [
+              "Fish"
+            ]
+          }
+        },
+        {
+          "label": "retry: authoritative kitchen note survives",
+          "kind": "target",
+          "pass": false,
+          "actual": "",
+          "expected": "MOCK remote kitchen restriction"
+        },
+        {
+          "label": "retry: authoritative guest count survives",
+          "kind": "target",
+          "pass": false,
+          "actual": 2,
+          "expected": 3
+        },
+        {
+          "label": "retry: unpaid line retains identity/position/owner/price and follows the table",
+          "kind": "target",
+          "pass": false,
+          "actual": [],
+          "expected": [
+            {
+              "lineId": "remote-unsent",
+              "seat": "2A",
+              "ownerCode": "3001",
+              "price": 12,
+              "table": "2",
+              "checkId": "chk_mvc29gd3h9qg"
+            }
+          ]
+        },
+        {
+          "label": "retry: ticket and check are both moved",
+          "kind": "target",
+          "pass": true,
+          "actual": [
+            "2",
+            "2"
+          ],
+          "expected": [
+            "2",
+            "2"
+          ]
+        },
+        {
+          "label": "retry: new device restores the draft exactly once on the destination",
+          "kind": "target",
+          "pass": false,
+          "actual": 0,
+          "expected": 1
+        },
+        {
+          "label": "application produces no uncaught browser errors",
+          "kind": "target",
+          "pass": true,
+          "actual": [],
+          "expected": []
+        }
+      ],
+      "blockedExternal": [
+        "fonts.googleapis.com",
+        "fonts.googleapis.com",
+        "fonts.googleapis.com",
+        "fonts.googleapis.com",
+        "fonts.googleapis.com"
+      ]
+    },
+    {
+      "id": "B05",
+      "title": "Payment receipts finalize exactly once after write failures, lost acknowledgments and device restart",
+      "status": "FAIL",
+      "durationMs": 17074,
+      "error": null,
+      "assertions": [
+        {
+          "label": "control: normal payment creates one receipt",
+          "kind": "control",
+          "pass": true,
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "control: normal payment closes only the paid check",
+          "kind": "control",
+          "pass": true,
+          "actual": "paid",
+          "expected": "paid"
+        },
+        {
+          "label": "control: normal payment marks its ticket item paid",
+          "kind": "control",
+          "pass": true,
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "control: stale charge cannot create another receipt",
+          "kind": "control",
+          "pass": true,
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "finalization writes fail: control receipt was durably stored before fault",
+          "kind": "control",
+          "pass": true,
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "finalization writes fail: control card was tokenized once",
+          "kind": "control",
+          "pass": true,
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "finalization writes fail: incomplete finalization cannot claim fully settled success",
+          "kind": "target",
+          "pass": false,
+          "actual": true,
+          "expected": false
+        },
+        {
+          "label": "finalization writes fail: retry never creates a second receipt",
+          "kind": "target",
+          "pass": true,
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "finalization writes fail: receipt recovery never tokenizes another card",
+          "kind": "target",
+          "pass": true,
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "finalization writes fail: receipt recovery finishes the check",
+          "kind": "target",
+          "pass": false,
+          "actual": "open",
+          "expected": "paid"
+        },
+        {
+          "label": "finalization writes fail: receipt recovery finishes its exact line",
+          "kind": "target",
+          "pass": false,
+          "actual": false,
+          "expected": true
+        },
+        {
+          "label": "payment acknowledgment lost: control receipt was durably stored before fault",
+          "kind": "control",
+          "pass": true,
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "payment acknowledgment lost: control card was tokenized once",
+          "kind": "control",
+          "pass": true,
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "payment acknowledgment lost: incomplete finalization cannot claim fully settled success",
+          "kind": "target",
+          "pass": true,
+          "actual": false,
+          "expected": false
+        },
+        {
+          "label": "payment acknowledgment lost: retry never creates a second receipt",
+          "kind": "target",
+          "pass": true,
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "payment acknowledgment lost: receipt recovery never tokenizes another card",
+          "kind": "target",
+          "pass": true,
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "payment acknowledgment lost: receipt recovery finishes the check",
+          "kind": "target",
+          "pass": false,
+          "actual": "open",
+          "expected": "paid"
+        },
+        {
+          "label": "payment acknowledgment lost: receipt recovery finishes its exact line",
+          "kind": "target",
+          "pass": false,
+          "actual": false,
+          "expected": true
+        },
+        {
+          "label": "first even share finalization fails: control receipt was durably stored before fault",
+          "kind": "control",
+          "pass": true,
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "first even share finalization fails: control card was tokenized once",
+          "kind": "control",
+          "pass": true,
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "first even share finalization fails: retry never creates a second receipt",
+          "kind": "target",
+          "pass": true,
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "first even share finalization fails: receipt recovery never tokenizes another card",
+          "kind": "target",
+          "pass": true,
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "first even share finalization fails: persisted split progress is recovered",
+          "kind": "target",
+          "pass": false,
+          "actual": {
+            "n": null,
+            "totalCents": null,
+            "paid": []
+          },
+          "expected": {
+            "n": 3,
+            "totalCents": 1000,
+            "paid": [
+              333
+            ]
+          }
+        },
+        {
+          "label": "first even share finalization fails: unfinished split remains open",
+          "kind": "target",
+          "pass": true,
+          "actual": "open",
+          "expected": "open"
+        },
+        {
+          "label": "first even share finalization fails: unfinished split does not prematurely pay its line",
+          "kind": "target",
+          "pass": true,
+          "actual": false,
+          "expected": false
+        },
+        {
+          "label": "application produces no uncaught browser errors",
+          "kind": "target",
+          "pass": true,
+          "actual": [],
+          "expected": []
+        }
+      ],
+      "blockedExternal": [
+        "fonts.googleapis.com",
+        "fonts.googleapis.com",
+        "fonts.googleapis.com",
+        "fonts.googleapis.com",
+        "fonts.googleapis.com",
+        "fonts.googleapis.com",
+        "fonts.googleapis.com"
+      ]
+    },
+    {
+      "id": "B06",
+      "title": "An employee cannot pay/close a check that contains another owner’s unpaid parked drafts",
+      "status": "FAIL",
+      "durationMs": 9021,
+      "error": null,
+      "assertions": [
+        {
+          "label": "control: first owner added an unpaid line",
+          "kind": "control",
+          "pass": true,
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "control: second employee does not inherit the draft",
+          "kind": "control",
+          "pass": true,
+          "actual": false,
+          "expected": false
+        },
+        {
+          "label": "control: other owner’s draft is parked and persisted",
+          "kind": "control",
+          "pass": true,
+          "actual": [
+            "mvc29y2s7vy5"
+          ],
+          "expected": [
+            "mvc29y2s7vy5"
+          ]
+        },
+        {
+          "label": "unresolved parked draft prevents a payment receipt",
+          "kind": "target",
+          "pass": false,
+          "actual": 1,
+          "expected": 0
+        },
+        {
+          "label": "unresolved parked draft prevents card tokenization",
+          "kind": "target",
+          "pass": false,
+          "actual": 1,
+          "expected": 0
+        },
+        {
+          "label": "check remains open for every owner’s unpaid work",
+          "kind": "target",
+          "pass": false,
+          "actual": "paid",
+          "expected": "open"
+        },
+        {
+          "label": "parked line remains durably recoverable",
+          "kind": "target",
+          "pass": true,
+          "actual": [
+            "mvc29y2s7vy5"
+          ],
+          "expected": [
+            "mvc29y2s7vy5"
+          ]
+        },
+        {
+          "label": "owner returns on a new device and receives the exact unpaid draft",
+          "kind": "target",
+          "pass": false,
+          "actual": 0,
+          "expected": 1
+        },
+        {
+          "label": "control: legitimate draft removal permits normal settlement",
+          "kind": "control",
+          "pass": true,
+          "actual": "paid",
+          "expected": "paid"
+        },
+        {
+          "label": "application produces no uncaught browser errors",
+          "kind": "target",
+          "pass": true,
+          "actual": [],
+          "expected": []
+        }
+      ],
+      "blockedExternal": [
+        "fonts.googleapis.com",
+        "fonts.googleapis.com",
+        "fonts.googleapis.com"
+      ]
+    },
+    {
+      "id": "B07",
+      "title": "New remote seat allergies and kitchen notes remain authoritative through refresh, save, send and restart",
+      "status": "FAIL",
+      "durationMs": 3962,
+      "error": null,
+      "assertions": [
+        {
+          "label": "control: original position 2 restriction is retained",
+          "kind": "control",
+          "pass": true,
+          "actual": [
+            "Dairy"
+          ],
+          "expected": [
+            "Dairy"
+          ]
+        },
+        {
+          "label": "fresh position 2A restriction is applied",
+          "kind": "target",
+          "pass": false,
+          "actual": [],
+          "expected": [
+            "Tree Nut"
+          ]
+        },
+        {
+          "label": "fresh position 3 restriction is applied",
+          "kind": "target",
+          "pass": false,
+          "actual": [],
+          "expected": [
+            "Fish"
+          ]
+        },
+        {
+          "label": "fresh kitchen note replaces a clean stale local note",
+          "kind": "target",
+          "pass": false,
+          "actual": "MOCK previous note",
+          "expected": "MOCK latest kitchen restrictions"
+        },
+        {
+          "label": "newly flagged guest cannot silently receive a conflicting item",
+          "kind": "target",
+          "pass": false,
+          "actual": true,
+          "expected": false
+        },
+        {
+          "label": "later save cannot erase fresh cloud restrictions",
+          "kind": "target",
+          "pass": false,
+          "actual": {
+            "1": [],
+            "2": [
+              "Dairy"
+            ],
+            "3": [],
+            "table": []
+          },
+          "expected": {
+            "2": [
+              "Dairy"
+            ],
+            "3": [
+              "Fish"
+            ],
+            "2A": [
+              "Tree Nut"
+            ]
+          }
+        },
+        {
+          "label": "new kitchen line carries the exact guest restriction",
+          "kind": "target",
+          "pass": false,
+          "actual": [],
+          "expected": [
+            "Tree Nut"
+          ]
+        },
+        {
+          "label": "new ticket carries the latest kitchen note",
+          "kind": "target",
+          "pass": false,
+          "actual": "MOCK previous note",
+          "expected": "MOCK latest kitchen restrictions"
+        },
+        {
+          "label": "new device restores both distinct positions",
+          "kind": "target",
+          "pass": false,
+          "actual": {
+            "2": [
+              "Dairy"
+            ],
+            "3": [],
+            "2A": []
+          },
+          "expected": {
+            "2": [
+              "Dairy"
+            ],
+            "3": [
+              "Fish"
+            ],
+            "2A": [
+              "Tree Nut"
+            ]
+          }
+        },
+        {
+          "label": "application produces no uncaught browser errors",
+          "kind": "target",
+          "pass": true,
+          "actual": [],
+          "expected": []
+        }
+      ],
+      "blockedExternal": [
+        "fonts.googleapis.com",
+        "fonts.googleapis.com"
+      ]
+    },
+    {
+      "id": "B08",
+      "title": "Selected modifier allergens and specific nut labels produce correct warnings without 2/2A crossover",
+      "status": "FAIL",
+      "durationMs": 5177,
+      "error": null,
+      "assertions": [
+        {
+          "label": "label Nuts vs Almond",
+          "kind": "target",
+          "pass": false,
+          "actual": false,
+          "expected": true
+        },
+        {
+          "label": "label Tree Nut vs Almond",
+          "kind": "target",
+          "pass": false,
+          "actual": false,
+          "expected": true
+        },
+        {
+          "label": "label Tree Nuts vs Hazelnuts",
+          "kind": "target",
+          "pass": true,
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "label Tree Nut vs Walnut",
+          "kind": "target",
+          "pass": true,
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "label Nuts vs Tree Nut (hazelnut)",
+          "kind": "target",
+          "pass": true,
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "label Nuts vs Peanut",
+          "kind": "target",
+          "pass": true,
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "label Peanut vs Tree Nut",
+          "kind": "target",
+          "pass": false,
+          "actual": true,
+          "expected": false
+        },
+        {
+          "label": "label Tree Nut vs Peanut",
+          "kind": "target",
+          "pass": false,
+          "actual": true,
+          "expected": false
+        },
+        {
+          "label": "label Nuts vs Nutmeg",
+          "kind": "target",
+          "pass": false,
+          "actual": true,
+          "expected": false
+        },
+        {
+          "label": "label Nuts vs Donut",
+          "kind": "target",
+          "pass": false,
+          "actual": true,
+          "expected": false
+        },
+        {
+          "label": "label Nuts vs unclassified nut ingredient",
+          "kind": "target",
+          "pass": true,
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "label Fish vs Fish",
+          "kind": "control",
+          "pass": true,
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "label Fish vs Gluten",
+          "kind": "control",
+          "pass": true,
+          "actual": false,
+          "expected": false
+        },
+        {
+          "label": "2A: control base item is compatible before selecting garnish",
+          "kind": "control",
+          "pass": true,
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "Tree Nut garnish cannot silently commit at flagged 2A",
+          "kind": "target",
+          "pass": false,
+          "actual": [
+            {
+              "seat": "2A",
+              "price": 11
+            }
+          ],
+          "expected": []
+        },
+        {
+          "label": "selected allergen is visibly warned before commit",
+          "kind": "target",
+          "pass": false,
+          "actual": false,
+          "expected": true
+        },
+        {
+          "label": "2: control base item is compatible before selecting garnish",
+          "kind": "control",
+          "pass": true,
+          "actual": true,
+          "expected": true
+        },
+        {
+          "label": "compatible guest 2 remains independent and retains modifier price",
+          "kind": "control",
+          "pass": true,
+          "actual": [
+            {
+              "seat": "2",
+              "price": 11
+            }
+          ],
+          "expected": [
+            {
+              "seat": "2",
+              "price": 11
+            }
+          ]
+        },
+        {
+          "label": "application produces no uncaught browser errors",
+          "kind": "target",
+          "pass": true,
+          "actual": [],
+          "expected": []
+        }
+      ],
+      "blockedExternal": [
+        "fonts.googleapis.com",
+        "fonts.googleapis.com",
+        "fonts.googleapis.com"
+      ]
+    },
+    {
+      "id": "I02",
+      "title": "EVEN /n selected from Split remains selected on the first Payment screen and charges exact shares",
+      "status": "FAIL",
+      "durationMs": 3775,
+      "error": null,
+      "assertions": [
+        {
+          "label": "Split /3 survives opening Payment",
+          "kind": "target",
+          "pass": false,
+          "actual": 1,
+          "expected": 3
+        },
+        {
+          "label": "first /3 share has the correct principal cents",
+          "kind": "target",
+          "pass": false,
+          "actual": 1000,
+          "expected": 333
+        },
+        {
+          "label": "Charge label uses requested share plus the selected tip",
+          "kind": "target",
+          "pass": false,
+          "actual": 1180,
+          "expected": 393
+        },
+        {
+          "label": "control: Payment selector still yields exact 333/333/334 principals",
+          "kind": "control",
+          "pass": true,
+          "actual": [
+            333,
+            333,
+            334
+          ],
+          "expected": [
+            333,
+            333,
+            334
+          ]
+        },
+        {
+          "label": "control: exact shares settle the check",
+          "kind": "control",
+          "pass": true,
+          "actual": "paid",
+          "expected": "paid"
+        },
+        {
+          "label": "application produces no uncaught browser errors",
+          "kind": "target",
+          "pass": true,
+          "actual": [],
+          "expected": []
+        }
+      ],
+      "blockedExternal": [
+        "fonts.googleapis.com",
+        "fonts.googleapis.com"
+      ]
+    },
+    {
+      "id": "I03",
+      "title": "Required modifier groups use stable identities even when their display names are identical",
+      "status": "FAIL",
+      "durationMs": 2658,
+      "error": null,
+      "assertions": [
+        {
+          "label": "different names: first choice cannot satisfy both required groups",
+          "kind": "control",
+          "pass": true,
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "different names: both stable group/option IDs are retained",
+          "kind": "control",
+          "pass": true,
+          "actual": [
+            [
+              "review-side",
+              "review-fries"
+            ],
+            [
+              "review-temperature",
+              "review-rare"
+            ]
+          ],
+          "expected": [
+            [
+              "review-side",
+              "review-fries"
+            ],
+            [
+              "review-temperature",
+              "review-rare"
+            ]
+          ]
+        },
+        {
+          "label": "different names: both deltas contribute exactly once",
+          "kind": "control",
+          "pass": true,
+          "actual": 13,
+          "expected": 13
+        },
+        {
+          "label": "same names: first choice cannot satisfy both required groups",
+          "kind": "target",
+          "pass": false,
+          "actual": 1,
+          "expected": 0
+        },
+        {
+          "label": "same names: both stable group/option IDs are retained",
+          "kind": "target",
+          "pass": false,
+          "actual": [
+            [
+              "review-temperature",
+              "review-rare"
+            ]
+          ],
+          "expected": [
+            [
+              "review-side",
+              "review-fries"
+            ],
+            [
+              "review-temperature",
+              "review-rare"
+            ]
+          ]
+        },
+        {
+          "label": "same names: both deltas contribute exactly once",
+          "kind": "target",
+          "pass": false,
+          "actual": 11,
+          "expected": 13
+        },
+        {
+          "label": "application produces no uncaught browser errors",
+          "kind": "target",
+          "pass": true,
+          "actual": [],
+          "expected": []
+        }
+      ],
+      "blockedExternal": [
+        "fonts.googleapis.com",
+        "fonts.googleapis.com"
+      ]
+    },
+    {
+      "id": "I04",
+      "title": "Rejected SEND preserves an unpaid recoverable draft and retry creates exactly one durable kitchen ticket",
+      "status": "FAIL",
+      "durationMs": 6459,
+      "error": null,
+      "assertions": [
+        {
+          "label": "control: normal SEND durably publishes one ticket",
+          "kind": "control",
+          "pass": true,
+          "actual": 1,
+          "expected": 1
+        },
+        {
+          "label": "control: rejected transport did not create a kitchen ticket",
+          "kind": "control",
+          "pass": true,
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "label": "rejected SEND cannot display a sent-success message",
+          "kind": "target",
+          "pass": false,
+          "actual": true,
+          "expected": false
+        },
+        {
+          "label": "unacknowledged line remains in the active recoverable draft",
+          "kind": "target",
+          "pass": false,
+          "actual": false,
+          "expected": true
+        },
+        {
+          "label": "unacknowledged line is durably preserved for its owner",
+          "kind": "target",
+          "pass": false,
+          "actual": [],
+          "expected": [
+            "mvc2aiq69z1b"
+          ]
+        },
+        {
+          "label": "new device restores the unpaid item before retry",
+          "kind": "target",
+          "pass": false,
+          "actual": false,
+          "expected": true
+        },
+        {
+          "label": "retry after restart publishes the original identity once",
+          "kind": "target",
+          "pass": false,
+          "actual": 0,
+          "expected": 1
+        },
+        {
+          "label": "retry keeps the original unpaid $10 line billable",
+          "kind": "target",
+          "pass": false,
+          "actual": 0,
+          "expected": 10
+        },
+        {
+          "label": "second retry cannot duplicate the ticket",
+          "kind": "target",
+          "pass": false,
+          "actual": 0,
+          "expected": 1
+        },
+        {
+          "label": "application produces no uncaught browser errors",
+          "kind": "target",
+          "pass": false,
+          "actual": [
+            "MOCK: write refused (simulated)"
+          ],
+          "expected": []
+        }
+      ],
+      "blockedExternal": [
+        "fonts.googleapis.com",
+        "fonts.googleapis.com",
+        "fonts.googleapis.com"
+      ]
+    }
+  ],
+  "passed": 0,
+  "failed": 8,
+  "errors": 0,
+  "unrun": 0,
+  "controlFailures": 0
+}

@@ -1,0 +1,61 @@
+FAIL B04 Transfers preserve fresh remote checks, exact positions and unpaid drafts through partial failure and retry
+  move: authoritative allergies survive expected={"2":["Dairy"],"2A":["Fish"]} actual={"table":[]}
+  move: authoritative kitchen note survives expected="MOCK remote kitchen restriction" actual=""
+  move: authoritative guest count survives expected=3 actual=2
+  move: unpaid line retains identity/position/owner/price and follows the table expected=[{"lineId":"remote-unsent","seat":"2A","ownerCode":"3001","price":12,"table":"2","checkId":"chk_mvc29d2gmxdx"}] actual=[]
+  move: new device restores the draft exactly once on the destination expected=1 actual=0
+  partial failure cannot erase remote allergies expected={"2":["Dairy"],"2A":["Fish"]} actual={"table":[]}
+  partial failure cannot erase another owner draft expected=["remote-unsent"] actual=[]
+  retry: authoritative allergies survive expected={"2":["Dairy"],"2A":["Fish"]} actual={"table":[]}
+  retry: authoritative kitchen note survives expected="MOCK remote kitchen restriction" actual=""
+  retry: authoritative guest count survives expected=3 actual=2
+  retry: unpaid line retains identity/position/owner/price and follows the table expected=[{"lineId":"remote-unsent","seat":"2A","ownerCode":"3001","price":12,"table":"2","checkId":"chk_mvc29gd3h9qg"}] actual=[]
+  retry: new device restores the draft exactly once on the destination expected=1 actual=0
+FAIL B05 Payment receipts finalize exactly once after write failures, lost acknowledgments and device restart
+  finalization writes fail: incomplete finalization cannot claim fully settled success expected=false actual=true
+  finalization writes fail: receipt recovery finishes the check expected="paid" actual="open"
+  finalization writes fail: receipt recovery finishes its exact line expected=true actual=false
+  payment acknowledgment lost: receipt recovery finishes the check expected="paid" actual="open"
+  payment acknowledgment lost: receipt recovery finishes its exact line expected=true actual=false
+  first even share finalization fails: persisted split progress is recovered expected={"n":3,"totalCents":1000,"paid":[333]} actual={"n":null,"totalCents":null,"paid":[]}
+FAIL B06 An employee cannot pay/close a check that contains another owner’s unpaid parked drafts
+  unresolved parked draft prevents a payment receipt expected=0 actual=1
+  unresolved parked draft prevents card tokenization expected=0 actual=1
+  check remains open for every owner’s unpaid work expected="open" actual="paid"
+  owner returns on a new device and receives the exact unpaid draft expected=1 actual=0
+FAIL B07 New remote seat allergies and kitchen notes remain authoritative through refresh, save, send and restart
+  fresh position 2A restriction is applied expected=["Tree Nut"] actual=[]
+  fresh position 3 restriction is applied expected=["Fish"] actual=[]
+  fresh kitchen note replaces a clean stale local note expected="MOCK latest kitchen restrictions" actual="MOCK previous note"
+  newly flagged guest cannot silently receive a conflicting item expected=false actual=true
+  later save cannot erase fresh cloud restrictions expected={"2":["Dairy"],"3":["Fish"],"2A":["Tree Nut"]} actual={"1":[],"2":["Dairy"],"3":[],"table":[]}
+  new kitchen line carries the exact guest restriction expected=["Tree Nut"] actual=[]
+  new ticket carries the latest kitchen note expected="MOCK latest kitchen restrictions" actual="MOCK previous note"
+  new device restores both distinct positions expected={"2":["Dairy"],"3":["Fish"],"2A":["Tree Nut"]} actual={"2":["Dairy"],"3":[],"2A":[]}
+FAIL B08 Selected modifier allergens and specific nut labels produce correct warnings without 2/2A crossover
+  label Nuts vs Almond expected=true actual=false
+  label Tree Nut vs Almond expected=true actual=false
+  label Peanut vs Tree Nut expected=false actual=true
+  label Tree Nut vs Peanut expected=false actual=true
+  label Nuts vs Nutmeg expected=false actual=true
+  label Nuts vs Donut expected=false actual=true
+  Tree Nut garnish cannot silently commit at flagged 2A expected=[] actual=[{"seat":"2A","price":11}]
+  selected allergen is visibly warned before commit expected=true actual=false
+FAIL I02 EVEN /n selected from Split remains selected on the first Payment screen and charges exact shares
+  Split /3 survives opening Payment expected=3 actual=1
+  first /3 share has the correct principal cents expected=333 actual=1000
+  Charge label uses requested share plus the selected tip expected=393 actual=1180
+FAIL I03 Required modifier groups use stable identities even when their display names are identical
+  same names: first choice cannot satisfy both required groups expected=0 actual=1
+  same names: both stable group/option IDs are retained expected=[["review-side","review-fries"],["review-temperature","review-rare"]] actual=[["review-temperature","review-rare"]]
+  same names: both deltas contribute exactly once expected=13 actual=11
+FAIL I04 Rejected SEND preserves an unpaid recoverable draft and retry creates exactly one durable kitchen ticket
+  rejected SEND cannot display a sent-success message expected=false actual=true
+  unacknowledged line remains in the active recoverable draft expected=true actual=false
+  unacknowledged line is durably preserved for its owner expected=["mvc2aiq69z1b"] actual=[]
+  new device restores the unpaid item before retry expected=true actual=false
+  retry after restart publishes the original identity once expected=1 actual=0
+  retry keeps the original unpaid $10 line billable expected=10 actual=0
+  second retry cannot duplicate the ticket expected=1 actual=0
+  application produces no uncaught browser errors expected=[] actual=["MOCK: write refused (simulated)"]
+{"passed":0,"failed":8,"errors":0,"unrun":0,"controlFailures":0,"output":"test/acceptance/regression-targets/evidence/baseline-run2.json"}
