@@ -1989,7 +1989,7 @@ function ensureOpenCheck(table){
 function unsentLinesForDoc(check){
   var mine=unsentFor(check.table).filter(function(i){ return lineBelongsToCheck(i, check.id, check.table); });
   var parked=(STATE.parkedLines||[]).filter(function(l){ return String(l.table)===String(check.table) && lineBelongsToCheck(l, check.id, check.table); });
-  return JSON.parse(JSON.stringify(mine.concat(parked)));
+  return JSON.parse(JSON.stringify(mine.concat(parked))).map(function(l){ delete l._sending; return l; }); // an in-flight marker is device-local
 }
 function stampLineOwners(){
   var me=STATE.currentServer; if (!me) return;
@@ -2034,15 +2034,23 @@ function persistCheck(check){
   }
   // Phase 0: seat allergy flags and the table's kitchen allergy note live on the check (not only in memory).
   if (check.status==='open') {
+    stampLineOwners(); // a saved draft always names the employee who entered it
     check.unsentLines=unsentLinesForDoc(check);
     var aSess=sessionOf(check.table);
-    check.allergies=JSON.parse(JSON.stringify(aSess.allergies||{}));
+    check.allergies=seatAllergyMap(check.table); // flagged positions only (an empty list means no flag)
     check.kitchenNote=aSess.kitchenNote||'';
   }
-  check.updatedAt=Date.now();
+  check.updatedAt=Math.max(Date.now(), (Number(check.updatedAt)||0)+1);
   STATE.checks[check.id]=check;
-  if (!fbReady) return;
-  fbDb.collection('checks').doc(check.id).set(check).catch(function(e){ console.warn('Check save:', e); });
+  STATE._checkWritten=STATE._checkWritten||{};
+  STATE._checkWritten[check.id]=stableStr(check);
+  if (!fbReady) return Promise.resolve(true);
+  return fbDb.collection('checks').doc(check.id).set(JSON.parse(JSON.stringify(check))).then(function(){ return true; }, function(e){ console.warn('Check save:', e); return false; });
+}
+function stableStr(v){
+  if (v===null || v===undefined || typeof v!=='object') return JSON.stringify(v===undefined?null:v);
+  if (Array.isArray(v)) return '['+v.map(stableStr).join(',')+']';
+  return '{'+Object.keys(v).filter(function(k){ return v[k]!==undefined; }).sort().map(function(k){ return JSON.stringify(k)+':'+stableStr(v[k]); }).join(',')+'}';
 }
 function closeOpenCheck(table, status){
   var sess=sessionOf(table);
@@ -2056,6 +2064,11 @@ function ingestOpenChecks(list){
   setTimeout(rehydrateMyLines, 0);
   (list||[]).forEach(function(ch){
     if (!ch || !ch.id) return;
+    var prevLocal=STATE.checks[ch.id];
+    // Phase 0 (B07): the cloud copy wins when another device changed it and it is not older than ours.
+    var written=(STATE._checkWritten||{})[ch.id];
+    var remoteChange=!prevLocal || written===undefined || written!==stableStr(ch);
+    var adopt=remoteChange && (Number(ch.updatedAt)||0) >= (Number(prevLocal && prevLocal.updatedAt)||0);
     STATE.checks[ch.id]=ch;
     if (ch.status!=='open') return;
     var sess=sessionOf(ch.table);
@@ -2067,9 +2080,14 @@ function ingestOpenChecks(list){
     if (ch.guestCount) sess.guestCount=ch.guestCount;
     if (ch.allergies && typeof ch.allergies==='object') {
       var hasLocal=Object.keys(sess.allergies||{}).some(function(k){ return (sess.allergies[k]||[]).length; });
-      if (!hasLocal) sess.allergies=JSON.parse(JSON.stringify(ch.allergies));
+      if (adopt || !hasLocal) {
+        var keepKeys=sess.allergies||{};
+        sess.allergies=JSON.parse(JSON.stringify(ch.allergies));
+        Object.keys(keepKeys).forEach(function(k){ if (!sess.allergies[k]) sess.allergies[k]=[]; }); // keep empty seat slots for the UI
+      }
     }
-    if (ch.kitchenNote && !sess.kitchenNote) sess.kitchenNote=ch.kitchenNote;
+    if (adopt && typeof ch.kitchenNote==='string') sess.kitchenNote=ch.kitchenNote;
+    else if (ch.kitchenNote && !sess.kitchenNote) sess.kitchenNote=ch.kitchenNote;
     // Restore unsent lines saved on the check: to their owner if signed in, otherwise parked.
     (Array.isArray(ch.unsentLines)?ch.unsentLines:[]).forEach(function(l){
       if (!l || !l.lineId || !l.ownerCode) return;
@@ -2637,9 +2655,44 @@ function backToFloor(){
    - An item is "verified" only when BOH marked it verified AND lists its allergens. Anything else is unverified:
      an empty or unverified list is never treated as safe. */
 function allergenKey(a){
-  var k=String(a||'').trim().toLowerCase().replace(/s$/,'');
-  if (/nut|peanut/.test(k)) return 'nut';
-  return k;
+  return String(a||'').trim().toLowerCase().replace(/\s+/g,' ').replace(/(es|s)$/,'');
+}
+/* Phase 0 (B08): conservative nut identities. A broad "Nuts" flag covers tree nuts AND peanuts;
+   "Tree Nut" and "Peanut" stay distinct. Named tree nuts (almond, hazelnut...) count as tree nuts.
+   An unspecified "nut" ingredient warns every nut flag. Nutmeg, donut, coconut are not nuts. */
+var TREE_NUT_RE=/\b(tree ?nuts?|almonds?|walnuts?|hazelnuts?|filberts?|pecans?|cashews?|pistachios?|macadamias?|brazil ?nuts?|pine ?nuts?|chestnuts?|praline|marzipan|gianduja|nougat)\b/;
+function nutClass(label){
+  var t=String(label||'').toLowerCase();
+  return { peanut:/\bpea ?nuts?\b/.test(t), tree:TREE_NUT_RE.test(t), generic:/\bnuts?\b/.test(t) };
+}
+function allergenMatches(flag, label){
+  var f=String(flag||'').trim().toLowerCase(), c=nutClass(label), fc=nutClass(f);
+  var broad=/^nuts?$/.test(f);
+  if (broad) return c.peanut || c.tree || c.generic;
+  if (fc.peanut && !fc.tree) return c.peanut || (c.generic && !c.tree);
+  if (fc.tree) {
+    if (/^tree ?nuts?$/.test(f)) return c.tree || (c.generic && !c.peanut);
+    if (allergenKey(f)===allergenKey(label)) return true;
+    return (c.tree && /\btree ?nuts?\b/.test(String(label).toLowerCase())) || (c.generic && !c.peanut && !c.tree); // unspecified tree nut / nut
+  }
+  return allergenKey(f)===allergenKey(label);
+}
+/* The dish as composed: base allergens plus every selected modifier option's declared allergens. */
+function selectedModifierChoices(item){
+  var out=[];
+  (item && item.modifiers || []).forEach(function(m){
+    if (!m || !m.choices || !m.choices.length) return;
+    modPicks(item, m).forEach(function(label){
+      var c=m.choices.filter(function(x){ return x.label===label || x.name===label; })[0];
+      if (c) out.push({groupId:m.groupId||'', optionId:c.id, name:c.name, allergens:asList(c.allergens), verified:c.verified===true});
+    });
+  });
+  return out;
+}
+function composedAllergens(item){
+  var list=asList(item && item.allergens).slice();
+  selectedModifierChoices(item).forEach(function(c){ c.allergens.forEach(function(a){ if (list.indexOf(a)<0) list.push(a); }); });
+  return list;
 }
 function itemAllergensVerified(item){
   return !!(item && item.verified===true && asList(item.allergens).length);
@@ -2657,9 +2710,10 @@ function flagsForSeat(seat, table){
 }
 function allergenRisk(item, seat, table){
   var flags=flagsForSeat(seat, table);
-  var listed=asList(item && item.allergens);
-  var conflicts=listed.filter(function(x){ return flags.some(function(f){ return allergenKey(f)===allergenKey(x); }); });
-  return { flags:flags, conflicts:conflicts, unverified:!itemAllergensVerified(item), status:itemAllergenStatus(item) };
+  var listed=composedAllergens(item);
+  var conflicts=listed.filter(function(x){ return flags.some(function(f){ return allergenMatches(f, x); }); });
+  var optionsUnverified=selectedModifierChoices(item).some(function(c){ return !c.verified; });
+  return { flags:flags, conflicts:conflicts, unverified:!itemAllergensVerified(item) || optionsUnverified, status:itemAllergenStatus(item) };
 }
 function seatAllergyMap(table){
   var all=sessionOf(table==null?STATE.selectedTable:table).allergies||{}, out={};
@@ -3050,7 +3104,7 @@ function attachFoodModifiers(mapped, it){
       var g = STATE.modGroups.filter(function(x){ return x.id===gid; })[0];
       if (!g) return null;
       // Phase 0: keep the display strings, and carry BOH's structured rules and upcharges.
-      var choices=(g.options||[]).map(function(o){ var up=Number(o.up)||0; return {id:String(o.id!=null?o.id:o.name), name:o.name, up:up, label:o.name+(up?(' +$'+up):'')}; });
+      var choices=(g.options||[]).map(function(o){ var up=Number(o.up)||0; return {id:String(o.id!=null?o.id:o.name), name:o.name, up:up, label:o.name+(up?(' +$'+up):''), allergens:asList(o.allergens), verified:o.verified===true}; });
       var min=(g.min!=null&&isFinite(Number(g.min)))?Number(g.min):(g.required?1:0);
       var max=(g.max!=null&&isFinite(Number(g.max)))?Number(g.max):(g.multi?choices.length:1);
       return {group:g.name, groupId:g.id, options:choices.map(function(c){ return c.label; }), choices:choices, min:Math.max(0,min), max:Math.max(1,max), multi:max>1};
@@ -8901,7 +8955,7 @@ function guestAllergyHits(allergens){
   Object.keys(seats).forEach(function(k){
     (seats[k]||[]).forEach(function(a){
       listed.forEach(function(x){
-        if (String(x).toLowerCase()===String(a).toLowerCase() && flagged.indexOf(x)<0) flagged.push(x);
+        if (allergenMatches(a, x) && flagged.indexOf(x)<0) flagged.push(x);
       });
     });
   });
@@ -9552,14 +9606,20 @@ function setPendingCourse(cn){
   }
   renderModifierSheet();
 }
+function modKey(p, mod){
+  var dup=((p && p.modifiers) || []).filter(function(m){ return m && m.group===mod.group; }).length>1;
+  return dup && mod.groupId ? 'gid:'+mod.groupId : mod.group;
+}
 function modPicks(p, mod){
-  var v=p && p.mods ? p.mods[mod.group] : null;
+  var v=p && p.mods ? p.mods[modKey(p, mod)] : null;
   if (v==null || v==='') return [];
   return Array.isArray(v) ? v.slice() : [v];
 }
 function modSelectionText(p){
-  return Object.keys(p.mods||{}).filter(function(g){ var v=p.mods[g]; return Array.isArray(v) ? v.length : !!v; })
-    .map(function(g){ var v=p.mods[g]; return g+': '+(Array.isArray(v)?v.join(' + '):v); }).join(', ');
+  var used={}, parts=[], has=function(v){ return Array.isArray(v) ? v.length : !!v; }, txt=function(v){ return Array.isArray(v)?v.join(' + '):v; };
+  (p.modifiers||[]).forEach(function(m){ if (!m) return; var k=modKey(p, m); used[k]=1; if (has((p.mods||{})[k])) parts.push(m.group+': '+txt(p.mods[k])); });
+  Object.keys(p.mods||{}).forEach(function(g){ if (!used[g] && has(p.mods[g])) parts.push(g+': '+txt(p.mods[g])); });
+  return parts.join(', ');
 }
 /* Phase 0: a structured (BOH) modifier ADDS its upcharge to the item's base price.
    Legacy string-only groups (e.g. wine pours, where the option IS the price) keep their old rule. */
@@ -9572,7 +9632,7 @@ function applyModPricing(p){
       var c=m.choices.filter(function(x){ return x.label===label || x.name===label; })[0];
       if (!c) return;
       deltaCents+=Math.round((Number(c.up)||0)*100);
-      sel.push({groupId:m.groupId||'', group:m.group, optionId:c.id, name:c.name, up:Number(c.up)||0});
+      sel.push({groupId:m.groupId||'', group:m.group, optionId:c.id, name:c.name, up:Number(c.up)||0, allergens:asList(c.allergens), verified:c.verified===true});
     });
   });
   p.modifierSelections=sel;
@@ -9591,22 +9651,22 @@ function modAutoAdds(p){
 function pickMod(mi, opt){
   var p=STATE.pendingItem; if(!p) return;
   var mod=p.modifiers[mi]||{};
-  var group=mod.group;
+  var group=mod.group, key=modKey(p, mod);
   if (mod.choices && mod.choices.length) {
     if (mod.max>1) {
       var cur=modPicks(p, mod), at=cur.indexOf(opt);
       if (at>-1) cur.splice(at,1);
       else if (cur.length<mod.max) cur.push(opt);
       else { toast('Up to '+mod.max+' for '+group); return; }
-      p.mods[group]=cur;
-    } else if (p.mods[group]===opt && mod.min<1) {
-      delete p.mods[group];
+      p.mods[key]=cur;
+    } else if (p.mods[key]===opt && mod.min<1) {
+      delete p.mods[key];
     } else {
-      p.mods[group]=opt;
+      p.mods[key]=opt;
     }
     applyModPricing(p);
   } else {
-    p.mods[group]=opt;
+    p.mods[key]=opt;
     var dollar=String(opt).match(/\$(\d+(?:\.\d+)?)/);
     if (dollar) {
       var add=Number(dollar[1]);
@@ -9626,7 +9686,7 @@ function modifiersReady(p){
   if (!p.modifiers || !p.modifiers.length) return true;
   return p.modifiers.every(function(m){
     if (m && m.choices && m.choices.length) { var n=modPicks(p, m).length; return n>=m.min && n<=m.max; }
-    return p.mods[m.group];
+    return p.mods[modKey(p, m)];
   });
 }
 function maybeAllergyThenAdd(){
@@ -9786,11 +9846,11 @@ function createSisterCheck(table){
 }
 function orderDocId(o){ return (o && (o.fbId || o.id)) || null; }
 function writeOrderItems(o, extra){
-  if (!fbReady || !o) return;
+  if (!fbReady || !o) return Promise.resolve(true);
   var id=orderDocId(o);
   // A local copy whose cloud id is not known yet: the change is kept locally and re-applied when the cloud copy arrives.
-  if (!id || ((STATE._localOrders||[]).indexOf(o)>-1 && !o.fbId)) { o._pendingItems=true; return; }
-  fbDb.collection('orders').doc(id).update(Object.assign({items:o.items, checkId:o.checkId||null}, extra||{})).catch(function(e){ console.warn('Order update:', e); });
+  if (!id || ((STATE._localOrders||[]).indexOf(o)>-1 && !o.fbId)) { o._pendingItems=true; return Promise.resolve(false); }
+  return fbDb.collection('orders').doc(id).update(Object.assign({items:o.items, checkId:o.checkId||null}, extra||{})).then(function(){ return true; }, function(e){ console.warn('Order update:', e); return false; });
 }
 function assignLineToCheck(lineId, checkId){
   unsentFor().forEach(function(i){ if (i.lineId===lineId) i.checkId=checkId; });
@@ -9911,7 +9971,10 @@ function splitEvenPrompt(){
 }
 function splitEven(n){
   n=Math.max(2, Math.min(9, Number(n)||2));
+  var es=evenSplitOf();
+  if (es && (es.paid||[]).length && n!==es.n) { toast('This check is already being split /'+es.n); closeSheet(); return; }
   STATE.payEven=n;
+  STATE._payCheckId=activeCheckId(); // the split belongs to this check: Payment keeps it
   closeSheet();
   toast('Even split /'+n+' — use PAY to charge each share');
   openPayment(checkTotals().grand);
@@ -10128,6 +10191,9 @@ function transferCheckTo(newTable, opts){
       return lo && String(lo.table)===old && lo.status!=='paid' && !lo.fbId && !fresh.orders.some(function(fo){ return fo.sentAt===lo.sentAt && String(fo.table)===old; });
     });
     if (unconfirmed.length) { toast('A ticket for table '+old+' is still being sent — move not done. Try again in a moment.'); return; }
+    if ((STATE.currentOrder||[]).some(function(i){ return i && i._sending && String(i.table)===old; })) { toast('Items for table '+old+' are still being sent — move not done. Try again in a moment.'); return; }
+    // Phase 0 (B04): another device may have changed the check (allergies, note, guests, drafts): apply it first.
+    ingestOpenChecks(fresh.checks.filter(function(c){ return String(c.table)===old && c.status==='open'; }));
     applyLocalTransfer(old, newTable);
     closeSheet(); renderOrder(); paintChrome();
     return finishCloudMove(old, newTable, fresh);
@@ -10552,7 +10618,7 @@ function startDiningFromCheckLine(ti){
 
 function sendOrder(opts) {
   opts = opts || {};
-  var pool = unsentFor().filter(function(i){ return lineBelongsToCheck(i); });
+  var pool = unsentFor().filter(function(i){ return lineBelongsToCheck(i) && !i._sending; });
   var selectedIds=selectedOrderLineIds();
   var hasSelected=Object.keys(selectedIds).length>0;
   var bundle = opts.fireCourse != null
@@ -10573,8 +10639,9 @@ function sendOrder(opts) {
   var tastingItems=bundle.filter(function(i){return i.isTasting||i.isPrixFixe||i.isPairing;});
   var check=STATE.checks[activeCheckId()] || ensureOpenCheck(STATE.selectedTable);
 
+  var cloudSend = fbReady && regularItems.length;
   if (regularItems.length) {
-    consumePosInventory(regularItems);
+    if (!cloudSend) consumePosInventory(regularItems);
     var mapped=kitchenItemsFrom(regularItems);
     var order = {
       table: STATE.selectedTable,
@@ -10590,11 +10657,19 @@ function sendOrder(opts) {
       sentAt:Date.now(),
       clearedAt:null
     };
-    var localOrder={id:genId(),...order};
-    STATE.orders.push(localOrder);
-    if (!STATE._localOrders) STATE._localOrders=[];
-    STATE._localOrders.push(localOrder);
-    if (fbReady) fbDb.collection('orders').add(order).then(function(ref){ localOrder.fbId=ref.id; publishActiveOrder(order, ref.id); });
+    if (!cloudSend) {
+      var localOrder={id:genId(),...order};
+      STATE.orders.push(localOrder);
+      if (!STATE._localOrders) STATE._localOrders=[];
+      STATE._localOrders.push(localOrder);
+    } else {
+      // Phase 0 (I04): the lines stay on the check (durably) until the kitchen ticket is confirmed.
+      // The ticket id is derived from the line ids, so a retry from any device writes the same ticket once.
+      var orderId='ord_'+check.id+'_'+payKeyHash(regularItems.map(function(i){ return i.lineId; }).sort().join('|'));
+      regularItems.forEach(function(i){ i._sending=true; });
+      persistCheck(check);
+      sendRegularTicket(order, orderId, regularItems, check, opts);
+    }
   }
 
   tastingItems.forEach(function(ti){
@@ -10613,9 +10688,10 @@ function sendOrder(opts) {
     }
   });
 
-  toast(opts.fireCourse!=null?'Course fired to kitchen':(opts.stay?'Sent — staying on table':'Order sent to kitchen'));
+  if (cloudSend && !tastingItems.length) toast('Sending to kitchen…');
+  else toast(opts.fireCourse!=null?'Course fired to kitchen':(opts.stay?'Sent — staying on table':'Order sent to kitchen'));
   var ids={};
-  bundle.forEach(function(i){ ids[i.lineId]=1; });
+  bundle.forEach(function(i){ if (!(cloudSend && !(i.isTasting||i.isPrixFixe||i.isPairing))) ids[i.lineId]=1; });
   STATE._sentLineIds=STATE._sentLineIds||{};
   Object.keys(ids).forEach(function(k){ STATE._sentLineIds[k]=1; });
   STATE.currentOrder=STATE.currentOrder.filter(function(i){ return !ids[i.lineId]; });
@@ -10627,6 +10703,33 @@ function sendOrder(opts) {
   } else {
     backToFloor();
   }
+}
+
+function sendRegularTicket(order, orderId, lines, check, opts){
+  var lineIds={}; lines.forEach(function(i){ lineIds[i.lineId]=1; });
+  return fbDb.collection('orders').doc(orderId).set(order).then(function(){
+    consumePosInventory(lines);
+    if (!STATE.orders.some(function(o){ return orderDocId(o)===orderId; })) {
+      var localOrder=Object.assign({id:orderId, fbId:orderId}, order);
+      STATE.orders.push(localOrder);
+      STATE._localOrders=STATE._localOrders||[]; STATE._localOrders.push(localOrder);
+    }
+    STATE._sentLineIds=STATE._sentLineIds||{};
+    Object.keys(lineIds).forEach(function(k){ STATE._sentLineIds[k]=1; });
+    STATE.currentOrder=STATE.currentOrder.filter(function(i){ return !lineIds[i.lineId]; });
+    persistCheck(STATE.checks[check.id]||check);
+    publishActiveOrder(order, orderId);
+    toast(opts.fireCourse!=null?'Course fired to kitchen':(opts.stay?'Sent — staying on table':'Order sent to kitchen'));
+    if (STATE.activeTab==='order') { renderOrder(); paintChrome(); }
+    return true;
+  }, function(e){
+    console.warn('Send failed:', e);
+    lines.forEach(function(i){ delete i._sending; });
+    persistCheck(STATE.checks[check.id]||check);
+    toast('⚠ NOT sent — the kitchen did not receive '+lines.length+' item(s). They are kept on the check: tap SEND to try again.');
+    if (STATE.activeTab==='order') { renderOrder(); paintChrome(); }
+    return false;
+  });
 }
 
 function fireDiningCourse(to, quiet, idx){
@@ -11360,7 +11463,7 @@ function unpaidSentLinesOf(cid){
   return guestCheckItems(cid).filter(function(r){ return r.status==='sent'; });
 }
 function markCheckLinesPaid(cid, paymentId, lineIds){
-  var only=null;
+  var only=null, jobs=[];
   if (Array.isArray(lineIds)) { only={}; lineIds.forEach(function(id){ only[id]=1; }); }
   STATE.orders.forEach(function(o){
     if (String(o.table)!==String(STATE.selectedTable) || (o.status!=='new' && o.status!=='held')) return;
@@ -11375,8 +11478,9 @@ function markCheckLinesPaid(cid, paymentId, lineIds){
     if (!touched) return;
     var allPaid=(o.items||[]).every(function(i){ return i.paid; });
     if (allPaid) { o.status='paid'; o.paidAt=Date.now(); }
-    writeOrderItems(o, allPaid ? {status:'paid', paidAt:o.paidAt} : null);
+    jobs.push(writeOrderItems(o, allPaid ? {status:'paid', paidAt:o.paidAt} : null));
   });
+  return Promise.all(jobs).then(function(r){ return r.every(function(x){ return x!==false; }); });
 }
 function closeCheckById(cid, status){
   var check=STATE.checks[cid]; if (!check) return;
@@ -11387,11 +11491,66 @@ function closeCheckById(cid, status){
   }
   check.status=status||'paid';
   check.closedAt=Date.now();
-  persistCheck(check);
+  var job=persistCheck(check);
   var sess=sessionOf(check.table);
   var others=tableCheckIds(check.table).filter(function(id){ return id!==cid; });
   if (sess.checkId===cid && others.length) sess.checkId=others[0];
   if (STATE.viewCheckId===cid) STATE.viewCheckId=others[0]||null;
+  return job;
+}
+// Phase 0 (B05): a stored receipt is settlement state. Finalizing it (closing the check, marking its
+// lines paid, recording split progress) is idempotent and can be replayed from the receipt alone.
+function snapshotForFinalize(cid){
+  return { check:JSON.parse(JSON.stringify(STATE.checks[cid]||null)), orders:STATE.orders.map(function(o){ return {o:o, items:JSON.parse(JSON.stringify(o.items||[])), status:o.status, paidAt:o.paidAt}; }), sessCheck:sessionOf(STATE.selectedTable).checkId, view:STATE.viewCheckId };
+}
+function restoreAfterFailedFinalize(cid, snap){
+  if (snap.check) STATE.checks[cid]=snap.check;
+  snap.orders.forEach(function(r){ r.o.items=r.items; r.o.status=r.status; r.o.paidAt=r.paidAt; });
+  sessionOf(STATE.selectedTable).checkId=snap.sessCheck; STATE.viewCheckId=snap.view;
+}
+function finalizeReceipts(cid, receipts){
+  var check=STATE.checks[cid];
+  if (!check) return Promise.resolve(false);
+  var snap=snapshotForFinalize(cid), jobs=[], settledLines=null;
+  var splits=receipts.filter(function(r){ return Number(r.split)>1; }), fulls=receipts.filter(function(r){ return !(Number(r.split)>1); });
+  var es=null;
+  if (splits.length) {
+    var n=Number(splits[0].split);
+    var all=(STATE._receiptsFor||{})[cid] || splits;
+    var shares=all.filter(function(r){ return Number(r.split)===n; }).sort(function(x,y){ return (x.shareIndex||0)-(y.shareIndex||0); });
+    es={ n:n, totalCents:Number(splits[0].checkSubtotal)||0, lineIds:splits[0].lineIds||[], paid:shares.map(function(r){ return Number(r.subtotal)||0; }) };
+    check.evenSplit=es;
+    var sum=es.paid.reduce(function(a2,b2){ return a2+b2; },0);
+    if (sum>=es.totalCents) settledLines=es.lineIds;
+  }
+  if (fulls.length) settledLines=(settledLines||[]).concat.apply(settledLines||[], fulls.map(function(r){ return r.lineIds||[]; }));
+  if (settledLines) {
+    if (check.status==='open') jobs.push(closeCheckById(cid, 'paid')); // records the check's items before they are marked paid
+    jobs.push(markCheckLinesPaid(cid, (fulls[0]||splits[0]).paymentId, settledLines));
+  } else if (check.status==='open') {
+    jobs.push(persistCheck(check));
+  }
+  return Promise.all(jobs).then(function(r){
+    if (!r.every(function(x){ return x!==false; })) { restoreAfterFailedFinalize(cid, snap); return false; }
+    if (!fbReady) return true;
+    return Promise.all(receipts.map(function(rc){ return fbDb.collection('payments').doc(rc.paymentId).update({finalizedAt:Date.now()}); })).then(function(){ return true; }, function(){ return true; }); // the check itself is final; a missing mark is replayed harmlessly
+  }).then(function(ok){
+    if (ok) { STATE.payEven = settledLines ? 1 : (es ? es.n : 1); STATE._payCheckId = null; }
+    return {ok:ok, settled:!!settledLines, es:es};
+  });
+}
+function receiptsForCheck(cid){
+  if (!fbReady) return Promise.resolve([]);
+  return fbDb.collection('payments').get().then(function(snap){
+    var out=[]; snap.forEach(function(d){ var r=d.data()||{}; if (String(r.checkId||'')===String(cid)) out.push(Object.assign({paymentId:d.id}, r)); });
+    STATE._receiptsFor=STATE._receiptsFor||{}; STATE._receiptsFor[cid]=out;
+    return out;
+  });
+}
+function showFinalizePending(totalCents){
+  var card=document.getElementById('payment-card');
+  if (card) card.innerHTML='<div class="payment-success"><h3>Payment recorded — check not closed yet</h3><p>The card payment is saved'+(totalCents?' ($'+(totalCents/100).toFixed(2)+')':'')+', but closing the check did not complete. Tap Charge again to finish: the card will NOT be charged again.</p><button class="charge-btn" id="charge-btn" onclick="processPayment()">Charge — finish recorded payment</button><button class="cancel-pay-btn" onclick="backToOrderScreen()">Back to order</button></div>';
+  toast('Payment recorded, check not closed yet — retry to finish (no new charge)');
 }
 function payKeyHash(text){
   var h=0; text=String(text||'');
@@ -11404,39 +11563,70 @@ async function processPayment(subtotal) {
   var check = STATE.checks[cid];
   STATE._payInFlight = STATE._payInFlight || {};
   STATE._paidKeys = STATE._paidKeys || {};
-  // Phase 0: one charge at a time per check; a stale Charge (after success, or for a check that
-  // is no longer the one on the payment screen) never charges anything.
+  // Phase 0: one charge at a time per check.
   if (STATE._payInFlight[cid]) return;
-  if (!check || check.status !== 'open' || STATE._payCheckId !== cid || !chargeBtn) { toast('This check is no longer open for payment — nothing was charged'); return; }
-  // Phase 0: unsent items cannot be paid (they have no kitchen ticket and would be lost when the check closes).
-  if (unsentFor().some(function(i){ return lineBelongsToCheck(i, cid); })) { toast('Send or remove unsent items before charging this check'); return; }
-  // Phase 0: the amount is recomputed from the check itself, in cents, at the moment of charging.
-  var subtotalCents = Math.round((Number(checkTotals().grand)||0) * 100);
-  if (subtotal != null && Math.round((Number(subtotal)||0) * 100) !== subtotalCents) { toast('This check changed — review the new amount before charging'); openPayment(subtotalCents/100); return; }
-  var lineIds = unpaidSentLinesOf(cid).map(function(r){ return r.lineId; }).sort();
-  if (subtotalCents <= 0) { toast('Nothing to charge on this check'); return; }
-  var even = Math.max(1, Number(STATE.payEven)||1);
-  var es = evenSplitOf(cid);
-  if (even > 1 && es && es.n === even && (es.totalCents !== subtotalCents || (es.lineIds && es.lineIds.join('|') !== lineIds.join('|')))) {
-    toast('This check changed after the split started (paid '+es.paid.length+' of '+es.n+'). The remaining shares cannot cover different items — settle the original split amount or move new items to another check.');
-    return;
-  }
-  var shareIndex = (es && es.n === even) ? (es.paid||[]).length : 0;
-  var shareCents = payShareCents(subtotalCents, cid);
-  var tipCents = STATE.customTip ? Math.round(Number(STATE.customTip) * 100) : tipCentsFor(shareCents, STATE.tipPercent);
-  var totalCents = shareCents + tipCents;
-  // Deterministic idempotency key: same check, same split share, same lines → same payment record.
-  var payKey = 'pay_' + cid + '_' + even + '_' + shareIndex + '_' + payKeyHash(lineIds.join('|') + '#' + subtotalCents);
-  if (STATE._paidKeys[payKey]) { toast('This payment was already processed — not charged again'); return; }
-
   STATE._payInFlight[cid] = true;
-  chargeBtn.disabled = true;
-  chargeBtn.textContent = 'Processing…';
   try {
-    if (fbReady) {
-      var prior = await fbDb.collection('payments').doc(payKey).get(); // a failed read aborts: never charge blind
-      if (prior && prior.exists) { STATE._paidKeys[payKey] = 1; throw Object.assign(new Error('This payment was already processed — not charged again'), {duplicate:true}); }
+    // Phase 0 (B05): a stored but unfinished receipt for this check is finished first, without a new card charge.
+    if (fbReady && check) {
+      var receipts;
+      try { receipts = await receiptsForCheck(cid); }
+      catch (e) { toast('⚠ Cannot reach the payment records — nothing was charged. Try again.'); return; }
+      var open = receipts.filter(function(r){ return !r.finalizedAt; });
+      if (open.length) {
+        var fin = await finalizeReceipts(cid, open);
+        if (!fin.ok) { showFinalizePending(0); return; }
+        var leftC = fin.es && !fin.settled ? fin.es.totalCents - fin.es.paid.reduce(function(a,b){ return a+b; },0) : 0;
+        showPaymentSuccess(open.reduce(function(a,r){ return a+(Number(r.amount)||0); },0)/100);
+        var card0 = document.querySelector('#payment-card .payment-success');
+        if (card0) card0.insertAdjacentHTML('beforeend', '<p>Recovered a payment that was already recorded — the card was not charged again.'+(leftC?' Remaining on this check: $'+(leftC/100).toFixed(2)+' ('+(fin.es.n-fin.es.paid.length)+' share(s) left)':'')+'</p>');
+        toast('Recovered recorded payment — no new card charge');
+        return;
+      }
     }
+    // A stale Charge (after success, or for a check that is no longer the one on the payment screen) never charges.
+    if (!check || check.status !== 'open' || STATE._payCheckId !== cid || !chargeBtn) { toast('This check is no longer open for payment — nothing was charged'); return; }
+    // Phase 0: unsent items cannot be paid (they have no kitchen ticket and would be lost when the check closes).
+    if (unsentFor().some(function(i){ return lineBelongsToCheck(i, cid); })) { toast('Send or remove unsent items before charging this check'); return; }
+    // Phase 0 (B06): the same rule for every employee's unsent work on this check, here or on another device.
+    var parked = (STATE.parkedLines||[]).filter(function(l){ return l && String(l.table)===String(check.table) && lineBelongsToCheck(l, cid, check.table); });
+    if (fbReady) {
+      var fresh;
+      try { fresh = await fbDb.collection('checks').doc(cid).get(); }
+      catch (e) { toast('⚠ Cannot confirm this check with the cloud — nothing was charged. Try again.'); return; }
+      var sentIds = {}; STATE.orders.forEach(function(o){ (o.items||[]).forEach(function(i){ if (i.lineId) sentIds[i.lineId]=1; }); });
+      var myCode = String(STATE.currentServer && STATE.currentServer.code || '');
+      var remoteUnsent = (fresh && fresh.exists && (fresh.data()||{}).unsentLines || []).filter(function(l){
+        return l && l.lineId && !sentIds[l.lineId] && String(l.ownerCode||'')!==myCode && !parked.some(function(x){ return x.lineId===l.lineId; });
+      });
+      parked = parked.concat(remoteUnsent);
+    }
+    if (parked.length) {
+      var who = parked.map(function(l){ return l.ownerName||l.ownerCode||'another employee'; }).filter(function(n,i,arr){ return arr.indexOf(n)===i; });
+      toast(parked.length+' unsent item(s) on this check belong to '+who.join(', ')+' — they must send or remove them before it can be charged');
+      return;
+    }
+    // Phase 0: the amount is recomputed from the check itself, in cents, at the moment of charging.
+    var subtotalCents = Math.round((Number(checkTotals().grand)||0) * 100);
+    if (subtotal != null && Math.round((Number(subtotal)||0) * 100) !== subtotalCents) { toast('This check changed — review the new amount before charging'); openPayment(subtotalCents/100); return; }
+    var lineIds = unpaidSentLinesOf(cid).map(function(r){ return r.lineId; }).sort();
+    if (subtotalCents <= 0) { toast('Nothing to charge on this check'); return; }
+    var even = Math.max(1, Number(STATE.payEven)||1);
+    var es = evenSplitOf(cid);
+    if (even > 1 && es && es.n === even && (es.totalCents !== subtotalCents || (es.lineIds && es.lineIds.join('|') !== lineIds.join('|')))) {
+      toast('This check changed after the split started (paid '+es.paid.length+' of '+es.n+'). The remaining shares cannot cover different items — settle the original split amount or move new items to another check.');
+      return;
+    }
+    var shareIndex = (es && es.n === even) ? (es.paid||[]).length : 0;
+    var shareCents = payShareCents(subtotalCents, cid);
+    var tipCents = STATE.customTip ? Math.round(Number(STATE.customTip) * 100) : tipCentsFor(shareCents, STATE.tipPercent);
+    var totalCents = shareCents + tipCents;
+    // Deterministic idempotency key: same check, same split share, same lines → same payment record.
+    var payKey = 'pay_' + cid + '_' + even + '_' + shareIndex + '_' + payKeyHash(lineIds.join('|') + '#' + subtotalCents);
+    if (STATE._paidKeys[payKey]) { toast('This payment was already processed — not charged again'); return; }
+
+    chargeBtn.disabled = true;
+    chargeBtn.textContent = 'Processing…';
     if (!squareCard) throw new Error('Card form not ready');
     var tokenResult = await squareCard.tokenize();
     if (tokenResult.status !== 'OK') throw new Error(tokenResult.errors?tokenResult.errors[0].message:'Tokenization failed');
@@ -11458,39 +11648,28 @@ async function processPayment(subtotal) {
       checkSubtotal: subtotalCents,
       split: even,
       shareIndex: shareIndex,
+      finalizedAt: null,
       timestamp: Date.now()
     };
-    if (fbReady) await fbDb.collection('payments').doc(payKey).set(paymentData);
+    if (fbReady) {
+      try { await fbDb.collection('payments').doc(payKey).set(paymentData); }
+      catch (e) { throw new Error('the payment record was not confirmed ('+e.message+'). Tap Charge again: if it was recorded it will be finished without a new card charge'); }
+    }
     STATE._paidKeys[payKey] = 1;
-
-    var settled = true;
-    if (even > 1) {
-      if (!es || es.n !== even) es = { n: even, totalCents: subtotalCents, lineIds: lineIds, paid: [] };
-      es.paid = (es.paid||[]).concat([shareCents]);
-      check.evenSplit = es;
-      var paidSum = es.paid.reduce(function(a,b){ return a+b; },0);
-      settled = paidSum >= es.totalCents;
-      if (!settled) persistCheck(check);
-    }
-    if (settled) {
-      // Phase 0: only this check's paid lines are marked paid, and only this check is closed.
-      closeCheckById(cid, 'paid');
-      markCheckLinesPaid(cid, payKey, lineIds);
-      STATE.payEven = 1;
-      STATE._payCheckId = null;
-    }
+    STATE._receiptsFor = STATE._receiptsFor || {};
+    STATE._receiptsFor[cid] = ((STATE._receiptsFor[cid]||[]).filter(function(r){ return r.paymentId!==payKey; })).concat([paymentData]);
+    var fin2 = await finalizeReceipts(cid, [paymentData]);
+    if (!fin2.ok) { showFinalizePending(totalCents); return; }
 
     showPaymentSuccess(totalCents/100);
-    if (!settled) {
-      var leftC = es.totalCents - es.paid.reduce(function(a,b){ return a+b; },0);
+    if (!fin2.settled && fin2.es) {
+      var left2 = fin2.es.totalCents - fin2.es.paid.reduce(function(a,b){ return a+b; },0);
       var card = document.querySelector('#payment-card .payment-success');
-      if (card) card.insertAdjacentHTML('beforeend', '<p>Remaining on this check: $'+(leftC/100).toFixed(2)+' ('+(es.n-es.paid.length)+' share(s) left)</p>');
-      STATE._payCheckId = null; // the next share opens a fresh payment screen
+      if (card) card.insertAdjacentHTML('beforeend', '<p>Remaining on this check: $'+(left2/100).toFixed(2)+' ('+(fin2.es.n-fin2.es.paid.length)+' share(s) left)</p>');
     }
-
   } catch(e) {
     var btn = document.getElementById('charge-btn');
-    if (btn) { btn.disabled = false; btn.textContent = 'Charge $'+(totalCents/100).toFixed(2); }
+    if (btn) { btn.disabled = false; btn.textContent = 'Charge again'; }
     toast(e.duplicate ? e.message : '⚠ Payment failed: '+e.message);
   } finally {
     delete STATE._payInFlight[cid];
