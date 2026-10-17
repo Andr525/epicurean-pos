@@ -3883,6 +3883,7 @@ function finishLogin(staff){
   if (err) err.textContent='';
   STATE.currentServer=staff;
   rehydrateMyLines();
+  setTimeout(refreshPendingSettlements, 0);
   STATE.floorUserPicked=false;
   STATE.floorFilter=defaultFloorFilter();
   STATE.floorFitDone=false;
@@ -5629,6 +5630,7 @@ function selectTable(t) {
   STATE.selectedTable = t;
   STATE.tableChosen = true;
   noticeParkedLines(t);
+  if (fbReady) refreshPendingSettlements();
   if (fbReady) {
     STATE.calls.filter(function(cl){ return String(cl.table)===String(t) && cl.status==='active'; }).forEach(function(cl){
       fbDb.collection('calls').doc(cl.id).update({status:'acknowledged'});
@@ -11508,36 +11510,172 @@ function restoreAfterFailedFinalize(cid, snap){
   snap.orders.forEach(function(r){ r.o.items=r.items; r.o.status=r.status; r.o.paidAt=r.paidAt; });
   sessionOf(STATE.selectedTable).checkId=snap.sessCheck; STATE.viewCheckId=snap.view;
 }
-function finalizeReceipts(cid, receipts){
-  var check=STATE.checks[cid];
-  if (!check) return Promise.resolve(false);
-  var snap=snapshotForFinalize(cid), jobs=[], settledLines=null;
-  var splits=receipts.filter(function(r){ return Number(r.split)>1; }), fulls=receipts.filter(function(r){ return !(Number(r.split)>1); });
-  var es=null;
+/* Phase 0: durable, idempotent payment settlement.
+   A receipt is written once, with an immutable itemized snapshot of what was paid (lines, positions,
+   prices, ticket ids, subtotal). Settlement is then reconciled FROM THE CLOUD, in any order and as
+   often as needed, on any device: (1) mark exactly the receipt's lines paid on their tickets,
+   (2) close the receipt's check with the snapshot as its itemized record, (3) re-read both and only
+   then mark the receipt settlement:'complete'. Nothing is rebuilt from unpaid-only items, nothing
+   depends on this browser's memory, and no step can tokenize or charge a card. */
+function receiptSettled(r){ return !!r && (r.settlement==='complete' || !!r.finalizedAt); }
+function lineTicketMap(cid){
+  var map={};
+  STATE.orders.forEach(function(o){ (o.items||[]).forEach(function(i, idx){ var lid=i.lineId||('sent_'+o.id+'_'+(i.id||idx)); var id=orderDocId(o); if (id && !map[lid]) map[lid]=id; }); });
+  return map;
+}
+function paymentSnapshot(cid, subtotalCents){
+  var tickets=lineTicketMap(cid);
+  var items=guestCheckItems(cid).filter(function(r){ return r.status==='sent'; }).map(function(r){
+    return { lineId:r.lineId, name:r.name, seat:r.seat, price:Number(r.price)||0, qty:parseInt(r.qty,10)||1, mods:r.mods||'', course:r.course||null, ticketId:tickets[r.lineId]||null };
+  });
+  return { checkId:cid, table:String(STATE.selectedTable), items:items, subtotalCents:subtotalCents, takenAt:Date.now() };
+}
+function settlementPlan(all){
+  var fulls=all.filter(function(r){ return !(Number(r.split)>1); }), splits=all.filter(function(r){ return Number(r.split)>1; });
+  var plan={ settled:false, lineIds:[], snapshot:null, es:null, paymentIds:all.map(function(r){ return r.paymentId; }) };
+  if (fulls.length) {
+    plan.settled=true;
+    fulls.forEach(function(r){ (r.lineIds||[]).forEach(function(l){ if (plan.lineIds.indexOf(l)<0) plan.lineIds.push(l); }); });
+    plan.snapshot=fulls[fulls.length-1].snapshot||null;
+  }
   if (splits.length) {
     var n=Number(splits[0].split);
-    var all=(STATE._receiptsFor||{})[cid] || splits;
-    var shares=all.filter(function(r){ return Number(r.split)===n; }).sort(function(x,y){ return (x.shareIndex||0)-(y.shareIndex||0); });
-    es={ n:n, totalCents:Number(splits[0].checkSubtotal)||0, lineIds:splits[0].lineIds||[], paid:shares.map(function(r){ return Number(r.subtotal)||0; }) };
-    check.evenSplit=es;
-    var sum=es.paid.reduce(function(a2,b2){ return a2+b2; },0);
-    if (sum>=es.totalCents) settledLines=es.lineIds;
+    var shares=splits.filter(function(r){ return Number(r.split)===n; }).sort(function(x,y){ return (x.shareIndex||0)-(y.shareIndex||0); });
+    plan.es={ n:n, totalCents:Number(shares[0].checkSubtotal)||0, lineIds:shares[0].lineIds||[], paid:shares.map(function(r){ return Number(r.subtotal)||0; }), snapshot:shares[0].snapshot||null, paymentIds:shares.map(function(r){ return r.paymentId; }) };
+    if (plan.es.paid.reduce(function(a,b){ return a+b; },0) >= plan.es.totalCents) {
+      plan.settled=true;
+      plan.es.lineIds.forEach(function(l){ if (plan.lineIds.indexOf(l)<0) plan.lineIds.push(l); });
+      plan.snapshot=plan.snapshot||plan.es.snapshot;
+    }
   }
-  if (fulls.length) settledLines=(settledLines||[]).concat.apply(settledLines||[], fulls.map(function(r){ return r.lineIds||[]; }));
-  if (settledLines) {
-    if (check.status==='open') jobs.push(closeCheckById(cid, 'paid')); // records the check's items before they are marked paid
-    jobs.push(markCheckLinesPaid(cid, (fulls[0]||splits[0]).paymentId, settledLines));
-  } else if (check.status==='open') {
-    jobs.push(persistCheck(check));
-  }
-  return Promise.all(jobs).then(function(r){
-    if (!r.every(function(x){ return x!==false; })) { restoreAfterFailedFinalize(cid, snap); return false; }
-    if (!fbReady) return true;
-    return Promise.all(receipts.map(function(rc){ return fbDb.collection('payments').doc(rc.paymentId).update({finalizedAt:Date.now()}); })).then(function(){ return true; }, function(){ return true; }); // the check itself is final; a missing mark is replayed harmlessly
-  }).then(function(ok){
-    if (ok) { STATE.payEven = settledLines ? 1 : (es ? es.n : 1); STATE._payCheckId = null; }
-    return {ok:ok, settled:!!settledLines, es:es};
+  return plan;
+}
+function ticketIdsFor(plan, all){
+  var ids={};
+  all.forEach(function(r){ ((r.snapshot&&r.snapshot.items)||[]).forEach(function(i){ if (i.ticketId && plan.lineIds.indexOf(i.lineId)>-1) ids[i.ticketId]=1; }); });
+  if (Object.keys(ids).length) return Promise.resolve(Object.keys(ids));
+  return fbDb.collection('orders').get().then(function(snap){ // older receipts without a snapshot: find the tickets by line id
+    snap.forEach(function(d){ var o=d.data()||{}; if ((o.items||[]).some(function(i){ return plan.lineIds.indexOf(i.lineId)>-1; })) ids[d.id]=1; });
+    return Object.keys(ids);
   });
+}
+// Reconcile one check's receipts. Each write is attempted independently (either may fail); the result
+// is decided only by re-reading the cloud.
+function settleCheckFromReceipts(cid, all){
+  var plan=settlementPlan(all), firstR=all[0]||{}, ticketIds=[];
+  var mark=function(items){ var changed=false; (items||[]).forEach(function(i){ if (plan.lineIds.indexOf(i.lineId)>-1 && !i.paid) { i.paid=true; i.paidCheckId=cid; i.paymentId=all.filter(function(r){ return (r.lineIds||[]).indexOf(i.lineId)>-1; }).map(function(r){ return r.paymentId; }).pop()||firstR.paymentId; changed=true; } }); return changed; };
+  var step=function(promise){ return Promise.resolve().then(function(){ return promise(); }).then(function(){ return true; }, function(e){ console.warn('Settlement step:', e); return false; }); };
+  return (plan.settled ? ticketIdsFor(plan, all) : Promise.resolve([])).then(function(ids){
+    ticketIds=ids;
+    var ticketJobs=ids.map(function(tid){ return step(function(){
+      return fbDb.collection('orders').doc(tid).get().then(function(d){
+        if (!d.exists) return;
+        var o=d.data()||{}, items=JSON.parse(JSON.stringify(o.items||[]));
+        if (!mark(items)) return;
+        var allPaid=items.every(function(i){ return i.paid; });
+        return fbDb.collection('orders').doc(tid).update(Object.assign({items:items}, allPaid?{status:'paid', paidAt:o.paidAt||Date.now()}:{}));
+      });
+    }); });
+    var checkJob=step(function(){
+      return fbDb.collection('checks').doc(cid).get().then(function(d){
+        var base=d.exists ? (d.data()||{}) : JSON.parse(JSON.stringify(STATE.checks[cid] || {id:cid, table:String(firstR.table||'')}));
+        base.id=cid;
+        if (plan.es) base.evenSplit={ n:plan.es.n, totalCents:plan.es.totalCents, lineIds:plan.es.lineIds, paid:plan.es.paid };
+        if (plan.settled) {
+          base.status='paid';
+          base.closedAt=base.closedAt||Date.now();
+          if (plan.snapshot) base.guest={ items:plan.snapshot.items.map(function(i){ return Object.assign({status:'sent', checkId:cid}, i); }), totals:{ subtotal:plan.snapshot.subtotalCents/100 } };
+          base.paymentIds=plan.paymentIds;
+        }
+        base.updatedAt=Date.now();
+        return fbDb.collection('checks').doc(cid).set(base);
+      });
+    });
+    return Promise.all(ticketJobs.concat([checkJob]));
+  }).then(function(){
+    // Verify against the cloud, never against this device's memory.
+    return Promise.all([fbDb.collection('checks').doc(cid).get()].concat(ticketIds.map(function(tid){ return fbDb.collection('orders').doc(tid).get(); })));
+  }).then(function(docs){
+    var ch=docs[0].exists ? docs[0].data() : null, tdocs=docs.slice(1).map(function(d){ return d.exists ? Object.assign({id:d.id}, d.data()) : null; });
+    var ok;
+    if (plan.settled) {
+      var paidLines={}; tdocs.forEach(function(o){ ((o&&o.items)||[]).forEach(function(i){ if (i.paid) paidLines[i.lineId]=1; }); });
+      ok=!!ch && ch.status==='paid' && plan.lineIds.every(function(l){ return paidLines[l]; }) && (!plan.snapshot || stableStr(((ch.guest||{}).items||[]).map(function(i){ return i.lineId; }))===stableStr(plan.snapshot.items.map(function(i){ return i.lineId; })));
+    } else {
+      ok=!!ch && !!ch.evenSplit && (ch.evenSplit.paid||[]).length===plan.es.paid.length;
+    }
+    // Bring this device's view in line with the cloud.
+    if (ch) STATE.checks[cid]=Object.assign({}, ch, {id:cid});
+    tdocs.forEach(function(o){ if (!o) return; var local=STATE.orders.filter(function(x){ return orderDocId(x)===o.id; })[0]; if (local) { local.items=o.items; local.status=o.status; local.paidAt=o.paidAt; } });
+    if (ok && plan.settled && ch) {
+      var sess=sessionOf(ch.table), others=tableCheckIds(ch.table).filter(function(id){ return id!==cid && STATE.checks[id] && STATE.checks[id].status==='open'; });
+      if (sess.checkId===cid && others.length) sess.checkId=others[0];
+      if (STATE.viewCheckId===cid) STATE.viewCheckId=others[0]||null;
+    }
+    var pend=all.filter(function(r){ return !receiptSettled(r); });
+    return Promise.all(pend.map(function(r){ return fbDb.collection('payments').doc(r.paymentId).update(ok ? {settlement:'complete', finalizedAt:Date.now()} : {settlement:'pending', lastAttemptAt:Date.now()}).then(function(){ return true; }, function(){ return false; }); })).then(function(){
+      return {ok:ok, settled:plan.settled, es:plan.es};
+    });
+  }).catch(function(e){ console.warn('Settlement:', e); return {ok:false, settled:plan.settled, es:plan.es}; });
+}
+// Local-only mode (no cloud): the earlier in-memory finalization.
+function finalizeReceipts(cid, receipts){
+  if (fbReady) {
+    var all=((STATE._receiptsFor||{})[cid]||[]).slice();
+    receipts.forEach(function(r){ if (!all.some(function(x){ return x.paymentId===r.paymentId; })) all.push(r); });
+    return settleCheckFromReceipts(cid, all).then(function(res){
+      if (res.ok) { STATE.payEven = res.settled ? 1 : (res.es ? res.es.n : 1); STATE._payCheckId = null; }
+      return res;
+    });
+  }
+  var check=STATE.checks[cid];
+  if (!check) return Promise.resolve({ok:false});
+  var plan=settlementPlan(((STATE._receiptsFor||{})[cid]||receipts));
+  if (plan.es) check.evenSplit={ n:plan.es.n, totalCents:plan.es.totalCents, lineIds:plan.es.lineIds, paid:plan.es.paid };
+  if (plan.settled) {
+    if (check.status==='open') closeCheckById(cid, 'paid');
+    if (plan.snapshot) { check.guest={ items:plan.snapshot.items, totals:{ subtotal:plan.snapshot.subtotalCents/100 } }; }
+    markCheckLinesPaid(cid, receipts[0].paymentId, plan.lineIds);
+  } else persistCheck(check);
+  STATE.payEven = plan.settled ? 1 : (plan.es ? plan.es.n : 1); STATE._payCheckId = null;
+  return Promise.resolve({ok:true, settled:plan.settled, es:plan.es});
+}
+/* Discoverability: every receipt whose settlement is not complete — even for a closed check — is listed
+   after sign-in and when a table opens, with a Finish settlement action. Finishing never charges. */
+function allPendingReceipts(){
+  if (!fbReady) return Promise.resolve([]);
+  return fbDb.collection('payments').get().then(function(snap){
+    var out=[]; snap.forEach(function(d){ var r=Object.assign({paymentId:d.id}, d.data()||{}); if (!receiptSettled(r)) out.push(r); });
+    return out;
+  });
+}
+function refreshPendingSettlements(){
+  return allPendingReceipts().then(function(list){ STATE.pendingSettlements=list; paintSettlementBanner(); return list; }, function(){ paintSettlementBanner('unknown'); return null; });
+}
+function paintSettlementBanner(state){
+  var list=STATE.pendingSettlements||[], b=document.getElementById('settlement-banner');
+  if (!STATE.currentServer || (!list.length && state!=='unknown' && !STATE._settleMsg)) { if (b) b.remove(); return; }
+  if (!b) { b=document.createElement('div'); b.id='settlement-banner'; b.style.cssText='position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:7000;background:#3a2a10;color:#fff;border:1px solid #d9a441;border-radius:10px;padding:8px 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px;max-width:calc(100% - 32px);box-sizing:border-box;'; document.body.appendChild(b); }
+  var cents=list.reduce(function(a,r){ return a+(Number(r.amount)||0); },0), tables=list.map(function(r){ return r.table; }).filter(function(t,i,arr){ return t!=null && arr.indexOf(t)===i; });
+  b.innerHTML=(list.length
+      ? '<span>⚠ '+list.length+' payment'+(list.length===1?'':'s')+' recorded ($'+(cents/100).toFixed(2)+(tables.length?', table '+tables.join(', '):'')+') — settlement pending. The card is not charged again.</span><button type="button" class="primary-btn" style="width:auto;padding:4px 10px;margin:0" onclick="finishPendingSettlements()">Finish settlement</button>'
+      : '<span>'+esc(STATE._settleMsg||'Payment records could not be checked.')+'</span><button type="button" class="ghost-btn" style="width:auto;padding:4px 10px;margin:0" onclick="STATE._settleMsg=null;refreshPendingSettlements()">OK</button>');
+}
+function finishPendingSettlements(){
+  if (STATE._settling) return Promise.resolve();
+  STATE._settling=true; STATE._settleMsg=null;
+  return fbDb.collection('payments').get().then(function(snap){
+    var byCheck={}; snap.forEach(function(d){ var r=Object.assign({paymentId:d.id}, d.data()||{}); if (r.checkId) (byCheck[r.checkId]=byCheck[r.checkId]||[]).push(r); });
+    var cids=Object.keys(byCheck).filter(function(c){ return byCheck[c].some(function(r){ return !receiptSettled(r); }); });
+    return cids.reduce(function(chain, c){ return chain.then(function(acc){ return settleCheckFromReceipts(c, byCheck[c]).then(function(res){ acc.push(res); return acc; }); }); }, Promise.resolve([]));
+  }).then(function(res){
+    var bad=res.filter(function(x){ return !x.ok; }).length;
+    STATE._settleMsg=bad ? null : 'Settlement complete — '+res.length+' recorded payment'+(res.length===1?'':'s')+' reconciled. The card was not charged again.';
+    toast(bad ? '⚠ Settlement still pending for '+bad+' payment record(s) — try again; the card will not be charged again' : 'Settlement complete — no new card charge');
+  }, function(e){ toast('⚠ Cannot reach the payment records — settlement still pending'); }).then(function(){
+    STATE._settling=false;
+    return refreshPendingSettlements();
+  }).then(function(){ if (STATE.activeTab==='order') { renderOrder(); paintChrome(); } else if (STATE.activeTab==='tables') renderTables(); });
 }
 function receiptsForCheck(cid){
   if (!fbReady) return Promise.resolve([]);
@@ -11549,8 +11687,9 @@ function receiptsForCheck(cid){
 }
 function showFinalizePending(totalCents){
   var card=document.getElementById('payment-card');
-  if (card) card.innerHTML='<div class="payment-success"><h3>Payment recorded — check not closed yet</h3><p>The card payment is saved'+(totalCents?' ($'+(totalCents/100).toFixed(2)+')':'')+', but closing the check did not complete. Tap Charge again to finish: the card will NOT be charged again.</p><button class="charge-btn" id="charge-btn" onclick="processPayment()">Charge — finish recorded payment</button><button class="cancel-pay-btn" onclick="backToOrderScreen()">Back to order</button></div>';
-  toast('Payment recorded, check not closed yet — retry to finish (no new charge)');
+  if (card) card.innerHTML='<div class="payment-success"><h3>Payment recorded — settlement pending</h3><p>The card payment is saved'+(totalCents?' ($'+(totalCents/100).toFixed(2)+')':'')+', but closing the check and marking its tickets paid did not complete. Tap Finish settlement (or Charge again) to finish: the card will NOT be charged again.</p><button class="charge-btn" id="charge-btn" onclick="processPayment()">Finish settlement — no new charge</button><button class="cancel-pay-btn" onclick="backToOrderScreen()">Back to order</button></div>';
+  toast('Payment recorded — settlement pending (no new charge on retry)');
+  refreshPendingSettlements();
 }
 function payKeyHash(text){
   var h=0; text=String(text||'');
@@ -11572,7 +11711,7 @@ async function processPayment(subtotal) {
       var receipts;
       try { receipts = await receiptsForCheck(cid); }
       catch (e) { toast('⚠ Cannot reach the payment records — nothing was charged. Try again.'); return; }
-      var open = receipts.filter(function(r){ return !r.finalizedAt; });
+      var open = receipts.filter(function(r){ return !receiptSettled(r); });
       if (open.length) {
         var fin = await finalizeReceipts(cid, open);
         if (!fin.ok) { showFinalizePending(0); return; }
@@ -11580,7 +11719,8 @@ async function processPayment(subtotal) {
         showPaymentSuccess(open.reduce(function(a,r){ return a+(Number(r.amount)||0); },0)/100);
         var card0 = document.querySelector('#payment-card .payment-success');
         if (card0) card0.insertAdjacentHTML('beforeend', '<p>Recovered a payment that was already recorded — the card was not charged again.'+(leftC?' Remaining on this check: $'+(leftC/100).toFixed(2)+' ('+(fin.es.n-fin.es.paid.length)+' share(s) left)':'')+'</p>');
-        toast('Recovered recorded payment — no new card charge');
+        toast('Settlement complete — recovered a recorded payment, no new card charge');
+        refreshPendingSettlements();
         return;
       }
     }
@@ -11648,6 +11788,8 @@ async function processPayment(subtotal) {
       checkSubtotal: subtotalCents,
       split: even,
       shareIndex: shareIndex,
+      snapshot: (es && es.n === even && es.snapshot) ? es.snapshot : paymentSnapshot(cid, subtotalCents),
+      settlement: 'recorded',
       finalizedAt: null,
       timestamp: Date.now()
     };
@@ -11681,6 +11823,7 @@ function showPaymentSuccess(total) {
   html += '<div class="check-icon">✅</div>';
   html += '<h3>Payment Successful!</h3>';
   html += '<p>$'+total.toFixed(2)+' charged to card</p>';
+  html += '<p class="sheet-sub">Settlement complete — check and tickets reconciled.</p>';
   html += '<p style="margin-top:0.5rem;">Table '+STATE.selectedTable+' — '+STATE.currentServer.name+'</p>';
   html += '<button class="charge-btn" style="margin-top:1.5rem;" onclick="closePayment()">Done</button>';
   html += '</div>';
