@@ -1913,6 +1913,25 @@ function lineBelongsToCheck(line, checkId, table){
   var owner=line && (line.checkId || primaryCheckId(table==null?STATE.selectedTable:table));
   return String(owner||'')===String(cid||'');
 }
+/* Data integrity (see test/acceptance/DATA-INTEGRITY.md): an item's complete business record is the
+   committed line itself, deep-cloned; keys starting with "_" are device-local transient state.
+   It travels unchanged as 'record' on kitchen ticket items and check rows. Display/kitchen fields
+   beside it are projections; operational state (paid, check assignment, kitchen marks) stays outside it. */
+function itemRecord(line){
+  var r=JSON.parse(JSON.stringify(line||{}));
+  Object.keys(r).forEach(function(k){ if (k.charAt(0)==='_') delete r[k]; });
+  return r;
+}
+function sentItemRecord(i){
+  if (i && i.record && typeof i.record==='object') return JSON.parse(JSON.stringify(i.record));
+  var r=itemRecord(i); // a ticket written before records existed: its stored item is the most complete copy
+  delete r.paid; delete r.paidCheckId; delete r.paymentId;
+  return r;
+}
+// The check's itemized record. The open check, a closed check and a payment snapshot all use this.
+function checkGuestRecord(cid, prevGuest){
+  return Object.assign(JSON.parse(JSON.stringify(prevGuest||{})), { items:guestCheckItems(cid), totals:{ subtotal:checkItemsTotal(cid) } });
+}
 function guestCheckItems(checkId){
   var cid=checkId||activeCheckId();
   var table=STATE.selectedTable;
@@ -1925,7 +1944,8 @@ function guestCheckItems(checkId){
       status:i.held?'held':'unsent', checkId:i.checkId||cid, allergyOverride:i.allergyOverride||null,
       extraPlate:!!i.extraPlate, pfExtra:!!i.pfExtra, pfCourseKind:i.pfCourseKind||null,
       ticketPos:i.ticketPos!=null?Number(i.ticketPos):null,
-      serviceCourse:i.serviceCourse!=null?Number(i.serviceCourse):(i.course||null)
+      serviceCourse:i.serviceCourse!=null?Number(i.serviceCourse):(i.course||null),
+      record:itemRecord(i)
     });
   });
   var sentMap={};
@@ -1947,7 +1967,8 @@ function guestCheckItems(checkId){
           status:'sent', checkId:itemCid, allergyOverride:i.allergyOverride||null,
           extraPlate:!!i.extraPlate, pfExtra:!!i.pfExtra, pfCourseKind:i.pfCourseKind||null,
           ticketPos:i.ticketPos!=null?Number(i.ticketPos):null,
-          serviceCourse:i.serviceCourse!=null?Number(i.serviceCourse):(i.course||null)
+          serviceCourse:i.serviceCourse!=null?Number(i.serviceCourse):(i.course||null),
+          record:sentItemRecord(i)
         };
       }
       sentMap[lid].qty += Math.max(1, parseInt(i.qty,10)||1);
@@ -2026,8 +2047,7 @@ function persistCheck(check){
   if (!check) return;
   check.guest=check.guest||{ items:[], totals:{ subtotal:0 } };
   if (String(check.table)===String(STATE.selectedTable) && check.status==='open') {
-    check.guest.items=guestCheckItems(check.id);
-    check.guest.totals={ subtotal:checkItemsTotal(check.id) };
+    check.guest=checkGuestRecord(check.id, check.guest);
     check.guestCount=sessionOf(check.table).guestCount||check.guestCount;
     check.seatedAt=sessionOf(check.table).seatedAt||check.seatedAt;
     check.femalePositions=Object.assign({}, femalePositionsOf(check.table));
@@ -10506,7 +10526,8 @@ function publishActiveOrder(order, docId) {
     return feedRef.get().then(function(doc){
       var data = doc.exists && doc.data() || {};
       var list = Array.isArray(data.list) ? data.list.filter(function(item){ return item && item.status === 'new' && item.id !== docId; }) : [];
-      list.push(Object.assign({}, order, {id:docId, status:'new'}));
+      // The feed is a kitchen display projection; the complete item records stay on the ticket document.
+      list.push(Object.assign({}, order, {id:docId, status:'new', items:(order.items||[]).map(function(it){ var c=Object.assign({}, it); delete c.record; return c; })}));
       return feedRef.set({list:list, updatedAt:Date.now()});
     });
   }).catch(function(error){ console.warn('Active order feed:', error); });
@@ -10533,7 +10554,8 @@ function kitchenItemsFrom(lines){
         lineId:i.lineId, checkId:i.checkId||cid,
         extraPlate:!!i.extraPlate, pfExtra:!!i.pfExtra, pfCourseKind:i.pfCourseKind||null,
         ticketPos:i.ticketPos!=null?Number(i.ticketPos):null,
-        serviceCourse:course
+        serviceCourse:course,
+        record:itemRecord(i)
       });
     }
   });
@@ -10620,6 +10642,7 @@ function startDiningFromCheckLine(ti){
 
 function sendOrder(opts) {
   opts = opts || {};
+  stampLineOwners(); // the record sent to the kitchen always names the employee who entered it
   var pool = unsentFor().filter(function(i){ return lineBelongsToCheck(i) && !i._sending; });
   var selectedIds=selectedOrderLineIds();
   var hasSelected=Object.keys(selectedIds).length>0;
@@ -11486,11 +11509,7 @@ function markCheckLinesPaid(cid, paymentId, lineIds){
 }
 function closeCheckById(cid, status){
   var check=STATE.checks[cid]; if (!check) return;
-  if (String(check.table)===String(STATE.selectedTable)) {
-    check.guest=check.guest||{};
-    check.guest.items=guestCheckItems(cid);
-    check.guest.totals={ subtotal:checkItemsTotal(cid) };
-  }
+  if (String(check.table)===String(STATE.selectedTable)) check.guest=checkGuestRecord(cid, check.guest);
   check.status=status||'paid';
   check.closedAt=Date.now();
   var job=persistCheck(check);
@@ -11523,12 +11542,31 @@ function lineTicketMap(cid){
   STATE.orders.forEach(function(o){ (o.items||[]).forEach(function(i, idx){ var lid=i.lineId||('sent_'+o.id+'_'+(i.id||idx)); var id=orderDocId(o); if (id && !map[lid]) map[lid]=id; }); });
   return map;
 }
+// The snapshot is the complete itemized check exactly as the open check stores it, plus the complete
+// check and ticket documents (without their item arrays) — whole objects, never a field list.
 function paymentSnapshot(cid, subtotalCents){
-  var tickets=lineTicketMap(cid);
-  var items=guestCheckItems(cid).filter(function(r){ return r.status==='sent'; }).map(function(r){
-    return { lineId:r.lineId, name:r.name, seat:r.seat, price:Number(r.price)||0, qty:parseInt(r.qty,10)||1, mods:r.mods||'', course:r.course||null, ticketId:tickets[r.lineId]||null };
+  var lineTickets=lineTicketMap(cid), check=itemRecord(STATE.checks[cid]||{id:cid}), tickets={};
+  var guest=checkGuestRecord(cid, check.guest);
+  delete check.guest;
+  guest.items.forEach(function(r){
+    var tid=lineTickets[r.lineId], o=tid && STATE.orders.filter(function(x){ return orderDocId(x)===tid; })[0];
+    if (o && !tickets[tid]) { var meta=itemRecord(o); delete meta.items; tickets[tid]=meta; }
   });
-  return { checkId:cid, table:String(STATE.selectedTable), items:items, subtotalCents:subtotalCents, takenAt:Date.now() };
+  var map={}; guest.items.forEach(function(r){ if (lineTickets[r.lineId]) map[r.lineId]=lineTickets[r.lineId]; });
+  return { version:2, checkId:cid, table:String(STATE.selectedTable), guest:guest, check:check, tickets:tickets, lineTickets:map, subtotalCents:subtotalCents, takenAt:Date.now() };
+}
+// Invariant 4: a snapshot that cannot represent every paid line completely is an error, never a partial record.
+function snapshotError(snap, lineIds){
+  if (!snap || snap.version!==2 || !snap.guest || !Array.isArray(snap.guest.items)) return 'the receipt has no complete itemized check snapshot';
+  var bad=(lineIds||[]).filter(function(l){ var row=snap.guest.items.filter(function(r){ return r.lineId===l; })[0]; return !row || !row.record || typeof row.record!=='object' || Array.isArray(row.record); });
+  return bad.length ? 'no complete record for '+bad.length+' paid line(s)' : null;
+}
+function fillMissing(target, source){
+  Object.keys(source||{}).forEach(function(k){
+    if (target[k]===undefined) target[k]=JSON.parse(JSON.stringify(source[k]));
+    else if (target[k] && source[k] && typeof target[k]==='object' && typeof source[k]==='object' && !Array.isArray(target[k]) && !Array.isArray(source[k])) fillMissing(target[k], source[k]);
+  });
+  return target;
 }
 function settlementPlan(all){
   var fulls=all.filter(function(r){ return !(Number(r.split)>1); }), splits=all.filter(function(r){ return Number(r.split)>1; });
@@ -11552,7 +11590,7 @@ function settlementPlan(all){
 }
 function ticketIdsFor(plan, all){
   var ids={};
-  all.forEach(function(r){ ((r.snapshot&&r.snapshot.items)||[]).forEach(function(i){ if (i.ticketId && plan.lineIds.indexOf(i.lineId)>-1) ids[i.ticketId]=1; }); });
+  all.forEach(function(r){ var m=(r.snapshot&&r.snapshot.lineTickets)||{}; plan.lineIds.forEach(function(l){ if (m[l]) ids[m[l]]=1; }); });
   if (Object.keys(ids).length) return Promise.resolve(Object.keys(ids));
   return fbDb.collection('orders').get().then(function(snap){ // older receipts without a snapshot: find the tickets by line id
     snap.forEach(function(d){ var o=d.data()||{}; if ((o.items||[]).some(function(i){ return plan.lineIds.indexOf(i.lineId)>-1; })) ids[d.id]=1; });
@@ -11563,6 +11601,11 @@ function ticketIdsFor(plan, all){
 // is decided only by re-reading the cloud.
 function settleCheckFromReceipts(cid, all){
   var plan=settlementPlan(all), firstR=all[0]||{}, ticketIds=[];
+  var integrity=plan.settled ? snapshotError(plan.snapshot, plan.lineIds) : (plan.es && snapshotError(plan.es.snapshot, plan.es.lineIds));
+  if (integrity) { // Invariant 4: never settle on an incomplete record; keep it pending with the reason.
+    return Promise.all(all.filter(function(r){ return !receiptSettled(r); }).map(function(r){ return fbDb.collection('payments').doc(r.paymentId).update({settlement:'pending', settlementError:integrity, lastAttemptAt:Date.now()}).catch(function(){}); }))
+      .then(function(){ return {ok:false, settled:plan.settled, es:plan.es, error:integrity}; });
+  }
   var mark=function(items){ var changed=false; (items||[]).forEach(function(i){ if (plan.lineIds.indexOf(i.lineId)>-1 && !i.paid) { i.paid=true; i.paidCheckId=cid; i.paymentId=all.filter(function(r){ return (r.lineIds||[]).indexOf(i.lineId)>-1; }).map(function(r){ return r.paymentId; }).pop()||firstR.paymentId; changed=true; } }); return changed; };
   var step=function(promise){ return Promise.resolve().then(function(){ return promise(); }).then(function(){ return true; }, function(e){ console.warn('Settlement step:', e); return false; }); };
   return (plan.settled ? ticketIdsFor(plan, all) : Promise.resolve([])).then(function(ids){
@@ -11578,13 +11621,16 @@ function settleCheckFromReceipts(cid, all){
     }); });
     var checkJob=step(function(){
       return fbDb.collection('checks').doc(cid).get().then(function(d){
-        var base=d.exists ? (d.data()||{}) : JSON.parse(JSON.stringify(STATE.checks[cid] || {id:cid, table:String(firstR.table||'')}));
-        base.id=cid;
+        // Start from the cloud document (unrelated fields survive); fill only what it lacks from the snapshot.
+        var snap=plan.snapshot || (plan.es && plan.es.snapshot);
+        var base=d.exists ? (d.data()||{}) : {};
+        fillMissing(base, snap.check);
+        if (base.id===undefined) base.id=cid;
         if (plan.es) base.evenSplit={ n:plan.es.n, totalCents:plan.es.totalCents, lineIds:plan.es.lineIds, paid:plan.es.paid };
         if (plan.settled) {
           base.status='paid';
           base.closedAt=base.closedAt||Date.now();
-          if (plan.snapshot) base.guest={ items:plan.snapshot.items.map(function(i){ return Object.assign({status:'sent', checkId:cid}, i); }), totals:{ subtotal:plan.snapshot.subtotalCents/100 } };
+          base.guest=JSON.parse(JSON.stringify(plan.snapshot.guest)); // the complete itemized check, as recorded with the payment
           base.paymentIds=plan.paymentIds;
         }
         base.updatedAt=Date.now();
@@ -11600,7 +11646,7 @@ function settleCheckFromReceipts(cid, all){
     var ok;
     if (plan.settled) {
       var paidLines={}; tdocs.forEach(function(o){ ((o&&o.items)||[]).forEach(function(i){ if (i.paid) paidLines[i.lineId]=1; }); });
-      ok=!!ch && ch.status==='paid' && plan.lineIds.every(function(l){ return paidLines[l]; }) && (!plan.snapshot || stableStr(((ch.guest||{}).items||[]).map(function(i){ return i.lineId; }))===stableStr(plan.snapshot.items.map(function(i){ return i.lineId; })));
+      ok=!!ch && ch.status==='paid' && plan.lineIds.every(function(l){ return paidLines[l]; }) && stableStr(ch.guest)===stableStr(plan.snapshot.guest);
     } else {
       ok=!!ch && !!ch.evenSplit && (ch.evenSplit.paid||[]).length===plan.es.paid.length;
     }
@@ -11634,7 +11680,7 @@ function finalizeReceipts(cid, receipts){
   if (plan.es) check.evenSplit={ n:plan.es.n, totalCents:plan.es.totalCents, lineIds:plan.es.lineIds, paid:plan.es.paid };
   if (plan.settled) {
     if (check.status==='open') closeCheckById(cid, 'paid');
-    if (plan.snapshot) { check.guest={ items:plan.snapshot.items, totals:{ subtotal:plan.snapshot.subtotalCents/100 } }; }
+    if (plan.snapshot && plan.snapshot.guest) check.guest=JSON.parse(JSON.stringify(plan.snapshot.guest));
     markCheckLinesPaid(cid, receipts[0].paymentId, plan.lineIds);
   } else persistCheck(check);
   STATE.payEven = plan.settled ? 1 : (plan.es ? plan.es.n : 1); STATE._payCheckId = null;
@@ -11657,8 +11703,9 @@ function paintSettlementBanner(state){
   if (!STATE.currentServer || (!list.length && state!=='unknown' && !STATE._settleMsg)) { if (b) b.remove(); return; }
   if (!b) { b=document.createElement('div'); b.id='settlement-banner'; b.style.cssText='position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:7000;background:#3a2a10;color:#fff;border:1px solid #d9a441;border-radius:10px;padding:8px 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px;max-width:calc(100% - 32px);box-sizing:border-box;'; document.body.appendChild(b); }
   var cents=list.reduce(function(a,r){ return a+(Number(r.amount)||0); },0), tables=list.map(function(r){ return r.table; }).filter(function(t,i,arr){ return t!=null && arr.indexOf(t)===i; });
+  var errs=list.map(function(r){ return r.settlementError; }).filter(function(e,i,arr){ return e && arr.indexOf(e)===i; });
   b.innerHTML=(list.length
-      ? '<span>⚠ '+list.length+' payment'+(list.length===1?'':'s')+' recorded ($'+(cents/100).toFixed(2)+(tables.length?', table '+tables.join(', '):'')+') — settlement pending. The card is not charged again.</span><button type="button" class="primary-btn" style="width:auto;padding:4px 10px;margin:0" onclick="finishPendingSettlements()">Finish settlement</button>'
+      ? '<span>⚠ '+list.length+' payment'+(list.length===1?'':'s')+' recorded ($'+(cents/100).toFixed(2)+(tables.length?', table '+tables.join(', '):'')+') — settlement pending. The card is not charged again.'+(errs.length?' Needs manager review: '+esc(errs.join('; '))+'.':'')+'</span><button type="button" class="primary-btn" style="width:auto;padding:4px 10px;margin:0" onclick="finishPendingSettlements()">Finish settlement</button>'
       : '<span>'+esc(STATE._settleMsg||'Payment records could not be checked.')+'</span><button type="button" class="ghost-btn" style="width:auto;padding:4px 10px;margin:0" onclick="STATE._settleMsg=null;refreshPendingSettlements()">OK</button>');
 }
 function finishPendingSettlements(){
@@ -11669,9 +11716,9 @@ function finishPendingSettlements(){
     var cids=Object.keys(byCheck).filter(function(c){ return byCheck[c].some(function(r){ return !receiptSettled(r); }); });
     return cids.reduce(function(chain, c){ return chain.then(function(acc){ return settleCheckFromReceipts(c, byCheck[c]).then(function(res){ acc.push(res); return acc; }); }); }, Promise.resolve([]));
   }).then(function(res){
-    var bad=res.filter(function(x){ return !x.ok; }).length;
+    var bad=res.filter(function(x){ return !x.ok; }).length, why=res.map(function(x){ return x.error; }).filter(Boolean);
     STATE._settleMsg=bad ? null : 'Settlement complete — '+res.length+' recorded payment'+(res.length===1?'':'s')+' reconciled. The card was not charged again.';
-    toast(bad ? '⚠ Settlement still pending for '+bad+' payment record(s) — try again; the card will not be charged again' : 'Settlement complete — no new card charge');
+    toast(bad ? '⚠ Settlement still pending for '+bad+' payment record(s)'+(why.length?' ('+why.join('; ')+')':'')+' — the card will not be charged again' : 'Settlement complete — no new card charge');
   }, function(e){ toast('⚠ Cannot reach the payment records — settlement still pending'); }).then(function(){
     STATE._settling=false;
     return refreshPendingSettlements();
@@ -11764,6 +11811,9 @@ async function processPayment(subtotal) {
     // Deterministic idempotency key: same check, same split share, same lines → same payment record.
     var payKey = 'pay_' + cid + '_' + even + '_' + shareIndex + '_' + payKeyHash(lineIds.join('|') + '#' + subtotalCents);
     if (STATE._paidKeys[payKey]) { toast('This payment was already processed — not charged again'); return; }
+    // Invariant 4: the complete itemized record is captured before the card is touched; if it cannot be, nothing is charged.
+    var snapshot = paymentSnapshot(cid, subtotalCents), snapErr = snapshotError(snapshot, lineIds);
+    if (snapErr) { toast('⚠ Not charged: '+snapErr+'. The check needs review before payment.'); return; }
 
     chargeBtn.disabled = true;
     chargeBtn.textContent = 'Processing…';
@@ -11788,7 +11838,7 @@ async function processPayment(subtotal) {
       checkSubtotal: subtotalCents,
       split: even,
       shareIndex: shareIndex,
-      snapshot: (es && es.n === even && es.snapshot) ? es.snapshot : paymentSnapshot(cid, subtotalCents),
+      snapshot: snapshot,
       settlement: 'recorded',
       finalizedAt: null,
       timestamp: Date.now()
