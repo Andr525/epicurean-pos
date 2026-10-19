@@ -58,10 +58,12 @@ edit('remove Square SDK script (real payment provider)', /<script[^>]*src="https
 edit('remove Google Fonts links (external)', /<link[^>]*href="https:\/\/fonts\.(googleapis|gstatic)\.com[^"]*"[^>]*>\s*/g, '', 2);
 edit('use the mock cloud instead of the Firestore REST adapter', /fbDb = createNamedFirestoreAdapter\(\);/g, "fbDb = window.__MOCK_DB__; /* TEST BUILD: mock cloud */", 1);
 edit('load the fictional data overlay after the bundled data files', /(<script src="scalini-dining\.js[^"]*"><\/script>)/g, '$1\n<script src="test-data-overlay.js"></script>', 1);
-edit('add no-network policy, test seed and mock cloud', /<head>/g, `<head>\n<meta http-equiv="Content-Security-Policy" content="connect-src 'none'; frame-src 'none'; worker-src 'none'; object-src 'none'; form-action 'none'">\n<script src="seed.js"></script>\n<script src="test-mock-cloud.js"></script>`, 1);
+edit('add no-network policy, test seed, BOH layout import and mock cloud', /<head>/g, `<head>\n<meta http-equiv="Content-Security-Policy" content="connect-src 'none'; frame-src 'none'; worker-src 'none'; object-src 'none'; form-action 'none'">\n<script src="seed.js"></script>\n<script src="boh-layout.js"></script>\n<script src="test-boh-layout.js"></script>\n<script src="test-mock-cloud.js"></script>`, 1);
 manifest.testChanges = TEST_CHANGES;
 fs.writeFileSync(path.join(KIT, 'index.html'), html);
-for (const f of ['test-data-overlay.js', 'test-mock-cloud.js']) fs.copyFileSync(path.join(HERE, f), path.join(KIT, f));
+for (const f of ['test-data-overlay.js', 'test-mock-cloud.js', 'test-boh-layout.js']) fs.copyFileSync(path.join(HERE, f), path.join(KIT, f));
+// Placeholder: the iPhone launcher's server replaces this with the boh-layout*.json found in the kit folder.
+fs.writeFileSync(path.join(KIT, 'boh-layout.js'), '/* TEST BUILD: no BOH layout file offered (see "READ ME FIRST.md"). */\nwindow.__BOH_LAYOUT_FROM_MAC__ = null;\n');
 const writeSeed = s => fs.writeFileSync(path.join(KIT, 'seed.js'), '/* FICTIONAL test data — Harbor Lane Bistro (not a real business). Restored by "Reset all test data". */\nwindow.__POS_TEST_SEED__=' + JSON.stringify(s).replace(/</g, '\\u003c') + ';\n');
 writeSeed(fictionalCloud());
 
@@ -142,6 +144,13 @@ fs.writeFileSync(path.join(KIT, 'Start Test POS for iPhone (Mac).command'), "#!/
 fs.chmodSync(path.join(KIT, 'Start Test POS for iPhone (Mac).command'), 0o755);
 for (const f of ['iphone-test-server.py', 'iphone-qr.html', 'qrcode-generator.js']) fs.copyFileSync(path.join(HERE, f), path.join(KIT, f));
 fs.copyFileSync(path.join(HERE, 'start-iphone-pos-test.command'), path.join(KIT, 'Start iPhone POS Test.command'));
+// Read-only BOH layout export: the bookmark button's code (boh-layout-export.js) on a helper page.
+{
+  const src = fs.readFileSync(path.join(HERE, 'boh-layout-export.js'), 'utf8').replace(/^\/\*[\s\S]*?\*\/\s*/, '');
+  const page = fs.readFileSync(path.join(HERE, 'boh-layout-export-page.html'), 'utf8');
+  if (page.split('__BOOKMARKLET__').length !== 2) throw Error('export page placeholder missing');
+  fs.writeFileSync(path.join(KIT, 'BOH Layout Export.html'), page.replace('__BOOKMARKLET__', 'javascript:' + encodeURIComponent(src)));
+}
 fs.chmodSync(path.join(KIT, 'Start iPhone POS Test.command'), 0o755);
 fs.writeFileSync(path.join(KIT, 'Start Test POS (Windows).bat'), '@echo off\r\ncd /d "%~dp0"\r\necho Harbor Lane TEST POS - http://127.0.0.1:8765  (close this window to stop)\r\nstart "" "http://127.0.0.1:8765/index.html"\r\npy -m http.server 8765 --bind 127.0.0.1 || python -m http.server 8765 --bind 127.0.0.1\r\n');
 fs.copyFileSync(path.join(HERE, 'OWNER-TESTING.md'), path.join(KIT, 'READ ME FIRST.md'));

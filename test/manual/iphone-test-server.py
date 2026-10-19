@@ -31,6 +31,29 @@ def port_in_use(ip, port):
         return s.connect_ex((ip, port)) == 0
 
 
+def layout_file():
+    """Newest boh-layout*.json in this folder (the read-only BOH export), or None."""
+    files = [f for f in os.listdir(KIT) if f.lower().startswith('boh-layout') and f.lower().endswith('.json')]
+    files.sort(key=lambda f: os.path.getmtime(os.path.join(KIT, f)), reverse=True)
+    return files[0] if files else None
+
+
+def layout_script():
+    """boh-layout.js: offers that file to the TEST panel ("Use BOH layout from the Mac"). Nothing is applied automatically."""
+    name = layout_file()
+    if name:
+        path = os.path.join(KIT, name)
+        if os.path.getsize(path) <= 10 * 1024 * 1024:
+            try:
+                with open(path, 'r', encoding='utf-8') as f:
+                    text = f.read()
+                json.loads(text)
+                return ('window.__BOH_LAYOUT_FROM_MAC__ = %s;\n' % json.dumps({'name': name, 'text': text})).replace('</', '<\\/').encode('utf-8')
+            except (OSError, ValueError, UnicodeDecodeError):
+                pass
+    return b'window.__BOH_LAYOUT_FROM_MAC__ = null;\n'
+
+
 def private_ipv4(text):
     try:
         ip = ipaddress.ip_address(text)
@@ -77,6 +100,14 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if path == '/__closing':
             State.closing_at = time.time()
             return self._json({'ok': True}) or True
+        if path == '/boh-layout.js':
+            body = layout_script()
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/javascript; charset=utf-8')
+            self.send_header('Content-Length', str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return True
         if path == '/__stop':
             self._json({'stopped': True})
             State.stopping = True
@@ -141,6 +172,9 @@ def main():
           '\n  iPhone URL:  %s\n'
           '\n  A QR window is opening on this Mac. Scan it with the iPhone camera.\n'
           '  To stop: press "Stop Testing" in that window, close it, or close this Terminal window.\n' % server.pos_url, flush=True)
+    lf = layout_file()
+    print(('  BOH layout file found: %s\n  In the POS: TEST tab → "Use BOH layout from the Mac".\n' % lf) if lf else
+          '  No BOH layout file in this folder (the fictional floor plan is used until you import one).\n', flush=True)
     threading.Thread(target=watchdog, args=(server,), daemon=True).start()
     if os.environ.get('HLTEST_NO_OPEN') != '1':
         try:

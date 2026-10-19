@@ -2,7 +2,7 @@
 
 This is the real POS screen from the approved commit, running entirely on your computer.
 
-- **Fictional data only.** The restaurant ("Harbor Lane Bistro"), menu, staff and tables are invented.
+- **Fictional data only.** The restaurant ("Harbor Lane Bistro"), menu, staff, guests and orders are invented. The sample floor plan is invented too, until you import your own BOH floor plan (section 1c).
 - **Mock cloud.** The database lives inside your browser. It never contacts Firebase.
 - **Mock card.** Payments are simulated. No card is needed and nothing is charged.
 - **No network.** The page is blocked from making network connections.
@@ -47,11 +47,35 @@ Notes:
   - Check the Mac's firewall: System Settings → Network → Firewall must allow python3.
   - Some routers block devices from seeing each other ("client isolation"). If so, use the Mac's own browser instead.
 
+## 1c. Use your ORIGINAL BOH floor plan
+**Export it from BOH (one time, read-only):**
+1. On the Mac, double-click **`BOH Layout Export.html`** in this folder. Open it in the **same browser** you use for BOH (e.g. Firefox).
+2. Show the bookmarks bar (Firefox: View → Toolbars → Bookmarks Toolbar; Safari: View → Show Favorites Bar). **Drag** the gold **📐 Export BOH layout** button onto it.
+3. Open your BOH as usual, check the dining room looks right, then click **📐 Export BOH layout** on the bookmarks bar.
+4. A message shows the rooms, tables, booths, walls and waiter stations, and a file `boh-layout-….json` is saved in **Downloads**.
+
+It only reads. It changes nothing in BOH, in the browser's storage or in Firebase. It leaves out employee PINs and guest details.
+
+**Load it into the test POS:**
+1. Move the `boh-layout-….json` file into this **harbor-lane-test-pos** folder.
+2. Double-click **`Start iPhone POS Test.command`** and scan the QR code (section 1a).
+3. In the POS on the iPhone: tap the gold **TEST** tab → **📐 Use BOH layout from the Mac**. Check the numbers of rooms, tables and stations, then tap **Apply this floor plan**.
+   - In any other browser running the kit, use **TEST → 📐 Import BOH Layout (choose file)** instead.
+   - Each device (each browser) keeps its own test data, so apply it once on each device you test with.
+4. A file that isn't a complete BOH layout is rejected with the reason, and nothing changes.
+
+**What the POS shows:**
+- Your original numbered tables in their exact positions, shapes and sizes, plus the walls.
+- No booths, sideboards, bar counters, doors, plants, labels, station lines, waiter names or seat counts.
+- Waiter stations still work behind the scenes. Each original waiter is replaced by a fictional test waiter, shown in the TEST panel (e.g. Station 1 → Jordan Reyes, PIN 3101). Sign in with that PIN and tap **My station**.
+
+Fictional employees, orders and mock payments stay as they are. **Reset all test data** keeps your imported floor plan; **Remove imported layout** goes back to the fictional one.
+
 ## 2. Test logins (PIN)
 | PIN | Employee | Role |
 |---|---|---|
-| 3101 | Jordan Reyes | Food Master (Station 1: tables 1–6) |
-| 3102 | Sam Patel | Food Master (Station 2: tables 7–12) |
+| 3101 | Jordan Reyes | Food Master (sample floor: Station 1, tables 1–6) |
+| 3102 | Sam Patel | Food Master (sample floor: Station 2, tables 7–12) |
 | 4101 | Casey Morgan | Server (order only) |
 | 5101 | Taylor Brooks | Manager |
 | 1101 | Riley Chen | Kitchen |
@@ -65,6 +89,8 @@ Notes:
 | **5** | 4 guests (Jordan). Seat 2 flagged **Shellfish**. Sent: Crispy Calamari on seat 2 (allergy warning overridden and recorded), Salmon, Risotto. **Unsent draft:** Dark Chocolate Tart on seat 4, owned by Jordan. |
 | **8** | 2 guests (Sam). Sent: Ribeye, Medium Rare; Truffle Fries. |
 | **Free tables** | 1, 2, 4, 6, 7, 9–12, bar B1–B4, patio P1–P2. |
+
+With your own floor plan imported, these sample orders stay on tables 3, 5 and 8 if your floor has those numbers.
 
 **Menu items with built-in test cases:**
 - **Harbor Burger:** allergens *not verified*, so a flagged seat always warns. It has an optional multi-select of add-ons with upcharges.
@@ -85,7 +111,9 @@ The gold **TEST** tab on the right edge opens the test panel. Drag it up or down
 | **Cloud offline** | Every read and write fails. |
 | **Clear simulated failure** | Back to normal (this tab only). |
 | **Download mock database** | Saves the current test data as a JSON file, for a bug report. |
-| **Reset all test data** | Returns to the starting sample data, on every tab. |
+| **Import BOH Layout / Use BOH layout from the Mac** | Loads your exported floor plan (section 1c). |
+| **Remove imported layout** | Back to the fictional sample floor plan. |
+| **Reset all test data** | Returns to the starting sample data, on every tab. Keeps an imported floor plan. |
 
 Simulated failures apply only to the tab where you set them, so you can recover from another tab ("a fresh device").
 

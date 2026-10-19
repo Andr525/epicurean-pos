@@ -89,6 +89,24 @@ async function decodeQr(page) {
   check('QR code decodes to exactly the POS URL', decoded === expected, 'decoded=' + decoded);
   check('URL is shown under the QR code', shown.trim() === expected, shown.trim());
   const box = await page.locator('#qr').boundingBox(); check('QR code is large (≥ 480 px on a 1280×900 window)', box && box.width >= 480, box && Math.round(box.width) + ' px');
+  // What a camera sees: the rendered screen pixels, at full size and shrunk (as from further away).
+  const shot = 'data:image/png;base64,' + (await page.locator('#qr').screenshot()).toString('base64');
+  const seen = await page.evaluate(async src => {
+    const img = new Image(); img.src = src; await img.decode();
+    const out = {};
+    for (const scale of [1, 0.35]) {
+      const w = Math.round(img.width * scale), h = Math.round(img.height * scale), c = document.createElement('canvas'); c.width = w; c.height = h;
+      const g = c.getContext('2d'); g.imageSmoothingEnabled = true; g.drawImage(img, 0, 0, w, h);
+      const d = g.getImageData(0, 0, w, h), r = window.jsQR(d.data, w, h); out[scale] = r ? r.data : null;
+    }
+    const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+    const px = g.getImageData(0, 0, img.width, img.height).data, colors = new Set();
+    for (let i = 0; i < px.length; i += 4) colors.add(px[i] + ',' + px[i + 1] + ',' + px[i + 2]);
+    const svg = document.querySelector('#qr svg');
+    return {decoded: out, colors: [...colors], modulePx: Number(svg.dataset.modulePx), width: svg.getBoundingClientRect().width, viewBox: svg.viewBox.baseVal.width, firstDark: (svg.querySelector('path').getAttribute('d').match(/^M(\d+) (\d+)/) || []).slice(1).map(Number)};
+  }, shot);
+  check('QR as seen on screen decodes at full size and at 35% (camera further away)', seen.decoded[1] === expected && seen.decoded[0.35] === expected, JSON.stringify(seen.decoded));
+  check('QR is sharp: whole screen pixels per module, pure black on white, 4-module white margin', Number.isInteger(seen.modulePx) && seen.modulePx >= 8 && seen.width === seen.modulePx * seen.viewBox && seen.colors.every(c => c === '0,0,0' || c === '255,255,255') && seen.firstDark[0] >= 4 && seen.firstDark[1] >= 4, `${seen.modulePx} px/module, ${seen.width} px, colours ${seen.colors.join(' / ')}, margin ${seen.firstDark.join(',')} modules`);
   await page.screenshot({path: path.join(os.tmpdir(), 'iphone-qr-window.png')});
   const pos = await (await fetch(expected)).text();
   check('the QR URL serves the isolated test POS (mock cloud + no-network policy present)', /connect-src 'none'/.test(pos) && /test-mock-cloud\.js/.test(pos) && /window\.__MOCK_DB__/.test(pos), pos.length + ' bytes');

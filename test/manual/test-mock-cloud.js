@@ -7,11 +7,25 @@
    Nothing here talks to the network; the page also carries a connect-src 'none' policy. */
 (function () {
   var KEY = 'HLTEST_MOCK_CLOUD_V1', FAULT_KEY = 'HLTEST_FAULT', TOKEN_KEY = 'HLTEST_TOKENS';
+  // Imported original BOH floor plan (see test-boh-layout.js). Kept across "Reset all test data".
+  var LAYOUT_KEY = 'HLTEST_BOH_LAYOUT_V1', POS_LAYOUT_CACHES = ['eh_pos_layout_v41', 'eh_pos_layout_live', 'eh_pos_table_combines'];
   var listeners = [], auto = 0;
   function clone(x) { return x === undefined ? undefined : JSON.parse(JSON.stringify(x, function (k, v) { return v && v._mockFV === 'serverTimestamp' ? new Date().toISOString() : v; })); }
+  function layoutRecord() { try { var raw = localStorage.getItem(LAYOUT_KEY); return raw ? JSON.parse(raw) : null; } catch (e) { return null; } }
+  // Floor plan + station waiters come from the imported layout; every other document stays fictional.
+  function applyLayout(s, rec) {
+    var seed = window.__POS_TEST_SEED__ || {}, sb = seed.boh_shared || {};
+    s.boh_shared = s.boh_shared || {};
+    s.boh_shared.tables = clone(rec ? rec.doc : sb.tables);
+    var staff = clone((sb.staff_clock && sb.staff_clock.list) || []);
+    if (rec && rec.extraStaff) staff = staff.concat(clone(rec.extraStaff));
+    s.boh_shared.staff_clock = Object.assign({}, s.boh_shared.staff_clock || {}, {list: staff, updatedAt: Date.now()});
+    return s;
+  }
   function load() {
     try { var raw = localStorage.getItem(KEY); if (raw) return JSON.parse(raw); } catch (e) {}
-    return clone(window.__POS_TEST_SEED__ || {}) || {};
+    var fresh = clone(window.__POS_TEST_SEED__ || {}) || {}, rec = layoutRecord();
+    return rec ? applyLayout(fresh, rec) : fresh;
   }
   var store = load();
   function save() { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) { console.error('MOCK cloud save failed', e); } }
@@ -75,6 +89,32 @@
   }
   function staffRows() { var s = (store.boh_shared && store.boh_shared.staff_clock && store.boh_shared.staff_clock.list) || []; return s.map(function (p) { return '<tr><td>' + p.name + '</td><td style="font-weight:700">' + p.code + '</td><td>' + ((p.jobs && p.jobs[0] && p.jobs[0].code) || '') + '</td></tr>'; }).join(''); }
   function faultText() { var f = fault(); if (!f) return 'none'; if (f.mode === 'offline') return 'CLOUD OFFLINE (reads and writes fail)'; if (f.mode === 'send') return 'Kitchen SEND fails (ticket writes refused)'; if (f.mode === 'after-payment') return (f.armed ? 'ACTIVE: ' : 'Armed for next payment: ') + (f.blocks.indexOf('checks') > -1 ? 'check write fails' : 'ticket write fails'); return 'none'; }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]; }); }
+  var pending = null; // {record, warnings} awaiting Apply, or {errors}
+  function fromMac() { var m = window.__BOH_LAYOUT_FROM_MAC__; return m && typeof m.text === 'string' ? m : null; }
+  function layoutHtml() {
+    var rec = layoutRecord(), mac = fromMac(), h = '<b>Floor plan</b><div style="margin:2px 0 6px">';
+    if (rec) h += '<span style="color:#7fe08f">ORIGINAL BOH layout</span> · ' + esc(rec.fileName || 'imported file') + '<br>' + rec.summary.rooms + ' rooms · ' + rec.summary.tables + ' tables · ' + rec.summary.walls + ' walls · ' + rec.summary.stations + ' stations';
+    else h += '<span style="color:#ffcf70">Fictional sample floor plan</span> (import your BOH layout below)';
+    h += '</div>';
+    if (pending && pending.errors) {
+      h += '<div style="border:1px solid #c66;border-radius:8px;padding:8px;margin:4px 0;background:#3a1717"><b>File rejected — nothing was changed</b><ul style="margin:4px 0;padding-left:18px">' +
+        pending.errors.map(function (e) { return '<li>' + esc(e) + '</li>'; }).join('') + '</ul>' + btn('OK', 'HLTEST.layoutCancel()') + '</div>';
+    } else if (pending) {
+      var r = pending.record, hid = Object.keys(r.hidden).map(function (k) { return r.hidden[k] + ' ' + k; }).join(', ');
+      h += '<div id="hltest-layout-review" style="border:1px solid #d9a441;border-radius:8px;padding:8px;margin:4px 0;background:#262012"><b>Check before applying</b><br>' + esc(r.fileName) +
+        '<div style="margin:4px 0;font-size:15px"><b>' + r.summary.rooms + '</b> rooms · <b>' + r.summary.tables + '</b> tables · <b>' + r.summary.stations + '</b> stations · ' + r.summary.walls + ' walls</div>' +
+        (hid ? '<div style="opacity:.8">Not drawn in the POS: ' + esc(hid) + '</div>' : '') +
+        (r.mapping.length ? '<div style="margin-top:4px">Stations → fictional waiters:<br>' + r.mapping.map(function (m) { return esc(m.station) + ' (' + m.tables + ' tables) → ' + esc(m.waiter); }).join('<br>') + '</div>' : '') +
+        (pending.warnings.length ? '<div style="color:#ffcf70;margin-top:4px">' + pending.warnings.map(esc).join('<br>') + '</div>' : '') +
+        btn('✅ Apply this floor plan', 'HLTEST.layoutApply()') + btn('Cancel', 'HLTEST.layoutCancel()') + '</div>';
+    } else {
+      if (mac) h += btn('📐 Use BOH layout from the Mac (' + esc(mac.name) + ')', 'HLTEST.layoutFromMac()');
+      h += btn('📐 Import BOH Layout (choose file)', 'HLTEST.layoutPick()');
+      if (rec) h += btn('Remove imported layout (back to fictional)', 'HLTEST.layoutRemove()');
+    }
+    return h;
+  }
   function btn(label, js, danger) { return '<button type="button" onclick="' + js + '" style="display:block;width:100%;margin:4px 0;padding:8px;border-radius:8px;border:1px solid ' + (danger ? '#c66' : '#555') + ';background:' + (danger ? '#4a1d1d' : '#2a2a2a') + ';color:#fff;font-size:13px;text-align:left">' + label + '</button>'; }
   function paint() {
     if (!document.body) return;
@@ -88,6 +128,7 @@
     panel.innerHTML = '<div style="width:300px;max-height:80vh;overflow:auto;background:#161616;border:1px solid #d9a441;border-right:0;border-radius:12px 0 0 12px;padding:12px;box-shadow:0 8px 24px rgba(0,0,0,.6)">' +
       '<div style="display:flex;justify-content:space-between;align-items:center"><b style="color:#d9a441">TEST MODE</b><button type="button" onclick="HLTEST.toggle()" style="background:none;border:0;color:#fff;font-size:18px">✕</button></div>' +
       '<div style="opacity:.8;margin:4px 0 8px">Harbor Lane Bistro — fictional data · mock cloud in this browser · mock card (nothing is charged)</div>' +
+      layoutHtml() +
       '<b>Test logins (PIN)</b><table style="width:100%;margin:4px 0 8px;border-collapse:collapse">' + staffRows() + '</table>' +
       '<b>This device</b><div style="margin:2px 0 6px">Simulated failure: <span style="color:#ffcf70">' + faultText() + '</span><br>Mock card authorizations on this device: ' + tokens() + '</div>' +
       btn('➕ Open another device (new tab)', 'HLTEST.newDevice()') +
@@ -104,8 +145,45 @@
     fault: function (k) { setFault(k === null ? null : k === 'offline' ? {mode: 'offline'} : k === 'send' ? {mode: 'send'} : {mode: 'after-payment', blocks: [k], armed: false}); },
     newDevice: function () { window.open(location.href.split('#')[0], '_blank'); },
     download: function () { var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(store, null, 2)], {type: 'application/json'})); a.download = 'harbor-lane-mock-db-' + new Date().toISOString().replace(/[:.]/g, '-') + '.json'; document.body.appendChild(a); a.click(); setTimeout(function () { a.remove(); }, 500); },
+    layoutPick: function () {
+      var inp = document.getElementById('hltest-layout-file');
+      if (!inp) {
+        inp = document.createElement('input'); inp.type = 'file'; inp.id = 'hltest-layout-file'; inp.accept = '.json,application/json'; inp.style.cssText = 'position:fixed;left:-1000px;top:0;opacity:0'; // not display:none (iOS Safari)
+        inp.addEventListener('change', function () {
+          var f = inp.files && inp.files[0]; if (!f) return;
+          var rd = new FileReader();
+          rd.onload = function () { window.HLTEST.layoutCheck(String(rd.result || ''), f.name); inp.value = ''; };
+          rd.onerror = function () { pending = {errors: ['The file could not be read.']}; paint(); inp.value = ''; };
+          rd.readAsText(f);
+        });
+        document.body.appendChild(inp);
+      }
+      inp.click();
+    },
+    layoutFromMac: function () { var m = fromMac(); if (m) window.HLTEST.layoutCheck(m.text, m.name); },
+    layoutCheck: function (text, name) {
+      var staff = (window.__POS_TEST_SEED__ && window.__POS_TEST_SEED__.boh_shared && window.__POS_TEST_SEED__.boh_shared.staff_clock && window.__POS_TEST_SEED__.boh_shared.staff_clock.list) || [];
+      var res = window.HLTEST_LAYOUT ? window.HLTEST_LAYOUT.prepare(text, name, staff) : {ok: false, errors: ['Layout import is not available in this build.']};
+      pending = res.ok ? {record: res.record, warnings: res.warnings} : {errors: res.errors};
+      open = true; paint();
+    },
+    layoutCancel: function () { pending = null; paint(); },
+    layoutApply: function () {
+      if (!pending || !pending.record) return;
+      try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(pending.record)); } catch (e) { pending = {errors: ['This browser could not store the floor plan (storage full or blocked).']}; paint(); return; }
+      applyLayout(store, pending.record); save(); notify(null);
+      POS_LAYOUT_CACHES.forEach(function (k) { localStorage.removeItem(k); }); // this device's copy of the old floor plan
+      location.reload();
+    },
+    layoutRemove: function () {
+      if (!window.confirm('Remove the imported BOH floor plan and go back to the fictional sample floor plan? (Your export file is not affected.)')) return;
+      localStorage.removeItem(LAYOUT_KEY);
+      applyLayout(store, null); save(); notify(null);
+      POS_LAYOUT_CACHES.forEach(function (k) { localStorage.removeItem(k); });
+      location.reload();
+    },
     reset: function () {
-      if (!window.confirm('Reset ALL test data? Every test check, ticket and payment in this browser goes back to the starting sample data.')) return;
+      if (!window.confirm('Reset ALL test data? Every test check, ticket and payment in this browser goes back to the starting sample data.' + (layoutRecord() ? ' Your imported BOH floor plan is kept.' : ''))) return;
       try { Object.keys(localStorage).forEach(function (k) { if (k === KEY || /^eh_/.test(k)) localStorage.removeItem(k); }); sessionStorage.clear(); } catch (e) {}
       location.reload();
     }
