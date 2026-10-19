@@ -2751,6 +2751,11 @@ function allergenHits(item, seat){
   return listed.filter(function(x){ return g.indexOf(String(x).toLowerCase())>-1; });
 }
 var SEATABLE = {table:1, stool:1, outdoor:1, couch:1};
+// The POS floor draws the numbered tables and the walls only. Booths, sideboards, decor and waiter
+// station boundaries stay in the BOH layout data (BOH is the full editor); they are just not drawn here.
+var FLOOR_WALL_TYPES = {wall:1, lshape:1, curve:1};
+function isFloorTable(o){ return !!(o && SEATABLE[o.type] && o.type!=='couch'); }
+function shownOnFloor(o){ return isFloorTable(o) || !!(o && FLOOR_WALL_TYPES[o.type]); }
 
 function asList(v){
   if (Array.isArray(v)) return v.filter(function(x){ return x!=null && String(x).trim()!==''; }).map(function(x){ return String(x); });
@@ -4480,7 +4485,7 @@ function stationTablesBox(st){
   if (!st) return null;
   var minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
   (roomObjectList(st.room)||[]).forEach(function(o){
-    if (!o || !SEATABLE[o.type] || tableIsCombinedAway(o)) return;
+    if (!isFloorTable(o) || tableIsCombinedAway(o)) return;
     if (!tableInStation(o, st)) return;
     minX=Math.min(minX, o.x||0);
     minY=Math.min(minY, o.y||0);
@@ -4601,7 +4606,7 @@ function visibleFloorObjects(){
       return Object.assign({}, o, {_room:rid});
     });
   }
-  return list.filter(function(o){ return !tableIsCombinedAway(o); });
+  return list.filter(function(o){ return shownOnFloor(o) && !tableIsCombinedAway(o); });
 }
 var STATION_COLORS=['#C9A84C','#9BC4E2','#5FB48A','#E0A36B','#B98AD8','#E07A6B'];
 function stationColor(st){
@@ -5387,7 +5392,7 @@ function renderTables() {
   var rooms = Array.isArray(STATE.rooms) ? STATE.rooms : [];
   var objs = normalizeFloor(visibleFloorObjects());
   var mineCount = 0;
-  allFloorObjects().forEach(function(o){ if (SEATABLE[o.type] && !tableIsCombinedAway(o) && serverOwnsTable(o, STATE.currentServer)) mineCount++; });
+  allFloorObjects().forEach(function(o){ if (isFloorTable(o) && !tableIsCombinedAway(o) && serverOwnsTable(o, STATE.currentServer)) mineCount++; });
 
   var html='<div class="floor-wrap floor-fixed">';
   var mgr=isManager();
@@ -5658,7 +5663,9 @@ function selectTable(t) {
   }
   var hasCheck = tableHasOrder(t) || unsentFor(t).length || (sessionOf(t).checkId && STATE.checks[sessionOf(t).checkId]);
   var sess = sessionOf(t);
-  STATE.guestCount = sess.guestCount || (obj && obj.seats) || 2;
+  var recorded = recordedGuestCount(t); // the guests on the open check/order, never the seating capacity
+  if (recorded) sess.guestCount = recorded;
+  STATE.guestCount = sess.guestCount || 2;
   if (hasCheck) {
     if (!sess.seatedAt) sess.seatedAt = tableSeatedAt(t, findFloorTable(t)) || Date.now();
     ensureOpenCheck(t);
@@ -10249,7 +10256,7 @@ function openCombineSheet(){
   var any=false;
   combineCandidates(STATE.selectedTable).forEach(function(row){
     any=true;
-    html+='<button class="chip" onclick=\'combineTables('+JSON.stringify(String(STATE.selectedTable))+','+JSON.stringify(String(row.n))+')\'>Table '+esc(String(row.n))+(row.seats?' · '+row.seats+' seats':'')+'</button>';
+    html+='<button class="chip" onclick=\'combineTables('+JSON.stringify(String(STATE.selectedTable))+','+JSON.stringify(String(row.n))+')\'>Table '+esc(String(row.n))+'</button>';
   });
   if (!any) html+='<p class="sheet-sub">No other tables on the floor.</p>';
   html+='</div><button class="ghost-btn" onclick="closeSheet()">Cancel</button>';
@@ -10278,10 +10285,10 @@ function resolveTableNumber(tNum){
 function combineCandidates(fromNum){
   var list=[];
   eachLiveFloorObject(function(o){
-    if (!o || !SEATABLE[o.type] || tableIsCombinedAway(o)) return;
+    if (!isFloorTable(o) || tableIsCombinedAway(o)) return;
     var n=String(tableKey(o));
     if (!n || n===String(fromNum)) return;
-    list.push({ n:n, seats:o.seats||2 });
+    list.push({ n:n });
   });
   list.sort(function(a,b){ return tableNumValue(a.n)-tableNumValue(b.n); });
   return list;
@@ -10398,6 +10405,7 @@ function combineTables(a, b){
   var keepObj=liveFloorTable(keep);
   var dropObj=liveFloorTable(drop);
   if (!keepObj || !dropObj) { toast('Those tables are not on the floor'); return; }
+  var guests=recordedGuestCount(keep)+recordedGuestCount(drop); // guests already seated at the two tables
   applyCombineToObject(keepObj, dropObj);
   eachLiveFloorObject(function(o){
     if (o && String(o.combinedInto)===String(drop)) o.combinedInto=String(keep);
@@ -10411,10 +10419,9 @@ function combineTables(a, b){
   persistTableCombines();
   persistPosLayout();
   mergeChecksIntoTable(drop, keep);
-  var seats=keepObj.seats||2;
-  var sess=sessionOf(keep);
-  sess.guestCount=seats;
-  STATE.guestCount=seats;
+  // The guest count never comes from the tables' seating capacity: seated guests are carried over and
+  // the waiter confirms or changes the number; combining empty tables seats nobody (asked when opened).
+  if (guests>0) setTableGuestCount(keep, guests);
   STATE.selectedTable=keep;
   var stayOnOrder=STATE.activeTab==='order';
   closeSheet();
@@ -10426,7 +10433,50 @@ function combineTables(a, b){
   } else {
     renderTables();
   }
-  toast('Tables '+a+' + '+b+' → table '+keep+' · '+seats+' seats');
+  toast('Tables '+a+' + '+b+' → table '+keep);
+  if (guests>0) openCombinedGuestSheet(keep, guests);
+}
+// Guests actually recorded for a table: its open check, this device's seated session, then the newest
+// open kitchen order (e.g. sent from another device). 0 when nobody is seated. Never the seating capacity.
+function recordedGuestCount(t){
+  t=String(t);
+  var sess=STATE.tableSessions && STATE.tableSessions[t];
+  var chk=sess && sess.checkId && STATE.checks[sess.checkId];
+  if (chk && chk.status==='open' && Number(chk.guestCount)>0) return Number(chk.guestCount);
+  if (sess && sess.seatedAt && Number(sess.guestCount)>0) return Number(sess.guestCount);
+  var n=0, at=-1;
+  (STATE.orders||[]).forEach(function(o){
+    if (!o || String(o.table)!==t || o.status==='paid' || o.status==='cleared' || o.status==='void' || !(Number(o.guestCount)>0)) return;
+    var when=Number(o.sentAt)||0;
+    if (when>=at) { at=when; n=Number(o.guestCount); }
+  });
+  return n;
+}
+function setTableGuestCount(t, n){
+  var sess=sessionOf(t);
+  sess.guestCount=n;
+  if (String(STATE.selectedTable)===String(t)) STATE.guestCount=n;
+  var chk=sess.checkId && STATE.checks[sess.checkId];
+  if (chk && chk.status==='open') { chk.guestCount=n; persistCheck(chk); }
+}
+function openCombinedGuestSheet(keep, guests){
+  STATE._combineGuestTable=String(keep);
+  var nums=[];
+  for (var n=1;n<=12;n++) nums.push('<button type="button" onclick="confirmCombinedGuests('+n+')"'+(n===guests?' style="outline:3px solid #C9A84C;outline-offset:-3px;"':'')+'>'+n+'</button>');
+  openSheet('<h2>Table '+esc(String(keep))+' · guests</h2>'+
+    '<p class="sheet-sub">Tables combined. Confirm the number of guests, or tap the right number.</p>'+
+    '<button type="button" class="ghost-btn" id="combine-keep-guests" onclick="confirmCombinedGuests('+guests+')">Keep '+guests+' guest'+(guests===1?'':'s')+'</button>'+
+    '<div class="guest-keypad count-grid">'+nums.join('')+'</div>');
+}
+function confirmCombinedGuests(n){
+  var t=String(STATE._combineGuestTable||'');
+  n=parseInt(n,10);
+  if (!t || !(n>=1 && n<=20)) return;
+  setTableGuestCount(t, n);
+  STATE._combineGuestTable='';
+  closeSheet();
+  if (STATE.activeTab==='order') { renderOrder(); paintChrome(); }
+  toast('Table '+t+' · '+n+' guests');
 }
 function combineTableFrom(otherTable){
   combineTables(STATE.selectedTable, otherTable);
@@ -10441,9 +10491,6 @@ function splitCombinedTable(keep){
   STATE.tableCombines=(STATE.tableCombines||[]).filter(function(c){ return !c || String(c.keep)!==keep; });
   persistTableCombines();
   persistPosLayout();
-  if (keepObj && STATE.tableSessions[keep]) {
-    STATE.tableSessions[keep].guestCount=keepObj.seats||STATE.tableSessions[keep].guestCount;
-  }
   STATE.selectedTable=keep;
   var stayOnOrder=STATE.activeTab==='order';
   closeSheet();
