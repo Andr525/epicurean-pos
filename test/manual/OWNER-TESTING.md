@@ -20,7 +20,17 @@ The address `127.0.0.1` means "this computer only". Nothing is put on the intern
 
 **Touchscreen:** use a touch-screen laptop or monitor, or Chrome's device mode: View → Developer → Developer Tools, then the phone/tablet icon. The POS layout is the same as on the iPad.
 
-## 1b. On your iPhone (same home Wi-Fi)
+## 1a. On your iPhone: easiest way (QR code)
+1. Unzip `harbor-lane-test-pos.zip`. Make sure the Mac and the iPhone are on the same home Wi-Fi.
+2. On the Mac, double-click **`Start iPhone POS Test.command`**. The first time, right-click → **Open**.
+   - If macOS asks *"Do you want the application python3 to accept incoming network connections?"*, choose **Allow**.
+3. A window opens on the Mac with a large QR code and the address underneath.
+4. On the iPhone, open the **Camera**, point it at the QR code, and tap the yellow link. The POS opens in **Safari**.
+5. To stop, press **Stop Testing** in the QR window (or close that window, or the Terminal window).
+
+If something is wrong, a dialog explains it: no home Wi-Fi found, or the test port is busy (close other test windows and try again).
+
+## 1b. On your iPhone: typing the address
 1. Make sure the Mac and the iPhone are on the same home Wi-Fi.
 2. On the Mac, double-click **`Start Test POS for iPhone (Mac).command`**. The first time, right-click → **Open**.
    - If macOS asks *"Do you want the application python3 to accept incoming network connections?"*, choose **Allow**.
