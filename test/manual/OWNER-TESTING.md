@@ -20,6 +20,23 @@ The address `127.0.0.1` means "this computer only". Nothing is put on the intern
 
 **Touchscreen:** use a touch-screen laptop or monitor, or Chrome's device mode: View → Developer → Developer Tools, then the phone/tablet icon. The POS layout is the same as on the iPad.
 
+## 1b. On your iPhone (same home Wi-Fi)
+1. Make sure the Mac and the iPhone are on the same home Wi-Fi.
+2. On the Mac, double-click **`Start Test POS for iPhone (Mac).command`**. The first time, right-click → **Open**.
+   - If macOS asks *"Do you want the application python3 to accept incoming network connections?"*, choose **Allow**.
+   - The window prints the exact address, for example `http://192.168.1.23:8765/index.html`. It shows the Mac's Wi-Fi address, so the numbers differ per network.
+3. On the iPhone, open **Safari** and type that address exactly, including `http://` and `:8765`.
+4. Optional: tap Share → **Add to Home Screen** to open it like an app.
+5. To stop, close the window on the Mac.
+
+Notes:
+- The iPhone keeps **its own** test data, separate from the Mac's browser. To test a second device, open another tab in Safari, or use the TEST panel's **Open another device**. Reset works per device.
+- This server listens only on the Mac's Wi-Fi address. Only devices on your home network can reach it; nothing is published on the internet.
+- **If the iPhone can't connect:**
+  - Check that both devices are on the same Wi-Fi, not a guest network.
+  - Check the Mac's firewall: System Settings → Network → Firewall must allow python3.
+  - Some routers block devices from seeing each other ("client isolation"). If so, use the Mac's own browser instead.
+
 ## 2. Test logins (PIN)
 | PIN | Employee | Role |
 |---|---|---|
