@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Test kit only: this page may talk to this Mac's own test server and nothing else. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-src 'none'; object-src 'none'; form-action 'none'">
+<title>iPhone POS Test — scan to open</title>
+<style>
+  :root { --bg:#ffffff; --fg:#111111; --muted:#4a4a4a; --red:#b3261e; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; background:var(--bg); color:var(--fg); font:16px -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif; display:flex; align-items:center; justify-content:center; padding:24px; }
+  main { width:100%; max-width:760px; text-align:center; }
+  h1 { font-size:28px; margin:0 0 6px; }
+  .sub { color:var(--muted); margin:0 0 22px; }
+  /* Pure black on white, whole-pixel modules, 4-module white quiet zone inside the code + white page around it. */
+  .qr { background:#fff; display:inline-block; padding:12px; line-height:0; }
+  .qr svg { display:block; shape-rendering:crispEdges; }
+  .url { font:700 26px ui-monospace, Menlo, monospace; margin:20px 0 6px; word-break:break-all; user-select:all; }
+  .steps { color:var(--muted); margin:6px 0 22px; line-height:1.5; }
+  .status { margin:0 0 18px; font-weight:600; }
+  .status.on::before { content:"● "; color:#1d7a3a; }
+  .status.off::before { content:"● "; color:var(--red); }
+  button { font:700 20px -apple-system, BlinkMacSystemFont, sans-serif; padding:16px 40px; border-radius:14px; border:2px solid var(--red); background:var(--red); color:#fff; cursor:pointer; }
+  button:disabled { background:#888; border-color:#888; }
+  .note { color:var(--muted); font-size:13px; margin-top:18px; line-height:1.5; }
+  .error { color:var(--red); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Harbor Lane TEST POS</h1>
+  <p class="sub">Test POS · fictional employees, orders and guests · mock payments · only on your home Wi-Fi</p>
+  <div class="qr" id="qr" aria-label="QR code for the test POS address"></div>
+  <div class="url" id="url">…</div>
+  <div class="steps">Open the iPhone <b>Camera</b>, point it at the code, then tap the yellow link to open it in Safari.<br>Your iPhone must be on the same Wi-Fi as this Mac.</div>
+  <p class="status on" id="status">Test server running</p>
+  <button type="button" id="stop">Stop Testing</button>
+  <p class="note">Test PINs: 3101 Jordan Reyes · 3102 Sam Patel · 4101 Casey Morgan · 5101 Taylor Brooks · 1101 Riley Chen<br>
+  If the iPhone can't open it: make sure both are on the same Wi-Fi (not a guest network), and allow "python3" if macOS asks about incoming connections.</p>
+</main>
+<script src="qrcode-generator.js"></script>
+<script>
+(function () {
+  var stopped = false;
+  function setStatus(text, on) { var s = document.getElementById('status'); s.textContent = text; s.className = 'status ' + (on ? 'on' : 'off'); }
+  var current = '';
+  function render(url) {
+    current = url;
+    var qr = qrcode(0, 'M'); qr.addData(url); qr.make();
+    var n = qr.getModuleCount(), q = 4, size = n + q * 2, d = '';
+    for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) if (qr.isDark(r, c)) d += 'M' + (c + q) + ' ' + (r + q) + 'h1v1h-1z';
+    // Whole screen pixels per module, as large as the window allows (max 640 px): sharp edges, no blur.
+    var avail = Math.min(window.innerWidth - 48, window.innerHeight - 380, 640);
+    var px = Math.max(4, Math.floor(avail / size)), side = px * size;
+    document.getElementById('qr').innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="' + side + '" height="' + side + '" viewBox="0 0 ' + size + ' ' + size + '" shape-rendering="crispEdges" data-url="' + url.replace(/"/g, '&quot;') + '" data-module-px="' + px + '"><rect width="100%" height="100%" fill="#fff"/><path d="' + d + '" fill="#000"/></svg>';
+    document.getElementById('url').textContent = url;
+  }
+  window.addEventListener('resize', function () { if (current) render(current); });
+  function stoppedView(msg) { stopped = true; setStatus(msg || 'Test server stopped — you can close this window.', false); var b = document.getElementById('stop'); b.disabled = true; b.textContent = 'Stopped'; }
+  fetch('/__info', {cache: 'no-store'}).then(function (r) { return r.json(); }).then(function (info) { render(info.url); }).catch(function () {
+    document.getElementById('url').innerHTML = '<span class="error">The test server is not running. Double-click “Start iPhone POS Test.command” again.</span>'; stoppedView('Test server not running');
+  });
+  setInterval(function () { if (!stopped) fetch('/__alive', {cache: 'no-store'}).catch(function () { stoppedView(); }); }, 5000);
+  document.getElementById('stop').addEventListener('click', function () {
+    fetch('/__stop', {method: 'POST'}).then(function () { stoppedView(); }, function () { stoppedView(); });
+  });
+  // Closing this window stops the server (a reload within a few seconds keeps it running).
+  window.addEventListener('pagehide', function () { if (!stopped && navigator.sendBeacon) navigator.sendBeacon('/__closing', ''); });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Export BOH Layout</title>
+<style>
+  :root { --bg:#ffffff; --fg:#151515; --muted:#555; --line:#ddd; --gold:#b47a14; --ok:#1d7a3a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:17px/1.5 -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif; padding:28px 16px; }
+  main { max-width:720px; margin:0 auto; }
+  h1 { font-size:28px; margin:0 0 4px; }
+  .sub { color:var(--muted); margin:0 0 24px; }
+  .drag { display:inline-block; font:700 22px -apple-system, BlinkMacSystemFont, sans-serif; color:#fff; background:var(--gold); padding:16px 28px; border-radius:14px; text-decoration:none; cursor:grab; box-shadow:0 3px 0 #7d5409; }
+  .box { border:1px solid var(--line); border-radius:14px; padding:18px 20px; margin:20px 0; }
+  ol { padding-left:22px; margin:8px 0; }
+  li { margin:8px 0; }
+  .safe { border-color:#bfe3c9; background:#f3fbf5; }
+  .safe b { color:var(--ok); }
+  kbd { font:600 14px ui-monospace, Menlo, monospace; border:1px solid var(--line); border-bottom-width:2px; border-radius:6px; padding:1px 6px; background:#fafafa; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Export your BOH floor plan</h1>
+  <p class="sub">Downloads your exact BOH dining-room layout as one file, for the iPhone POS test kit. Read-only: nothing in BOH is changed.</p>
+
+  <div class="box">
+    <b>Step 1 — install the button (one time)</b>
+    <ol>
+      <li>Show the bookmarks bar:
+        <b>Firefox</b>: menu <kbd>View</kbd> → <kbd>Toolbars</kbd> → <kbd>Bookmarks Toolbar</kbd> → <kbd>Always Show</kbd>.
+        <b>Safari</b>: menu <kbd>View</kbd> → <kbd>Show Favorites Bar</kbd>.</li>
+      <li><b>Drag</b> this gold button onto the bookmarks bar (don't click it here):<br><br>
+        <a class="drag" id="export-button" href="javascript:(function%20()%20%7B%0A%20%20var%20W%20%3D%20window%2C%20S%20%3D%20W.STATE%3B%0A%20%20if%20(!S%20%7C%7C%20typeof%20S%20!%3D%3D%20'object'%20%7C%7C%20!S.roomObjs%20%7C%7C%20!Array.isArray(S.rooms))%20%7B%0A%20%20%20%20W.alert('Export%20BOH%20layout%5Cn%5CnOpen%20your%20Epicurean%20BOH%20page%20first%20(the%20one%20that%20shows%20Floor%20%26%20Tables)%2C%20then%20click%20this%20button%20again.%5Cn%5CnNothing%20was%20changed.')%3B%0A%20%20%20%20return%3B%0A%20%20%7D%0A%20%20var%20DROP%20%3D%20%7BserverCode%3A%20'credential'%2C%20code%3A%20'credential'%2C%20pin%3A%20'credential'%2C%20passcode%3A%20'credential'%2C%20password%3A%20'credential'%2C%20pass%3A%20'credential'%2C%20token%3A%20'credential'%2C%20secret%3A%20'credential'%2C%20apiKey%3A%20'credential'%2C%0A%20%20%20%20guestName%3A%20'guest'%2C%20guestId%3A%20'guest'%2C%20guestPhone%3A%20'guest'%2C%20phone%3A%20'guest'%2C%20email%3A%20'guest'%2C%20vip%3A%20'guest'%2C%20notes%3A%20'guest'%2C%20note%3A%20'guest'%2C%20guestNote%3A%20'guest'%2C%20turns%3A%20'guest'%2C%20_demoTurns%3A%20'guest'%7D%3B%0A%20%20var%20removed%20%3D%20%7B%7D%3B%0A%20%20function%20clone(v)%20%7B%20return%20v%20%3D%3D%3D%20undefined%20%3F%20null%20%3A%20JSON.parse(JSON.stringify(v))%3B%20%7D%0A%20%20function%20scrub(v)%20%7B%0A%20%20%20%20if%20(Array.isArray(v))%20return%20v.map(scrub)%3B%0A%20%20%20%20if%20(v%20%26%26%20typeof%20v%20%3D%3D%3D%20'object')%20%7B%0A%20%20%20%20%20%20var%20o%20%3D%20%7B%7D%3B%0A%20%20%20%20%20%20Object.keys(v).forEach(function%20(k)%20%7B%20if%20(DROP%5Bk%5D)%20%7B%20removed%5Bk%5D%20%3D%20(removed%5Bk%5D%20%7C%7C%200)%20%2B%201%3B%20return%3B%20%7D%20o%5Bk%5D%20%3D%20scrub(v%5Bk%5D)%3B%20%7D)%3B%0A%20%20%20%20%20%20return%20o%3B%0A%20%20%20%20%7D%0A%20%20%20%20return%20v%3B%0A%20%20%7D%0A%20%20function%20byRoom(raw)%20%7B%0A%20%20%20%20if%20(Array.isArray(raw))%20return%20%7Bmain%3A%20raw.slice()%7D%3B%0A%20%20%20%20var%20out%20%3D%20%7B%7D%3B%0A%20%20%20%20Object.keys(raw%20%7C%7C%20%7B%7D).forEach(function%20(r)%20%7B%20var%20a%20%3D%20raw%5Br%5D%3B%20out%5Br%5D%20%3D%20Array.isArray(a)%20%3F%20a.slice()%20%3A%20Object.keys(a%20%7C%7C%20%7B%7D).map(function%20(k)%20%7B%20return%20a%5Bk%5D%3B%20%7D)%3B%20%7D)%3B%0A%20%20%20%20return%20out%3B%0A%20%20%7D%0A%20%20function%20attempt(f%2C%20fallback)%20%7B%20try%20%7B%20return%20f()%3B%20%7D%20catch%20(e)%20%7B%20return%20fallback()%3B%20%7D%20%7D%0A%20%20var%20editor%20%3D%20attempt(function%20()%20%7B%20return%20typeof%20W.stripDemoTurnsFromRooms%20%3D%3D%3D%20'function'%20%3F%20W.stripDemoTurnsFromRooms(S.roomObjs)%20%3A%20clone(byRoom(S.roomObjs))%3B%20%7D%2C%20function%20()%20%7B%20return%20clone(byRoom(S.roomObjs))%3B%20%7D)%3B%0A%20%20var%20physical%20%3D%20attempt(function%20()%20%7B%20if%20(typeof%20W.physicalRoomObjs%20!%3D%3D%20'function')%20throw%200%3B%20return%20W.physicalRoomObjs(S.roomObjs)%3B%20%7D%2C%20function%20()%20%7B%0A%20%20%20%20var%20src%20%3D%20clone(byRoom(S.roomObjs))%2C%20out%20%3D%20%7B%7D%3B%0A%20%20%20%20Object.keys(src).forEach(function%20(r)%20%7B%20out%5Br%5D%20%3D%20src%5Br%5D.filter(function%20(o)%20%7B%20return%20o%20%26%26%20o.type%20!%3D%3D%20'waiterstation'%3B%20%7D)%3B%20%7D)%3B%0A%20%20%20%20return%20out%3B%0A%20%20%7D)%3B%0A%20%20var%20stations%20%3D%20attempt(function%20()%20%7B%20if%20(typeof%20W.computeStations%20!%3D%3D%20'function'%20%7C%7C%20typeof%20W.mergeStationSync%20!%3D%3D%20'function')%20throw%200%3B%20return%20clone(W.mergeStationSync(W.computeStations()%2C%20S.stations))%3B%20%7D%2C%20function%20()%20%7B%20return%20clone(S.stations%20%7C%7C%20%5B%5D)%3B%20%7D)%3B%0A%20%20function%20saved(k)%20%7B%20try%20%7B%20var%20raw%20%3D%20W.localStorage.getItem(k)%3B%20return%20raw%20%3F%20JSON.parse(raw)%20%3A%20null%3B%20%7D%20catch%20(e)%20%7B%20return%20null%3B%20%7D%20%7D%0A%20%20var%20published%20%3D%20scrub(%7Brooms%3A%20clone(S.rooms)%2C%20roomObjs%3A%20clone(physical)%2C%20stations%3A%20stations%7D)%3B%0A%20%20var%20editorObjs%20%3D%20scrub(clone(editor))%3B%0A%20%20var%20savedCopy%20%3D%20scrub(%7Beh_rooms%3A%20saved('eh_rooms')%2C%20eh_rooms_objs%3A%20saved('eh_rooms_objs')%2C%20eh_stations%3A%20saved('eh_stations')%7D)%3B%0A%20%20var%20SEAT%20%3D%20%7Btable%3A%201%2C%20stool%3A%201%2C%20outdoor%3A%201%2C%20couch%3A%201%7D%2C%20WALL%20%3D%20%7Bwall%3A%201%2C%20lshape%3A%201%2C%20curve%3A%201%7D%3B%0A%20%20var%20types%20%3D%20%7B%7D%2C%20tables%20%3D%200%2C%20booths%20%3D%200%2C%20walls%20%3D%200%2C%20objects%20%3D%200%3B%0A%20%20Object.keys(editorObjs).forEach(function%20(r)%20%7B%0A%20%20%20%20(editorObjs%5Br%5D%20%7C%7C%20%5B%5D).forEach(function%20(o)%20%7B%0A%20%20%20%20%20%20if%20(!o)%20return%3B%0A%20%20%20%20%20%20objects%2B%2B%3B%20types%5Bo.type%5D%20%3D%20(types%5Bo.type%5D%20%7C%7C%200)%20%2B%201%3B%0A%20%20%20%20%20%20if%20(o.type%20%3D%3D%3D%20'couch')%20booths%2B%2B%3B%20else%20if%20(SEAT%5Bo.type%5D)%20tables%2B%2B%3B%0A%20%20%20%20%20%20if%20(WALL%5Bo.type%5D)%20walls%2B%2B%3B%0A%20%20%20%20%7D)%3B%0A%20%20%7D)%3B%0A%20%20var%20now%20%3D%20new%20Date()%3B%0A%20%20function%20pad(n)%20%7B%20return%20(n%20%3C%2010%20%3F%20'0'%20%3A%20'')%20%2B%20n%3B%20%7D%0A%20%20var%20stamp%20%3D%20now.getFullYear()%20%2B%20'-'%20%2B%20pad(now.getMonth()%20%2B%201)%20%2B%20'-'%20%2B%20pad(now.getDate())%20%2B%20'-'%20%2B%20pad(now.getHours())%20%2B%20pad(now.getMinutes())%3B%0A%20%20var%20file%20%3D%20%7B%0A%20%20%20%20format%3A%20'epicurean-boh-layout-export'%2C%20version%3A%201%2C%20exportedAt%3A%20now.toISOString()%2C%0A%20%20%20%20source%3A%20%7Bpage%3A%20W.location.origin%20%2B%20W.location.pathname%2C%20title%3A%20W.document.title%2C%20method%3A%20'Read-only%20bookmark%20button.%20Nothing%20in%20BOH%2C%20this%20browser%20or%20Firebase%20was%20changed.'%7D%2C%0A%20%20%20%20summary%3A%20%7Brooms%3A%20published.rooms.length%2C%20objects%3A%20objects%2C%20tables%3A%20tables%2C%20booths%3A%20booths%2C%20walls%3A%20walls%2C%20stations%3A%20(published.stations%20%7C%7C%20%5B%5D).length%2C%20objectTypes%3A%20types%7D%2C%0A%20%20%20%20removed%3A%20%7Bfields%3A%20removed%2C%20note%3A%20'Left%20out%20on%20purpose%3A%20employee%20PINs%2Fcredentials%20and%20guest%20details.%20Layout%2C%20geometry%2C%20numbers%2C%20seats%2C%20rooms%20and%20station%20assignments%20are%20complete.'%7D%2C%0A%20%20%20%20published%3A%20published%2C%0A%20%20%20%20editorRoomObjs%3A%20editorObjs%2C%0A%20%20%20%20savedCopy%3A%20savedCopy%0A%20%20%7D%3B%0A%20%20var%20name%20%3D%20'boh-layout-'%20%2B%20stamp%20%2B%20'.json'%3B%0A%20%20var%20url%20%3D%20URL.createObjectURL(new%20Blob(%5BJSON.stringify(file%2C%20null%2C%202)%5D%2C%20%7Btype%3A%20'application%2Fjson'%7D))%3B%0A%20%20var%20a%20%3D%20W.document.createElement('a')%3B%0A%20%20a.href%20%3D%20url%3B%20a.download%20%3D%20name%3B%20a.style.display%20%3D%20'none'%3B%0A%20%20W.document.body.appendChild(a)%3B%20a.click()%3B%20a.remove()%3B%0A%20%20setTimeout(function%20()%20%7B%20URL.revokeObjectURL(url)%3B%20%7D%2C%2060000)%3B%0A%20%20W.alert('BOH%20layout%20exported%20(read-only)%5Cn%5CnFile%3A%20'%20%2B%20name%20%2B%20'%20(in%20your%20Downloads%20folder)%5Cn%5Cn'%20%2B%0A%20%20%20%20published.rooms.length%20%2B%20'%20rooms%20%C2%B7%20'%20%2B%20tables%20%2B%20'%20tables%20%C2%B7%20'%20%2B%20booths%20%2B%20'%20booths%20%C2%B7%20'%20%2B%20walls%20%2B%20'%20walls%20%C2%B7%20'%20%2B%20(published.stations%20%7C%7C%20%5B%5D).length%20%2B%20'%20waiter%20stations%5Cn%5Cn'%20%2B%0A%20%20%20%20'Employee%20PINs%20and%20guest%20details%20were%20left%20out.%20Nothing%20in%20BOH%20was%20changed.')%3B%0A%7D)()%3B%0A" title="Drag me to your bookmarks bar">📐 Export BOH layout</a><br><br>
+        Firefox alternative: right-click the button → <kbd>Bookmark Link…</kbd> → Folder <kbd>Bookmarks Toolbar</kbd> → <kbd>Save</kbd>.</li>
+    </ol>
+  </div>
+
+  <div class="box">
+    <b>Step 2 — export</b>
+    <ol>
+      <li>Open your Epicurean BOH as usual, in the <b>same browser</b>, and check your dining room looks right. Don't leave an edit half-done.</li>
+      <li>Click <b>📐 Export BOH layout</b> on the bookmarks bar.</li>
+      <li>A message shows the number of rooms, tables, booths, walls and waiter stations, and a file like <b>boh-layout-2026-10-19-1930.json</b> is saved in <b>Downloads</b>.</li>
+    </ol>
+  </div>
+
+  <div class="box safe">
+    <b>What the button does — and doesn't do</b>
+    <ul>
+      <li>It only <b>reads</b> the floor plan BOH is showing: rooms, every table, booth, wall and object with its number, shape, position, size and seats, and the waiter stations with their tables.</li>
+      <li>It <b>leaves out</b> employee PINs/passwords and guest details (guest names, VIP flags, notes, reservations).</li>
+      <li>It does <b>not</b> save anything in BOH, does not change or clear the browser's storage, does not contact Firebase or any server. The only thing it creates is the downloaded file.</li>
+    </ul>
+  </div>
+
+  <div class="box">
+    <b>Step 3 — use it in the test kit</b>
+    <ol>
+      <li><b>Mac:</b> move the downloaded file into the <b>harbor-lane-test-pos</b> folder. When you start <b>Start iPhone POS Test.command</b>, the iPhone and the Mac can load it from there: open the POS, tap the gold <b>TEST</b> tab → <b>Use BOH layout from the Mac</b>.</li>
+      <li>Or, in any browser running the kit: <b>TEST</b> tab → <b>Import BOH Layout (choose file)</b>.</li>
+      <li>Check the numbers shown, then tap <b>Apply this floor plan</b>.</li>
+    </ol>
+  </div>
+</main>
+</body>
+</html>
