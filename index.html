@@ -1316,6 +1316,89 @@ body.hh-on .voice-dock, body.hh-on .voice-dock button { background:#12151c; colo
 body.hh-on .voice-dock button.on { background:#c9a84c; color:#1a1008; }
 body.hh-on .voice-test label, body.hh-on .voice-rev { color:#7a4b12; }
 body.hh-on .voice-draft .voice-draft-acts button { background:#fff; color:#000; }
+
+/* Handheld manual order: categories stay at the top, the allergy section stays
+   open, and the bill keeps a large block. Voice is not on this screen. */
+@media (max-width:767px) {
+  body.hh-on.hh-table .voice-dock,
+  body.hh-on.hh-table .voice-test { display:none !important; }
+  body.hh-on.hh-table .app-content {
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+    padding:0.35rem 0.45rem calc(0.45rem + env(safe-area-inset-bottom));
+  }
+  body.hh-on.hh-table .ts-console,
+  body.hh-on.hh-table .ts-console.toast-go {
+    height:auto;
+    min-height:0;
+    overflow:visible;
+  }
+  body.hh-on.hh-table #order-top { flex:0 0 auto; }
+  body.hh-on.hh-table .period-tabs {
+    position:sticky;
+    top:0;
+    z-index:6;
+    flex:0 0 auto;
+    background:#d7dee8;
+    margin:0;
+  }
+  body.hh-on.hh-table .period-tab { min-height:44px; }
+  body.hh-on.hh-table .hh-cat-bar {
+    position:sticky;
+    top:45px;
+    z-index:6;
+    display:flex;
+    align-items:center;
+    flex:0 0 auto;
+    min-height:52px;
+    gap:6px;
+    overflow-x:auto;
+    overflow-y:hidden;
+    -webkit-overflow-scrolling:touch;
+    background:#d7dee8;
+    padding:4px 0 6px;
+  }
+  body.hh-on.hh-table .hh-cat {
+    flex:0 0 auto;
+    min-height:44px;
+    padding:0 0.8rem;
+    border-radius:10px;
+    border:1px solid #c5ced8;
+    background:#fff;
+    color:#000;
+    font-weight:800;
+    font-size:0.8rem;
+  }
+  body.hh-on.hh-table .hh-cat.on { background:#1b2430; color:#fff; border-color:#1b2430; }
+  body.hh-on.hh-table .allergy-strip { max-height:none; overflow:visible; }
+  body.hh-on.hh-table .allergy-strip .as-pill,
+  body.hh-on.hh-table .allergy-strip .chip {
+    min-height:44px !important;
+    padding:0 0.7rem;
+  }
+  body.hh-on.hh-table .ts-console.toast-go .ts-check,
+  body.hh-on.hh-table .ts-console.toast-go.has-dining .ts-check {
+    flex:0 0 auto;
+    min-height:42vh;
+    max-height:none;
+    overflow:visible;
+  }
+  body.hh-on.hh-table .ts-check-lines { max-height:none; overflow:visible; }
+  body.hh-on.hh-table .toast-check-actions button,
+  body.hh-on.hh-table .toast-check-ops button { min-height:44px; }
+  body.hh-on.hh-table .add-items-pane,
+  body.hh-on.hh-table .ts-console.toast-go.has-dining .add-items-pane {
+    flex:0 0 auto;
+    min-height:0;
+    overflow:visible;
+  }
+  body.hh-on.hh-table .ts-grid-wrap { flex:0 0 auto; min-height:0; }
+  body.hh-on.hh-table .ts-console.toast-go .ts-grid {
+    align-content:start;
+    grid-auto-rows:minmax(44px, auto);
+  }
+  body.hh-on.hh-table .ts-tile.back { min-height:44px; }
+}
 </style>
 </head>
 <body>
@@ -8174,10 +8257,16 @@ function orderTopHtml(){
   var warn=reservationWarning(STATE.selectedTable);
   var html='<div id="order-top">';
   if (warn.text) html+='<div class="res-warn lvl'+warn.level+'">'+esc(warn.text)+'</div>';
-  html+=liveCheckHtml();
-  html+=renderGuestAllergyStrip();
-  html+=renderSeatBar();
-  html+=voiceTestHtml();
+  if (isHandheld()) {
+    html+=renderGuestAllergyStrip();
+    html+=renderSeatBar();
+    html+=liveCheckHtml();
+  } else {
+    html+=liveCheckHtml();
+    html+=renderGuestAllergyStrip();
+    html+=renderSeatBar();
+    html+=voiceTestHtml();
+  }
   return html+'</div>';
 }
 function mountVoiceDock(){
@@ -8211,10 +8300,14 @@ function renderOrder() {
     }
   }
   var html='<div class="'+cls+'">';
+  if (isHandheld()) {
+    html+=periodTabsHtml();
+    html+=handheldCategoryBarHtml();
+  }
   html+=orderTopHtml();
   html+='<div class="add-items-pane'+(STATE.menuOpen===false?' menu-closed':'')+'" id="add-items-pane" data-open="'+(STATE.menuOpen===false?'false':'true')+'">';
   html+=addItemsHeaderHtml();
-  html+=periodTabsHtml();
+  if (!isHandheld()) html+=periodTabsHtml();
   html+=renderMenuGrid();
   html+='</div></div>';
   c.innerHTML=html;
@@ -8267,6 +8360,22 @@ function addItemsHeaderHtml(){
     '<button type="button" class="add-items-close" onclick="closeAddItemsPane()" aria-label="Close">X</button>'+
     '<input class="search-box add-search" id="pos-item-find" value="'+esc(STATE.menuSearch||'')+'" placeholder="'+esc(ph)+'" oninput="onAddItemsSearchInput(this)"></div>';
 }
+function handheldCategoryBarHtml(){
+  if (!isHandheld()) return '';
+  var buttons=[];
+  function add(label, catId, on){
+    buttons.push('<button type="button" class="hh-cat'+(on?' on':'')+'" onclick=\'filterCat('+JSON.stringify(String(catId))+')\'>'+esc(label)+'</button>');
+  }
+  if (STATE.menuFamily!=='drinks') {
+    if ((STATE.prixFixeMenus||[]).length) add('Prix Fixe','__prixfixe__', STATE.orderCat==='__prixfixe__');
+    if ((STATE.tastingMenus||[]).length) add('Tasting','__tasting__', STATE.orderCat==='__tasting__');
+  }
+  familyCategories().forEach(function(cat){
+    add(cat.name, cat.id, STATE.orderCat===cat.id);
+  });
+  if (!buttons.length) return '';
+  return '<div class="hh-cat-bar" id="hh-cat-bar">'+buttons.join('')+'</div>';
+}
 function periodTabsHtml(){
   var nav=STATE.menuNav||{};
   var food=STATE.menuFamily!=='drinks' && nav.cat!=='__prixfixe__' && nav.cat!=='__tasting__' && STATE.orderCat!=='__prixfixe__' && STATE.orderCat!=='__tasting__';
@@ -8290,7 +8399,7 @@ function renderGuestAllergyStrip(){
   }
   collect('table');
   for (var i=1;i<=n;i++) collect(i);
-  if (dining) {
+  if (dining && !isHandheld()) {
     return '<div class="allergy-strip compact-line"><span>'+(bits.length?esc(bits.join(' · ')):'Allergies — tap a guest to flag')+'</span>'+
       '<button type="button" onclick="openAllergyEditor()">Edit</button>'+
       '<button type="button" onclick="sendKitchenAllergyNote()">Send note</button></div>';
@@ -8519,12 +8628,20 @@ function paintBeverageResults(q){
 function renderBeverageSearchPanel(){
   var q=String(STATE.menuSearch||STATE._drinkSearch||'');
   var hits=filterBeverageHits(q);
+  if (isHandheld() && STATE.orderCat && STATE.orderCat!=='__beverages__') {
+    var catId=STATE.orderCat;
+    hits=hits.filter(function(i){
+      if (i.catIds && i.catIds.length) return i.catIds.indexOf(catId)>-1;
+      return i.category===catId;
+    });
+  }
   STATE._wineWinStart=STATE._bevWinStart||0;
   return renderWineWindow(hits, '');
 }
 
 function menuNavBack(){
   var nav=STATE.menuNav||{level:'root'};
+  STATE.tilePage=0;
   if (nav.level==='items') {
     STATE.menuNav={ level:'cats', family:STATE.menuFamily };
     STATE.orderCat=null;
