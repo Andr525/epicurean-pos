@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Export BOH Layout</title>
+<style>
+  :root { --bg:#ffffff; --fg:#151515; --muted:#555; --line:#ddd; --gold:#b47a14; --ok:#1d7a3a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:17px/1.5 -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif; padding:28px 16px; }
+  main { max-width:720px; margin:0 auto; }
+  h1 { font-size:28px; margin:0 0 4px; }
+  .sub { color:var(--muted); margin:0 0 24px; }
+  .drag { display:inline-block; font:700 22px -apple-system, BlinkMacSystemFont, sans-serif; color:#fff; background:var(--gold); padding:16px 28px; border-radius:14px; text-decoration:none; cursor:grab; box-shadow:0 3px 0 #7d5409; }
+  .box { border:1px solid var(--line); border-radius:14px; padding:18px 20px; margin:20px 0; }
+  ol { padding-left:22px; margin:8px 0; }
+  li { margin:8px 0; }
+  .safe { border-color:#bfe3c9; background:#f3fbf5; }
+  .safe b { color:var(--ok); }
+  kbd { font:600 14px ui-monospace, Menlo, monospace; border:1px solid var(--line); border-bottom-width:2px; border-radius:6px; padding:1px 6px; background:#fafafa; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Export your BOH floor plan</h1>
+  <p class="sub">Downloads your exact BOH dining-room layout as one file, for the iPhone POS test kit. Read-only: nothing in BOH is changed.</p>
+
+  <div class="box">
+    <b>Step 1 — install the button (one time)</b>
+    <ol>
+      <li>Show the bookmarks bar:
+        <b>Firefox</b>: menu <kbd>View</kbd> → <kbd>Toolbars</kbd> → <kbd>Bookmarks Toolbar</kbd> → <kbd>Always Show</kbd>.
+        <b>Safari</b>: menu <kbd>View</kbd> → <kbd>Show Favorites Bar</kbd>.</li>
+      <li><b>Drag</b> this gold button onto the bookmarks bar (don't click it here):<br><br>
+        <a class="drag" id="export-button" href="__BOOKMARKLET__" title="Drag me to your bookmarks bar">📐 Export BOH layout</a><br><br>
+        Firefox alternative: right-click the button → <kbd>Bookmark Link…</kbd> → Folder <kbd>Bookmarks Toolbar</kbd> → <kbd>Save</kbd>.</li>
+    </ol>
+  </div>
+
+  <div class="box">
+    <b>Step 2 — export</b>
+    <ol>
+      <li>Open your Epicurean BOH as usual, in the <b>same browser</b>, and check your dining room looks right. Don't leave an edit half-done.</li>
+      <li>Click <b>📐 Export BOH layout</b> on the bookmarks bar.</li>
+      <li>A message shows the number of rooms, tables, booths, walls and waiter stations, and a file like <b>boh-layout-2026-10-19-1930.json</b> is saved in <b>Downloads</b>.</li>
+    </ol>
+  </div>
+
+  <div class="box safe">
+    <b>What the button does — and doesn't do</b>
+    <ul>
+      <li>It only <b>reads</b> the floor plan BOH is showing: rooms, every table, booth, wall and object with its number, shape, position, size and seats, and the waiter stations with their tables.</li>
+      <li>It <b>leaves out</b> employee PINs/passwords and guest details (guest names, VIP flags, notes, reservations).</li>
+      <li>It does <b>not</b> save anything in BOH, does not change or clear the browser's storage, does not contact Firebase or any server. The only thing it creates is the downloaded file.</li>
+    </ul>
+  </div>
+
+  <div class="box">
+    <b>Step 3 — use it in the test kit</b>
+    <ol>
+      <li><b>Mac:</b> move the downloaded file into the <b>harbor-lane-test-pos</b> folder. When you start <b>Start iPhone POS Test.command</b>, the iPhone and the Mac can load it from there: open the POS, tap the gold <b>TEST</b> tab → <b>Use BOH layout from the Mac</b>.</li>
+      <li>Or, in any browser running the kit: <b>TEST</b> tab → <b>Import BOH Layout (choose file)</b>.</li>
+      <li>Check the numbers shown, then tap <b>Apply this floor plan</b>.</li>
+    </ol>
+  </div>
+</main>
+</body>
+</html>

@@ -1,0 +1,66 @@
+{
+  "builtAt": "2026-10-20T19:34:39.953Z",
+  "restaurant": "Harbor Lane Bistro (TEST)",
+  "approvedCommit": "ece7396cee5ae33ef06e67c7ec110f0ac9bc9009",
+  "files": {
+    "index.html": "932709bf9c9aa5df0f1bb9cd2469b301d84a77425fb165ac5e419d971fffe978",
+    "cellar.js": "4185a0fc10838a4d99c086c1aae334c6b248266812269974d5c67911f1b35b13",
+    "scalini-dining.js": "4073c2157582157c0cfc1f817b83decf5641aee969d9afb61d1520acbc83a9dc",
+    "voice-vocab.js": "377a20163da857ab141f4bb1d328e40b6b65a79802cbd74a6e087a1d925018b7",
+    "voice-engine.js": "188a968dbd8bc21dc1f2a4eca7b1b98fcf87927d294349b752f4657a4ddc8c00",
+    "voice-turn.js": "ee609a4688690bfde5ac311a65c4a7d2af9bbc2166ea40a68d667671460e4009",
+    "voice-catalog.js": "2b15a91caf6e6410f352df53f6592771d229e85e0d0847144ee5d222cb73f370",
+    "voice-cocktails.js": "cf5810b87922193cc9961b791672ca33b4da805c2343c84cf4262b4ee0d9168c",
+    "voice-price.js": "9ec27ee8bbd3a271c454ee266c38a8cb3d2a9528e0b37577cd0a51f64e8df8f9",
+    "voice-service.js": "52c911b186fcec074da41360632ebf937090c4ac451f0c4cbf65fb2490bb1418",
+    "manifest.json": "7163a20872be0ca98312e82139c7f3640a5abc82db00920fd43a322779cd5324",
+    "icon-192.png": "4a295b6753456e406e49e0a07b7313916e2f097dcd220aae315d604c02020290",
+    "icon-512.png": "e2d38487015842744ac2828aef9a61ee4e539b53f7f1cb58731f60ff30bfe415"
+  },
+  "testChanges": [
+    "remove Firebase SDK scripts (production cloud) (3)",
+    "remove Square SDK script (real payment provider) (1)",
+    "remove Google Fonts links (external) (2)",
+    "use the mock cloud instead of the Firestore REST adapter (1)",
+    "load the fictional data overlay after the bundled data files (1)",
+    "add no-network policy, test seed, BOH layout import and mock cloud (1)"
+  ],
+  "fictionalDataFiles": {
+    "cellar.js": "generated fictional data",
+    "scalini-dining.js": "fictional data + approved helper functions (verbatim), sha256 of helper block 04bb745d96a4e5bf76b14a439aa0ecf4763286b7bd6db24fd9aafff6e40310fd"
+  },
+  "verification": {
+    "loginRoster": [
+      "1101 Riley Chen",
+      "3101 Jordan Reyes",
+      "3102 Sam Patel",
+      "4101 Casey Morgan",
+      "5101 Taylor Brooks"
+    ],
+    "openChecks": [
+      "3",
+      "5",
+      "8"
+    ],
+    "tickets": [
+      "3:Tuna Crudo+Harbor Burger",
+      "5:Crispy Calamari+Pan-Seared Salmon+Wild Mushroom Risotto",
+      "8:Grilled Ribeye 14 oz+Truffle Fries"
+    ],
+    "normalPayment": {
+      "label": "Charge $12.98",
+      "success": true
+    },
+    "faultedPayment": true,
+    "recoveryDiscoverable": true,
+    "recovered": true,
+    "tokenizationsOnSecondDevice": 0,
+    "pageErrors": [],
+    "externalRequests": [],
+    "fileUrl": {
+      "loggedIn": "Sam Patel",
+      "pageErrors": [],
+      "networkAttempts": []
+    }
+  }
+}
