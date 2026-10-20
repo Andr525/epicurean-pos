@@ -206,7 +206,7 @@ check('after separating, every table is back at its original BOH position', spli
 check('POS screens: no page errors and no outside requests', !kit.errors.length && !kit.external.length, JSON.stringify(kit.errors.concat(kit.external)).slice(0, 200));
 
 // Reset keeps the imported plan; invalid files are rejected; Remove goes back to fictional
-await ev(() => HLTEST.reset()); await P.waitForTimeout(2000);
+await ev(() => { HLTEST.reset(); HLTEST.reset(); }); await P.waitForTimeout(2000); // two-tap confirmation
 const afterReset = await ev(() => __MOCK_DB__.__dump());
 check('"Reset all test data" restores fictional orders but keeps the imported floor plan', eq(omit(afterReset.boh_shared.tables, ['updatedAt']), omit(doc, ['updatedAt'])) && Object.keys(SEED).filter(c => c !== 'boh_shared').every(c => eq(afterReset[c], SEED[c])));
 const bad = {
@@ -237,7 +237,7 @@ await P.locator('#hltest-panel button', {hasText: 'Apply this floor plan'}).clic
 const rawDoc = (await ev(() => __MOCK_DB__.__dump())).boh_shared.tables;
 check('a plain boh_shared/tables document (e.g. Firebase console export) is accepted; real PINs are replaced', rawOk && rawDoc.stations.every(s => s.serverCode !== '3001' && fictionalNames.has(s.server)));
 await ev(() => { HLTEST.toggle(); }); await P.waitForTimeout(100);
-await ev(() => HLTEST.layoutRemove()); await P.waitForTimeout(1800);
+await ev(() => { HLTEST.layoutRemove(); HLTEST.layoutRemove(); }); await P.waitForTimeout(1800); // two-tap confirmation
 const removed = await ev(() => ({doc: __MOCK_DB__.__dump().boh_shared.tables, key: localStorage.getItem('HLTEST_BOH_LAYOUT_V1')}));
 check('"Remove imported layout" goes back to the fictional floor plan', removed.key === null && eq(removed.doc, SEED.boh_shared.tables));
 await kit.context.close();

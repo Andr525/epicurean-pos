@@ -153,6 +153,23 @@ fs.copyFileSync(path.join(HERE, 'start-iphone-pos-test.command'), path.join(KIT,
 }
 fs.chmodSync(path.join(KIT, 'Start iPhone POS Test.command'), 0o755);
 fs.writeFileSync(path.join(KIT, 'Start Test POS (Windows).bat'), '@echo off\r\ncd /d "%~dp0"\r\necho Harbor Lane TEST POS - http://127.0.0.1:8765  (close this window to stop)\r\nstart "" "http://127.0.0.1:8765/index.html"\r\npy -m http.server 8765 --bind 127.0.0.1 || python -m http.server 8765 --bind 127.0.0.1\r\n');
+// Optional: BOH_LAYOUT_FILE=<boh_shared/tables copy or BOH layout export> builds the owner's original floor
+// plan into the starting data (same conversion as "Import BOH Layout": tables + walls drawn, stations kept,
+// waiters mapped to fictional employees, PINs and guest details never copied). Default build: unchanged.
+if (process.env.BOH_LAYOUT_FILE) {
+  const sandbox = {}; sandbox.window = sandbox; vm.createContext(sandbox);
+  vm.runInContext(fs.readFileSync(path.join(HERE, 'test-boh-layout.js'), 'utf8'), sandbox);
+  const text = fs.readFileSync(process.env.BOH_LAYOUT_FILE, 'utf8');
+  const res = sandbox.HLTEST_LAYOUT.prepare(text, path.basename(process.env.BOH_LAYOUT_FILE), STAFF);
+  if (!res.ok) throw Error('BOH_LAYOUT_FILE rejected: ' + res.errors.join(' '));
+  const src = fs.readFileSync(path.join(KIT, 'seed.js'), 'utf8'), seed = JSON.parse(src.slice(src.indexOf('=') + 1).trim().replace(/;$/, ''));
+  seed.boh_shared.tables = res.record.doc;
+  seed.boh_shared.staff_clock.list = seed.boh_shared.staff_clock.list.concat(res.record.extraStaff);
+  seed.__builtInLayout = {label: process.env.BOH_LAYOUT_LABEL || 'original BOH layout', summary: res.record.summary, mapping: res.record.mapping, hidden: res.record.hidden, warnings: res.warnings};
+  writeSeed(seed);
+  manifest.builtInLayout = seed.__builtInLayout;
+  fs.writeFileSync(path.join(KIT, 'BUILD-MANIFEST.json'), JSON.stringify(manifest, null, 2));
+}
 fs.copyFileSync(path.join(HERE, 'OWNER-TESTING.md'), path.join(KIT, 'READ ME FIRST.md'));
 fs.writeFileSync(path.join(KIT, 'test-logins.txt'), 'Harbor Lane Bistro (TEST) — fictional employees\n\n' + STAFF.map(s => `${s.code}  ${s.name}  (${s.jobs[0].code})`).join('\n') + '\n');
 execFileSync('zip', ['-qr', 'harbor-lane-test-pos.zip', 'harbor-lane-test-pos'], {cwd: OUT});

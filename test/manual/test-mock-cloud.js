@@ -29,7 +29,7 @@
   }
   var store = load();
   function save() { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) { console.error('MOCK cloud save failed', e); } }
-  if (!localStorage.getItem(KEY)) save();
+  try { if (!localStorage.getItem(KEY)) save(); } catch (e) { console.error('MOCK cloud: browser storage unavailable', e); }
   function col(c) { return store[c] || (store[c] = {}); }
   function docSnap(c, id) { var d = col(c)[id]; return {id: id, exists: d !== undefined, data: function () { return clone(d); }}; }
   function match(d, w) { if (!w) return true; var v = d[w.f]; return w.op === '==' ? v === w.v : true; }
@@ -91,10 +91,12 @@
   function faultText() { var f = fault(); if (!f) return 'none'; if (f.mode === 'offline') return 'CLOUD OFFLINE (reads and writes fail)'; if (f.mode === 'send') return 'Kitchen SEND fails (ticket writes refused)'; if (f.mode === 'after-payment') return (f.armed ? 'ACTIVE: ' : 'Armed for next payment: ') + (f.blocks.indexOf('checks') > -1 ? 'check write fails' : 'ticket write fails'); return 'none'; }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]; }); }
   var pending = null; // {record, warnings} awaiting Apply, or {errors}
+  var armed = '', note = ''; // two-tap confirmation inside the panel (some hosts block window.confirm)
   function fromMac() { var m = window.__BOH_LAYOUT_FROM_MAC__; return m && typeof m.text === 'string' ? m : null; }
   function layoutHtml() {
     var rec = layoutRecord(), mac = fromMac(), h = '<b>Floor plan</b><div style="margin:2px 0 6px">';
     if (rec) h += '<span style="color:#7fe08f">ORIGINAL BOH layout</span> · ' + esc(rec.fileName || 'imported file') + '<br>' + rec.summary.rooms + ' rooms · ' + rec.summary.tables + ' tables · ' + rec.summary.walls + ' walls · ' + rec.summary.stations + ' stations';
+    else if (window.__POS_TEST_SEED__ && window.__POS_TEST_SEED__.__builtInLayout) { var bl = window.__POS_TEST_SEED__.__builtInLayout; h += '<span style="color:#7fe08f">ORIGINAL BOH layout (built in)</span> · ' + esc(bl.label) + '<br>' + bl.summary.rooms + ' rooms · ' + bl.summary.tables + ' tables · ' + bl.summary.walls + ' walls · ' + bl.summary.stations + ' stations' + (bl.mapping && bl.mapping.length ? '<br>' + bl.mapping.map(function (m) { return esc(m.station) + ' → ' + esc(m.waiter); }).join('<br>') : ''); }
     else h += '<span style="color:#ffcf70">Fictional sample floor plan</span> (import your BOH layout below)';
     h += '</div>';
     if (pending && pending.errors) {
@@ -111,7 +113,7 @@
     } else {
       if (mac) h += btn('📐 Use BOH layout from the Mac (' + esc(mac.name) + ')', 'HLTEST.layoutFromMac()');
       h += btn('📐 Import BOH Layout (choose file)', 'HLTEST.layoutPick()');
-      if (rec) h += btn('Remove imported layout (back to fictional)', 'HLTEST.layoutRemove()');
+      if (rec) h += btn(armed === 'remove' ? '⚠ Tap again to remove the imported layout' : 'Remove imported layout (back to fictional)', 'HLTEST.layoutRemove()', armed === 'remove');
     }
     return h;
   }
@@ -131,19 +133,19 @@
       layoutHtml() +
       '<b>Test logins (PIN)</b><table style="width:100%;margin:4px 0 8px;border-collapse:collapse">' + staffRows() + '</table>' +
       '<b>This device</b><div style="margin:2px 0 6px">Simulated failure: <span style="color:#ffcf70">' + faultText() + '</span><br>Mock card authorizations on this device: ' + tokens() + '</div>' +
-      btn('➕ Open another device (new tab)', 'HLTEST.newDevice()') +
+      btn('➕ Open another device (new tab)', 'HLTEST.newDevice()') + (note ? '<div style="color:#ffcf70;margin:2px 0 6px">' + esc(note) + '</div>' : '') +
       btn('💳 Next payment: check write fails', "HLTEST.fault('checks')") +
       btn('🎫 Next payment: ticket write fails', "HLTEST.fault('orders')") +
       btn('🍳 Kitchen SEND fails', "HLTEST.fault('send')") +
       btn('📴 Cloud offline', "HLTEST.fault('offline')") +
       btn('✅ Clear simulated failure', 'HLTEST.fault(null)') +
       btn('⬇ Download mock database (JSON)', 'HLTEST.download()') +
-      btn('↺ Reset all test data', 'HLTEST.reset()', true) + '</div>';
+      btn(armed === 'reset' ? '⚠ Tap again to reset ALL test data' + (layoutRecord() ? ' (imported floor plan kept)' : '') : '↺ Reset all test data', 'HLTEST.reset()', true) + '</div>';
   }
   window.HLTEST = {
     toggle: function () { open = !open; paint(); },
     fault: function (k) { setFault(k === null ? null : k === 'offline' ? {mode: 'offline'} : k === 'send' ? {mode: 'send'} : {mode: 'after-payment', blocks: [k], armed: false}); },
-    newDevice: function () { window.open(location.href.split('#')[0], '_blank'); },
+    newDevice: function () { var w = null; try { w = window.open(location.href.split('#')[0], '_blank'); } catch (e) {} note = w ? '' : 'Open this same link in another browser tab: each tab is another POS device.'; paint(); },
     download: function () { var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(store, null, 2)], {type: 'application/json'})); a.download = 'harbor-lane-mock-db-' + new Date().toISOString().replace(/[:.]/g, '-') + '.json'; document.body.appendChild(a); a.click(); setTimeout(function () { a.remove(); }, 500); },
     layoutPick: function () {
       var inp = document.getElementById('hltest-layout-file');
@@ -176,14 +178,16 @@
       location.reload();
     },
     layoutRemove: function () {
-      if (!window.confirm('Remove the imported BOH floor plan and go back to the fictional sample floor plan? (Your export file is not affected.)')) return;
+      if (armed !== 'remove') { armed = 'remove'; paint(); return; }
+      armed = '';
       localStorage.removeItem(LAYOUT_KEY);
       applyLayout(store, null); save(); notify(null);
       POS_LAYOUT_CACHES.forEach(function (k) { localStorage.removeItem(k); });
       location.reload();
     },
     reset: function () {
-      if (!window.confirm('Reset ALL test data? Every test check, ticket and payment in this browser goes back to the starting sample data.' + (layoutRecord() ? ' Your imported BOH floor plan is kept.' : ''))) return;
+      if (armed !== 'reset') { armed = 'reset'; paint(); return; }
+      armed = '';
       try { Object.keys(localStorage).forEach(function (k) { if (k === KEY || /^eh_/.test(k)) localStorage.removeItem(k); }); sessionStorage.clear(); } catch (e) {}
       location.reload();
     }
