@@ -1,7 +1,7 @@
-// Offline baseline for the POS pipeline on main (cfeceb8).
-// These tests state the behavior the pipeline should have. Several are expected
-// to FAIL on the current page. Do not change index.html or the assertions to
-// force a pass. No request in this file is sent to Firestore.
+// Offline pipeline harness. Assertions describe the behavior the pipeline
+// should have. Do not edit them to force a pass. Phase 1 records an
+// "after" column beside the frozen test/pipeline-baseline (32bdc41) results.
+// No request in this file is sent to live Firestore.
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
@@ -119,7 +119,7 @@ function writeCallSites() {
   const lines = [];
   lines.push('# Firestore call sites');
   lines.push('');
-  lines.push('Source command, run against `index.html` at `cfeceb8` (POS main). The file was not modified.');
+  lines.push('Source command, run against `index.html` on `fix/phase1-adapter`. The named adapter lives in `firestore-adapter.js`. Call sites in `index.html` were not retargeted, except `transferCheckTo`, which wraps `retargetKitchenTickets` so a Firestore failure toasts and does not abort the local move.');
   lines.push('');
   lines.push('```');
   lines.push('grep -n "fbDb\\." index.html');
@@ -150,34 +150,80 @@ function writeCallSites() {
   return hits.length;
 }
 
+// Frozen output of test/pipeline-baseline at 32bdc41. Do not regenerate this
+// from a later run. The After Phase 1 column is the only live measurement.
+const BASELINE_ROWS = [
+  { id: 'T1 BOH menu write appears in POS state', pass: 'PASS', measured: '59.8s until Probe Tuna was in POS state', errors: [] },
+  { id: 'T2 blocked send must not show sent without an orders doc and active_orders entry', pass: 'FAIL', measured: 'toast="Order sent to kitchen" orders=0 active_orders=0', errors: ['Failed to load resource: net::ERR_EMPTY_RESPONSE', 'TypeError: Failed to fetch\n    at http://127.0.0.1:46845/index.html:1455:16'] },
+  { id: 'T3 two simultaneous sends both reach active_orders', pass: 'FAIL', measured: 'orders docs=2 feed=[Alpha Plate] heldGets=2', errors: [] },
+  { id: 'T4 POS sees all 1200 order documents', pass: 'FAIL', measured: 'POS saw 1000 of 1200 (first read 1000)', errors: [] },
+  { id: 'T5 stale POS bar write keeps the BOH edit', pass: 'FAIL', measured: 'POS state before write=[lager] stored list=[lager]', errors: [] },
+  { id: 'T6 transferCheckTo re-tables an open kitchen ticket without throwing', pass: 'FAIL', measured: 'threw=yes orders.table=1 active_orders.table=1 sendToast="Order sent to kitchen"', errors: ['page.evaluate: TypeError: fbDb.collection(...).where(...).get is not a function\n    at retargetKitchenTickets (http://127.0.0.1:46845/index.html:9720:58)\n    at transferCheckTo (http://127.0.0.1:46845/index.html:9790:3)\n    at eval (eval at evaluate (:370:30), <anonymous>:1:9)\n    at UtilityScript.evaluate (<anonymous>:372:16)\n    at UtilityScript.<anonymous> (<anonymous>:1:44)\n    at main (/workspace/test/pipeline.test.mjs:441:22)'] },
+  { id: 'T7 KDS bump clears the ticket', pass: 'PASS', measured: 'bump buttons before=1 after=0 orders.status=cleared kds="✓ All clear — no active orders"', errors: [] },
+  { id: 'T8 manual seat, add, SEND appears on KDS', pass: 'PASS', measured: 'menuReady=true toast="Order sent to kitchen" kds=shows Probe Tuna', errors: [] }
+];
+
+function cell(value) {
+  return String(value == null ? '' : value).replace(/\|/g, '\\|').replace(/\s+/g, ' ').trim();
+}
+
 function writeResults() {
   const lines = [];
+  const byId = new Map(results.map((row) => [row.id, row]));
   lines.push('# Pipeline baseline results');
   lines.push('');
-  lines.push('POS commit `cfeceb8` (main). Branch `test/pipeline-baseline`. No `index.html` change, no Firestore network, no deploy.');
+  lines.push('POS commit `cfeceb8` (main) is what `test/pipeline-baseline` (`32bdc41`) measured. This file on `fix/phase1-adapter` adds the After Phase 1 column from the same assertions. No live Firestore network and no deploy.');
   lines.push('');
-  lines.push('The assertions describe the behavior the pipeline should have. A FAIL is the baseline defect. Tests were not edited to turn a FAIL into a PASS.');
+  lines.push('The assertions describe the behavior the pipeline should have. They were not edited to turn a FAIL into a PASS. T2, T3, and T5 are still expected to fail in Phase 1.');
   lines.push('');
   lines.push('Chrome logs `Failed to load resource: 404` for every missing document. The named adapter treats that 404 as "document does not exist", so those lines are omitted here. Application exceptions are kept.');
   lines.push('');
-  lines.push('| Test | PASS/FAIL | Measured value | Console error |');
-  lines.push('| --- | --- | --- | --- |');
-  results.forEach((row) => {
-    const err = row.errors.length ? row.errors.map((item) => item.replace(/\|/g, '\\|').replace(/\s+/g, ' ').trim()).join(' || ') : '';
-    const measured = String(row.measured).replace(/\|/g, '\\|').replace(/\s+/g, ' ').trim();
-    lines.push('| ' + row.id + ' | ' + row.pass + ' | ' + measured + ' | ' + err + ' |');
+  lines.push('| Test | Baseline (32bdc41) | After Phase 1 | Baseline measured | After Phase 1 measured |');
+  lines.push('| --- | --- | --- | --- | --- |');
+  const changes = [];
+  BASELINE_ROWS.forEach((before) => {
+    const after = byId.get(before.id);
+    const afterPass = after ? after.pass : 'not run';
+    const afterMeasured = after ? after.measured : '';
+    if (before.pass !== afterPass) changes.push(before.id + ': ' + before.pass + ' → ' + afterPass);
+    lines.push('| ' + before.id + ' | ' + before.pass + ' | ' + afterPass + ' | ' + cell(before.measured) + ' | ' + cell(afterMeasured) + ' |');
   });
+  results.forEach((row) => {
+    if (!BASELINE_ROWS.some((before) => before.id === row.id)) {
+      changes.push(row.id + ': (new) → ' + row.pass);
+      lines.push('| ' + row.id + ' | — | ' + row.pass + ' | — | ' + cell(row.measured) + ' |');
+    }
+  });
+  lines.push('');
+  lines.push('## PASS/FAIL changes');
+  lines.push('');
+  if (!changes.length) lines.push('No test changed PASS/FAIL.');
+  else changes.forEach((line) => lines.push('- ' + line));
+  lines.push('');
+  lines.push('T1 stayed PASS. The measured wait is the menu poll, so that number changed when the poll became 5 seconds. T2, T3, T5, T7, and T8 kept the same PASS/FAIL. T2 still fails with the same toast and zero documents; its console stack now points at `firestore-adapter.js` because that is where `fetch` runs.');
   lines.push('');
   lines.push('## Exact console errors');
   lines.push('');
-  results.forEach((row) => {
-    lines.push('### ' + row.id);
+  BASELINE_ROWS.forEach((before) => {
+    const after = byId.get(before.id);
+    lines.push('### ' + before.id);
     lines.push('');
-    if (!row.errors.length) {
-      lines.push('none');
-    } else {
+    lines.push('Baseline:');
+    lines.push('');
+    if (!before.errors.length) lines.push('none');
+    else {
       lines.push('```');
-      lines.push(row.errors.join('\n'));
+      lines.push(before.errors.join('\n'));
+      lines.push('```');
+    }
+    lines.push('');
+    lines.push('After Phase 1:');
+    lines.push('');
+    const afterErrors = after ? after.errors : [];
+    if (!after || !afterErrors.length) lines.push(after ? 'none' : 'not run');
+    else {
+      lines.push('```');
+      lines.push(afterErrors.join('\n'));
       lines.push('```');
     }
     lines.push('');
