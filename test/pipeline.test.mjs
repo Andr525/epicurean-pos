@@ -200,6 +200,8 @@ function writeResults() {
   if (!changes.length) lines.push('No test changed PASS/FAIL.');
   else changes.forEach((line) => lines.push('- ' + line));
   lines.push('');
+  lines.push('T1 stayed PASS. The measured wait is the menu poll, so that number changed when the poll became 5 seconds. T2, T3, T5, T7, and T8 kept the same PASS/FAIL. T2 still fails with the same toast and zero documents; its console stack now points at `firestore-adapter.js` because that is where `fetch` runs.');
+  lines.push('');
   lines.push('## Exact console errors');
   lines.push('');
   BASELINE_ROWS.forEach((before) => {
