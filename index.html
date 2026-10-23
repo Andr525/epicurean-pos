@@ -1415,6 +1415,7 @@ body.hh-on .voice-draft .voice-draft-acts button { background:#fff; color:#000; 
   </div>
 </div>
 
+<script src="firestore-adapter.js"></script>
 <script>
 // ─── Square Config ─────────────────────────────────────────────
 var SQUARE_APP_ID = 'sandbox-sq0idb-wKcjD8vOYIKLyvtV7Zo6hQ';
@@ -1435,166 +1436,10 @@ var fbApp=null, fbDb=null, fbAuth=null, fbReady=false;
 try { fbApp=firebase.initializeApp(firebaseConfig); fbDb=firebase.firestore(); fbAuth=firebase.auth(); fbReady=true; } catch(e){ console.warn('Firebase:',e); }
 
 
-/* Named Firestore adapter for the existing database ID: default.
-   It exposes the small compat-like surface used by these static apps. */
+/* Named Firestore adapter lives in firestore-adapter.js.
+   FIRESTORE_ROOT stays here so an offline harness can replace it before this script runs. */
 var FIRESTORE_DATABASE_ID = 'default';
 var FIRESTORE_ROOT = 'https://firestore.googleapis.com/v1/projects/' + encodeURIComponent(firebaseConfig.projectId) + '/databases/' + encodeURIComponent(FIRESTORE_DATABASE_ID) + '/documents';
-function createNamedFirestoreAdapter(){
-  var pollers=[];
-  function ensureAuth(){
-    if(typeof fbAuth==='undefined' || !fbAuth) return Promise.resolve(null);
-    if(fbAuth.currentUser) return Promise.resolve(fbAuth.currentUser);
-    return fbAuth.signInAnonymously().then(function(result){ return result.user; });
-  }
-  function request(method,url,body){
-    return ensureAuth().then(function(user){
-      var headers={'Content-Type':'application/json'};
-      var tokenPromise=user ? user.getIdToken().then(function(token){ headers.Authorization='Bearer '+token; }) : Promise.resolve();
-      return tokenPromise.then(function(){
-        var fullUrl=url+(url.indexOf('?')>=0?'&':'?')+'key='+encodeURIComponent(firebaseConfig.apiKey);
-        return fetch(fullUrl,{method:method,headers:headers,body:body===undefined?undefined:JSON.stringify(body)}).then(function(response){
-          return response.text().then(function(text){
-            var json=text?JSON.parse(text):{};
-            if(!response.ok){
-              var error=new Error((json.error&&json.error.message)||('Firestore request failed ('+response.status+')'));
-              error.code=(json.error&&json.error.status)||('http-'+response.status);
-              throw error;
-            }
-            return json;
-          });
-        });
-      });
-    });
-  }
-  function encodeValue(value){
-    if(value===null || value===undefined) return {nullValue:null};
-    if(value instanceof Date) return {timestampValue:value.toISOString()};
-    if(value && typeof value==='object' && (value._methodName==='FieldValue.serverTimestamp' || value._methodName==='serverTimestamp')){
-      return {timestampValue:new Date().toISOString()};
-    }
-    if(Array.isArray(value)) return {arrayValue:{values:value.map(encodeValue)}};
-    if(typeof value==='boolean') return {booleanValue:value};
-    if(typeof value==='number'){
-      if(!isFinite(value)) return {doubleValue:0};
-      return Number.isInteger(value)?{integerValue:String(value)}:{doubleValue:value};
-    }
-    if(typeof value==='object') return {mapValue:{fields:encodeFields(value)}};
-    return {stringValue:String(value)};
-  }
-  function encodeFields(object){
-    var fields={};
-    Object.keys(object||{}).forEach(function(key){ if(object[key]!==undefined) fields[key]=encodeValue(object[key]); });
-    return fields;
-  }
-  function fieldMaskQuery(data){
-    return Object.keys(data||{}).filter(function(k){ return data[k]!==undefined; }).map(function(k){ return 'updateMask.fieldPaths='+encodeURIComponent(k); }).join('&');
-  }
-  function decodeValue(value){
-    if(!value) return null;
-    if(Object.prototype.hasOwnProperty.call(value,'nullValue')) return null;
-    if(Object.prototype.hasOwnProperty.call(value,'stringValue')) return value.stringValue;
-    if(Object.prototype.hasOwnProperty.call(value,'booleanValue')) return value.booleanValue;
-    if(Object.prototype.hasOwnProperty.call(value,'integerValue')) return Number(value.integerValue);
-    if(Object.prototype.hasOwnProperty.call(value,'doubleValue')) return Number(value.doubleValue);
-    if(Object.prototype.hasOwnProperty.call(value,'timestampValue')) return value.timestampValue;
-    if(Object.prototype.hasOwnProperty.call(value,'bytesValue')) return value.bytesValue;
-    if(Object.prototype.hasOwnProperty.call(value,'referenceValue')) return value.referenceValue;
-    if(Object.prototype.hasOwnProperty.call(value,'geoPointValue')) return value.geoPointValue;
-    if(Object.prototype.hasOwnProperty.call(value,'arrayValue')) return (value.arrayValue.values||[]).map(decodeValue);
-    if(Object.prototype.hasOwnProperty.call(value,'mapValue')){
-      var map={}; Object.keys(value.mapValue.fields||{}).forEach(function(key){map[key]=decodeValue(value.mapValue.fields[key]);}); return map;
-    }
-    return null;
-  }
-  function decodeFields(fields){
-    var result={}; Object.keys(fields||{}).forEach(function(key){result[key]=decodeValue(fields[key]);}); return result;
-  }
-  function docUrl(collection,id){ return FIRESTORE_ROOT+'/'+encodeURIComponent(collection)+'/'+encodeURIComponent(id); }
-  function docFrom(json,fallbackId){
-    if(!json || !json.name) return {exists:false,id:fallbackId||'',data:function(){return undefined;}};
-    var parts=json.name.split('/');
-    return {exists:true,id:parts[parts.length-1]||fallbackId||'',data:function(){return decodeFields(json.fields||{});}};
-  }
-  function getDoc(collection,id){
-    return request('GET',docUrl(collection,id)).then(function(json){return docFrom(json,id);}).catch(function(error){
-      if(error.code==='NOT_FOUND' || error.code==='http-404') return docFrom(null,id);
-      throw error;
-    });
-  }
-  function setDoc(collection,id,data,options){
-    var url=docUrl(collection,id);
-    if(options && options.merge){
-      var mask=fieldMaskQuery(data);
-      if(mask) url+='?'+mask;
-    }
-    return request('PATCH',url,{fields:encodeFields(data)}).then(function(json){return docFrom(json,id);});
-  }
-  function updateDoc(collection,id,data){
-    var mask=fieldMaskQuery(data);
-    var url=docUrl(collection,id)+(mask?'?'+mask:'');
-    return request('PATCH',url,{fields:encodeFields(data)}).then(function(json){return docFrom(json,id);});
-  }
-  function addDoc(collection,data){
-    var id='web_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,10);
-    return request('POST',FIRESTORE_ROOT+'/'+encodeURIComponent(collection)+'?documentId='+encodeURIComponent(id),{fields:encodeFields(data)}).then(function(json){return docFrom(json,id);});
-  }
-  function listDocs(collection){
-    return request('GET',FIRESTORE_ROOT+'/'+encodeURIComponent(collection)+'?pageSize=1000').then(function(json){return (json.documents||[]).map(function(doc){return docFrom(doc);});});
-  }
-  function snapshot(docs){
-    return {docs:docs,size:docs.length,empty:docs.length===0,forEach:function(callback,context){docs.forEach(function(doc){callback.call(context,doc);});}};
-  }
-  function isQuotaError(error){
-    var code=String((error&&error.code)||'');
-    var msg=String((error&&error.message)||'');
-    return code==='RESOURCE_EXHAUSTED' || code==='http-429' || /quota|resource.?exhausted|429/i.test(msg);
-  }
-  function watchWithBackoff(tick, onError){
-    var stopped=false, delay=60000, timer=null;
-    function arm(ms){ if(stopped) return; timer=setTimeout(run, ms); pollers.push(timer); }
-    function run(){
-      if(stopped) return;
-      Promise.resolve().then(tick).then(function(){
-        delay=60000;
-        arm(delay);
-      }).catch(function(error){
-        if(stopped) return;
-        if(isQuotaError(error)) delay=Math.min(Math.max(delay,60000)*2, 600000);
-        else delay=60000;
-        if(onError) onError(error);
-        arm(delay);
-      });
-    }
-    run();
-    return function(){ stopped=true; if(timer) clearTimeout(timer); };
-  }
-  function watchDoc(collection,id,callback,onError){
-    return watchWithBackoff(function(){
-      return getDoc(collection,id).then(function(doc){ callback(doc); });
-    }, onError);
-  }
-  function watchCollection(collection,filter,callback,onError){
-    var last='';
-    return watchWithBackoff(function(){
-      return listDocs(collection).then(function(docs){
-        if(filter) docs=docs.filter(function(doc){var data=doc.data()||{};return filter.op==='==' ? data[filter.field]===filter.value : true;});
-        var signature=JSON.stringify(docs.map(function(doc){return {id:doc.id,data:doc.data()};}));
-        if(signature!==last){ last=signature; callback(snapshot(docs)); }
-      });
-    }, onError);
-  }
-  function collection(name){
-    var ref={
-      doc:function(id){return {get:function(){return getDoc(name,id);},set:function(data,options){return setDoc(name,id,data,options);},update:function(data){return updateDoc(name,id,data);},onSnapshot:function(callback,onError){return watchDoc(name,id,callback,onError);}};},
-      add:function(data){return addDoc(name,data);},
-      onSnapshot:function(callback,onError){return watchCollection(name,null,callback,onError);},
-      where:function(field,op,value){return {onSnapshot:function(callback,onError){return watchCollection(name,{field:field,op:op,value:value},callback,onError);}};}
-    };
-    return ref;
-  }
-  return {collection:collection};
-}
-
 if (typeof fbReady !== 'undefined' && fbReady) fbDb = createNamedFirestoreAdapter();
 var POS_LAYOUT_KEY = 'eh_pos_layout_v41';
 var POS_COMBINE_KEY = 'eh_pos_table_combines';
@@ -9716,16 +9561,18 @@ function openMoveTableSheet(){
   openSheet(html);
 }
 function retargetKitchenTickets(oldTable, newTable){
-  if (!fbReady || !fbDb || !fbDb.collection) return;
-  fbDb.collection('orders').where('table','==',oldTable).get().then(function(snap){
+  if (!fbReady || !fbDb || !fbDb.collection) return Promise.resolve();
+  var ordersJob = fbDb.collection('orders').where('table','==',oldTable).get().then(function(snap){
+    var jobs = [];
     snap.forEach(function(doc){
       var data=doc.data()||{};
       if (data.status==='paid' || data.status==='cleared' || data.status==='void') return;
-      doc.ref.update({table:String(newTable)});
+      jobs.push(doc.ref.update({table:String(newTable)}));
     });
-  }).catch(function(){});
+    return Promise.all(jobs);
+  });
   var feed=fbDb.collection('boh_shared').doc('active_orders');
-  feed.get().then(function(doc){
+  var feedJob = feed.get().then(function(doc){
     if (!doc.exists) return null;
     var data=doc.data()||{};
     var list=Array.isArray(data.list)?data.list.map(function(item){
@@ -9736,7 +9583,8 @@ function retargetKitchenTickets(oldTable, newTable){
       return copy;
     }):[];
     return feed.set({list:list, updatedAt:Date.now()});
-  }).catch(function(){});
+  });
+  return Promise.all([ordersJob, feedJob]);
 }
 function transferCheckTo(newTable){
   var old=String(STATE.selectedTable||'');
@@ -9787,7 +9635,15 @@ function transferCheckTo(newTable){
   });
   delete STATE.tableSessions[old];
   STATE.viewCheckId=dest.checkId;
-  retargetKitchenTickets(old, newTable);
+  try {
+    Promise.resolve(retargetKitchenTickets(old, newTable)).then(function(){}, function(err){
+      console.error(err);
+      toast('Could not move the kitchen ticket');
+    });
+  } catch (err) {
+    console.error(err);
+    toast('Could not move the kitchen ticket');
+  }
   closeSheet();
   renderOrder();
   paintChrome();

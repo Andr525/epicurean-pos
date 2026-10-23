@@ -65,6 +65,7 @@ export function startFakeFirestore() {
   const docs = new Map();
   const requests = [];
   const gates = [];
+  const faults = [];
   let block = null;
   let server;
 
@@ -99,7 +100,13 @@ export function startFakeFirestore() {
     docs.clear();
     requests.length = 0;
     gates.length = 0;
+    faults.length = 0;
     block = null;
+  }
+
+  function failNext(count, kind) {
+    const n = Math.max(0, Number(count) || 0);
+    for (let i = 0; i < n; i++) faults.push(kind);
   }
 
   function holdGets(match, until) {
@@ -181,9 +188,32 @@ export function startFakeFirestore() {
     const target = parseTarget(url);
     const entry = { method: req.method, path: url.pathname, query: url.search, at: Date.now() };
     requests.push(entry);
+    req.on('error', () => {});
     if (!target || !url.pathname.includes('/v1/projects/')) {
       sendJson(res, 404, errorBody('NOT_FOUND', 404));
       return;
+    }
+    if (faults.length) {
+      const fault = faults.shift();
+      entry.fault = String(fault);
+      if (fault === 'drop') {
+        req.socket.on('error', () => {});
+        req.socket.destroy();
+        return;
+      }
+      if (fault === 'hang') return;
+      if (fault === 429 || fault === '429') {
+        sendJson(res, 429, { error: { code: 429, message: 'Quota exceeded.', status: 'RESOURCE_EXHAUSTED' } });
+        return;
+      }
+      if (fault === 401 || fault === '401') {
+        sendJson(res, 401, { error: { code: 401, message: 'Request had invalid authentication credentials.', status: 'UNAUTHENTICATED' } });
+        return;
+      }
+      if (fault === 500 || fault === '500') {
+        sendJson(res, 500, { error: { code: 500, message: 'Internal error', status: 'INTERNAL' } });
+        return;
+      }
     }
 
     const chunks = [];
@@ -271,6 +301,7 @@ export function startFakeFirestore() {
   };
 
   server = http.createServer(listener);
+  server.on('clientError', (_err, socket) => { if (socket && !socket.destroyed) socket.destroy(); });
   server.listen(0, '127.0.0.1');
   return new Promise((resolve, reject) => {
     server.once('error', reject);
@@ -290,10 +321,12 @@ export function startFakeFirestore() {
         reset,
         block(predicate) { block = predicate; },
         unblock() { block = null; },
+        failNext,
         holdGets,
         releaseAll,
         close() {
           releaseAll();
+          if (typeof server.closeAllConnections === 'function') server.closeAllConnections();
           return new Promise((done) => server.close(() => done()));
         }
       });
