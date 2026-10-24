@@ -66,6 +66,7 @@ export function startFakeFirestore() {
   const requests = [];
   const gates = [];
   const faults = [];
+  const targetedFaults = [];
   let block = null;
   let server;
 
@@ -101,12 +102,29 @@ export function startFakeFirestore() {
     requests.length = 0;
     gates.length = 0;
     faults.length = 0;
+    targetedFaults.length = 0;
     block = null;
   }
 
   function failNext(count, kind) {
     const n = Math.max(0, Number(count) || 0);
     for (let i = 0; i < n; i++) faults.push(kind);
+  }
+
+  // Like failNext, but only for requests the predicate matches, so background
+  // polls do not consume the fault.
+  // Returns a handle; set handle.left = 0 to stop the fault early.
+  function failWhen(match, count, kind) {
+    const handle = { match, left: Math.max(0, Number(count) || 0), kind };
+    targetedFaults.push(handle);
+    return handle;
+  }
+
+  function takeTargetedFault(described) {
+    const hit = targetedFaults.find((item) => item.left > 0 && item.match(described));
+    if (!hit) return null;
+    hit.left -= 1;
+    return hit.kind;
   }
 
   function holdGets(match, until) {
@@ -200,8 +218,14 @@ export function startFakeFirestore() {
       sendJson(res, 404, errorBody('NOT_FOUND', 404));
       return;
     }
-    if (faults.length) {
-      const fault = faults.shift();
+    const targeted = takeTargetedFault({
+      method: req.method,
+      kind: target.kind,
+      collection: target.collection || '',
+      id: target.id || ''
+    });
+    if (targeted != null || faults.length) {
+      const fault = targeted != null ? targeted : faults.shift();
       entry.fault = String(fault);
       if (fault === 'lose') {
         req.loseResponse = true;
@@ -358,6 +382,7 @@ export function startFakeFirestore() {
         block(predicate) { block = predicate; },
         unblock() { block = null; },
         failNext,
+        failWhen,
         holdGets,
         releaseAll,
         close() {
