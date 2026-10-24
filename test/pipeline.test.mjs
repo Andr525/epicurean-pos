@@ -423,13 +423,15 @@ async function main() {
       await b.context.close();
     }
 
-    // T4 — the POS must see every order document, including past the first page.
+    // T4 — the POS must see every order in the current business day. sentAt is now,
+    // which is always at or after the 05:00 cutoff.
     {
       const errors = [];
       fake.reset();
+      const sentAt = Date.now();
       for (let i = 0; i < 1200; i++) {
         const id = 'ord_' + String(i).padStart(4, '0');
-        fake.put('orders', id, { table: '9', status: 'new', sentAt: i, items: [{ name: 'Seed ' + i }] });
+        fake.put('orders', id, { table: '9', status: 'new', sentAt: sentAt, items: [{ name: 'Seed ' + i }] });
       }
       const { context, page } = await openApp(browser, pos.origin, fake.root, errors);
       const seen = await waitFor(async () => {

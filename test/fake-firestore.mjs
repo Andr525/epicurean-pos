@@ -134,6 +134,12 @@ export function startFakeFirestore() {
   }
 
   function sendJson(res, status, body) {
+    if (res.req && res.req.loseResponse) {
+      res.req.loseResponse = false;
+      res.req.socket.on('error', () => {});
+      res.req.socket.destroy();
+      return;
+    }
     const raw = JSON.stringify(body);
     res.writeHead(status, {
       'Content-Type': 'application/json',
@@ -185,7 +191,8 @@ export function startFakeFirestore() {
       res.end();
       return;
     }
-    const target = parseTarget(url);
+    let target = parseTarget(url);
+    if (req.method === 'POST' && url.pathname.endsWith('/documents:runQuery')) target = { kind: 'query' };
     const entry = { method: req.method, path: url.pathname, query: url.search, at: Date.now() };
     requests.push(entry);
     req.on('error', () => {});
@@ -196,7 +203,9 @@ export function startFakeFirestore() {
     if (faults.length) {
       const fault = faults.shift();
       entry.fault = String(fault);
-      if (fault === 'drop') {
+      if (fault === 'lose') {
+        req.loseResponse = true;
+      } else if (fault === 'drop') {
         req.socket.on('error', () => {});
         req.socket.destroy();
         return;
@@ -225,6 +234,7 @@ export function startFakeFirestore() {
         if (raw) {
           try { body = JSON.parse(raw); } catch { body = {}; }
         }
+        entry.body = body;
         const described = {
           method: req.method,
           kind: target.kind,
@@ -238,6 +248,32 @@ export function startFakeFirestore() {
           return;
         }
         await waitGate(described);
+
+        if (target.kind === 'query' && req.method === 'POST') {
+          const query = body.structuredQuery || {};
+          const from = (query.from && query.from[0]) || {};
+          const collection = from.collectionId || '';
+          let rows = collection ? listAll(collection) : [];
+          const fieldFilter = query.where && query.where.fieldFilter;
+          if (fieldFilter) {
+            const path = fieldFilter.field && fieldFilter.field.fieldPath;
+            const op = fieldFilter.op;
+            const expected = decodeValue(fieldFilter.value);
+            rows = rows.filter((doc) => {
+              const actual = doc.data ? doc.data[path] : undefined;
+              if (actual == null || expected == null) return false;
+              if (op === 'GREATER_THAN_OR_EQUAL') return actual >= expected;
+              if (op === 'EQUAL') return actual === expected;
+              return false;
+            });
+          }
+          if (query.limit != null) rows = rows.slice(0, Math.max(0, Number(query.limit) || 0));
+          sendJson(res, 200, rows.map((doc) => ({
+            document: { name: docName(collection, doc.id), fields: encodeFields(doc.data) },
+            readTime: new Date().toISOString()
+          })));
+          return;
+        }
 
         if (target.kind === 'collection' && req.method === 'GET') {
           const pageSize = Math.max(1, Number(url.searchParams.get('pageSize')) || 1000);
