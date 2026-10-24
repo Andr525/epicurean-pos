@@ -644,6 +644,13 @@ body.hh-on.floor-drawing .floor-stage { outline:2px dashed var(--primary); }
 .res-warn.lvl1 { background:rgba(251,146,60,0.12); border:1px solid var(--warning); color:#fdba74; }
 .res-warn.lvl2 { background:rgba(251,146,60,0.22); border:1px solid var(--warning); color:#fb923c; }
 .res-warn.lvl3 { background:rgba(248,113,113,0.2); border:1px solid var(--danger); color:#fecaca; animation:callPulse 1.4s infinite; }
+.kitchen-send-banner { grid-column:1 / -1; }
+.kitchen-send-banner:empty { display:none; }
+.kitchen-send-badge { display:block; border-radius:8px; padding:0.3rem 0.5rem; font-size:0.72rem; font-weight:800; line-height:1.2; text-align:center; font-family:inherit; }
+.kitchen-send-badge.sending { background:#e5e7eb; border:1px solid #9ca3af; color:#111827; }
+.kitchen-send-badge.failed { background:#dc2626; border:1px solid #991b1b; color:#fff; cursor:pointer; }
+.kitchen-send-banner .kitchen-send-badge { width:100%; font-size:0.85rem; padding:0.5rem 0.65rem; }
+.floor-obj .kitchen-send-badge { position:absolute; bottom:2px; left:50%; transform:translateX(-50%); width:max-content; max-width:calc(100% - 6px); z-index:8; font-size:0.45rem; line-height:1.1; padding:2px 3px; border-radius:5px; }
 .family-tabs { display:flex; gap:8px; margin-bottom:0.55rem; }
 .family-tab {
   flex:1; min-height:52px; border-radius:14px; border:1px solid var(--border);
@@ -5067,7 +5074,7 @@ function renderTables() {
         html+='<div class="floor-obj seatable" data-table="'+esc(String(tNum))+'" data-combined="'+(isCombinedTable(tNum)?'1':'0')+'" style="'+style+extra+'">'+
           '<div class="'+innerCls+'" style="'+(hasCall?'box-shadow:0 0 0 3px #E65050;':'')+'">'+
             '<span class="f-tnum">'+esc(String(tNum))+'</span>'+
-          '</div></div>';
+          '</div>'+kitchenSendBadgeHtml(tNum)+'</div>';
         }
       } else {
         html+=layoutObjectHtml(o, style);
@@ -7786,6 +7793,7 @@ function voiceMicHtml(){
 function orderTopHtml(){
   var warn=reservationWarning(STATE.selectedTable);
   var html='<div id="order-top">';
+  html+=kitchenSendBannerHtml(STATE.selectedTable);
   if (warn.text) html+='<div class="res-warn lvl'+warn.level+'">'+esc(warn.text)+'</div>';
   html+=liveCheckHtml();
   html+=renderGuestAllergyStrip();
@@ -8768,9 +8776,10 @@ function sendKitchenAllergyNote(){
   STATE.orders.push(local);
   if (!STATE._localOrders) STATE._localOrders=[];
   STATE._localOrders.push(local);
-  if (fbReady) fbDb.collection('orders').add(order).then(function(ref){ publishActiveOrder(order, ref.id); });
+  var noted=postKitchenTicket(order, 'orders', local);
   sess.kitchenNoteSent=true;
-  toast('Allergy note sent to kitchen');
+  toast('Sending…');
+  noted.then(function(){ toast('Allergy note sent to kitchen'); }, function(){ toast('Not sent to kitchen — tap to retry'); });
   closeSheet();
   renderOrder();
 }
@@ -9942,8 +9951,8 @@ function toggleAllergy(seat, name, stay){
 
 var activeOrdersWrite = Promise.resolve();
 function publishActiveOrder(order, docId) {
-  if (!fbReady) return Promise.resolve();
-  activeOrdersWrite = activeOrdersWrite.then(function(){
+  if (!fbReady) return Promise.reject(new Error('Firestore is not ready'));
+  var run = activeOrdersWrite.then(function(){
     var feedRef = fbDb.collection('boh_shared').doc('active_orders');
     return feedRef.get().then(function(doc){
       var data = doc.exists && doc.data() || {};
@@ -9951,8 +9960,145 @@ function publishActiveOrder(order, docId) {
       list.push(Object.assign({}, order, {id:docId, status:'new'}));
       return feedRef.set({list:list, updatedAt:Date.now()});
     });
-  }).catch(function(error){ console.warn('Active order feed:', error); });
-  return activeOrdersWrite;
+  });
+  // The chain must survive a failed write so the next ticket still publishes.
+  activeOrdersWrite = run.catch(function(error){ console.warn('Active order feed:', error); });
+  return run;
+}
+
+var KITCHEN_OUTBOX_KEY = 'eh_outbox_v1';
+var KITCHEN_RETRY_BASE_MS = 2000;
+var KITCHEN_RETRY_MAX_MS = 30000;
+var kitchenOutbox = loadKitchenOutbox();
+var kitchenOutboxTimer = null;
+var kitchenSendBatch = null;
+
+function loadKitchenOutbox(){
+  try {
+    var list = JSON.parse(localStorage.getItem(KITCHEN_OUTBOX_KEY) || '[]');
+    return Array.isArray(list) ? list.filter(function(e){ return e && e.id && e.order; }) : [];
+  } catch (e) { return []; }
+}
+function saveKitchenOutbox(){
+  try {
+    localStorage.setItem(KITCHEN_OUTBOX_KEY, JSON.stringify(kitchenOutbox.map(function(e){
+      return {id:e.id, order:e.order, collection:e.collection, attempts:e.attempts, state:e.state, written:!!e.written};
+    })));
+  } catch (e) {}
+}
+function kitchenRetryDelay(attempts){
+  return Math.min(KITCHEN_RETRY_BASE_MS * Math.pow(2, Math.max(0, attempts - 1)), KITCHEN_RETRY_MAX_MS);
+}
+function kitchenSendsFor(table){
+  return (kitchenOutbox || []).filter(function(e){ return String(e.order.table) === String(table); });
+}
+function kitchenSendBadgeHtml(table){
+  var list = kitchenSendsFor(table);
+  if (!list.length) return '';
+  var failed = list.some(function(e){ return e.state === 'failed'; });
+  if (!failed) return '<div class="kitchen-send-badge sending">Sending…</div>';
+  return '<button type="button" class="kitchen-send-badge failed" onpointerdown="event.stopPropagation()" onpointerup="event.stopPropagation()" ontouchstart="event.stopPropagation()" ontouchend="event.stopPropagation()" onclick=\'event.stopPropagation();retryKitchenSends('+JSON.stringify(String(table))+')\'>Not sent to kitchen — tap to retry</button>';
+}
+function kitchenSendBannerHtml(table){
+  var badge = kitchenSendBadgeHtml(table);
+  return '<div class="kitchen-send-banner">'+badge+'</div>';
+}
+function paintKitchenSendState(){
+  if (typeof document === 'undefined') return;
+  document.querySelectorAll('.floor-obj.seatable[data-table]').forEach(function(el){
+    var old = el.querySelector('.kitchen-send-badge');
+    if (old) old.remove();
+    var html = kitchenSendBadgeHtml(el.getAttribute('data-table'));
+    if (html) el.insertAdjacentHTML('beforeend', html);
+  });
+  var banner = document.querySelector('#order-top .kitchen-send-banner');
+  if (banner) banner.outerHTML = kitchenSendBannerHtml(STATE.selectedTable);
+}
+function scheduleKitchenOutbox(){
+  if (kitchenOutboxTimer) { clearTimeout(kitchenOutboxTimer); kitchenOutboxTimer = null; }
+  // fbReady is only set at page load, so a timed retry cannot succeed without it;
+  // the ticket stays in the outbox for the next load or a tap on retry.
+  if (!fbReady) return;
+  var waiting = kitchenOutbox.filter(function(e){ return !e.running; });
+  if (!waiting.length) return;
+  var next = Math.min.apply(null, waiting.map(function(e){ return e.nextAt || 0; }));
+  kitchenOutboxTimer = setTimeout(function(){
+    kitchenOutboxTimer = null;
+    flushKitchenOutbox(false);
+  }, Math.max(0, next - Date.now()));
+}
+function deliverKitchenTicket(entry){
+  if (entry.running) return entry.running;
+  entry.attempts = (entry.attempts || 0) + 1;
+  var run = (fbReady && fbDb ? Promise.resolve() : Promise.reject(new Error('Firestore is not ready'))).then(function(){
+    if (entry.written) return;
+    return fbDb.collection(entry.collection).doc(entry.id).set(entry.order).then(function(){
+      entry.written = true;
+      saveKitchenOutbox();
+    });
+  }).then(function(){
+    if (entry.collection === 'orders') return publishActiveOrder(entry.order, entry.id);
+  }).then(function(){
+    entry.running = null;
+    kitchenOutbox = kitchenOutbox.filter(function(e){ return e !== entry && e.id !== entry.id; });
+    saveKitchenOutbox();
+    if (entry.local) entry.local.sendState = 'ok';
+    paintKitchenSendState();
+    scheduleKitchenOutbox();
+    return entry.id;
+  }, function(error){
+    entry.running = null;
+    entry.state = 'failed';
+    entry.nextAt = Date.now() + kitchenRetryDelay(entry.attempts);
+    if (entry.local) entry.local.sendState = 'failed';
+    saveKitchenOutbox();
+    console.warn('Kitchen send:', error);
+    paintKitchenSendState();
+    scheduleKitchenOutbox();
+    throw error;
+  });
+  entry.running = run;
+  return run;
+}
+function flushKitchenOutbox(now){
+  var at = Date.now();
+  kitchenOutbox.filter(function(e){
+    return !e.running && (now || !e.nextAt || e.nextAt <= at);
+  }).forEach(function(e){ deliverKitchenTicket(e).catch(function(){}); });
+  scheduleKitchenOutbox();
+}
+function retryKitchenSends(table){
+  var list = kitchenSendsFor(table);
+  if (!list.length) return;
+  list.forEach(function(e){ if (!e.running) { e.state = 'pending'; e.nextAt = 0; } });
+  saveKitchenOutbox();
+  paintKitchenSendState();
+  toast('Sending…');
+  Promise.all(list.map(function(e){ return deliverKitchenTicket(e); })).then(function(){
+    toast('Order sent to kitchen');
+  }, function(){
+    toast('Not sent to kitchen — tap to retry');
+  });
+}
+function postKitchenTicket(order, collection, local){
+  collection = collection || 'orders';
+  var id = 'web_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+  if (local) { local.id = id; local.sendState = 'pending'; }
+  var entry = {id:id, order:JSON.parse(JSON.stringify(order)), collection:collection, attempts:0, state:'pending', written:false, local:local || null};
+  kitchenOutbox.push(entry);
+  saveKitchenOutbox();
+  paintKitchenSendState();
+  var run = deliverKitchenTicket(entry);
+  run.catch(function(){});
+  if (kitchenSendBatch) kitchenSendBatch.push(run);
+  return run;
+}
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', function(){ flushKitchenOutbox(true); });
+  document.addEventListener('visibilitychange', function(){
+    if (document.visibilityState === 'visible') flushKitchenOutbox(true);
+  });
+  setTimeout(function(){ flushKitchenOutbox(true); }, 0);
 }
 
 function kitchenItemsFrom(lines){
@@ -10054,7 +10200,7 @@ function startDiningFromCheckLine(ti){
   if (!STATE.activeTastingOrders) STATE.activeTastingOrders=[];
   STATE.activeTastingOrders.push(dining);
   ti.diningOrderId=dining.id;
-  if (fbReady) fbDb.collection('tasting_orders').add(dining);
+  postKitchenTicket(dining, 'tasting_orders');
   return dining;
 }
 
@@ -10080,6 +10226,9 @@ function sendOrder(opts) {
   var regularItems=bundle.filter(function(i){return !i.isTasting&&!i.isPrixFixe&&!i.isPairing;});
   var tastingItems=bundle.filter(function(i){return i.isTasting||i.isPrixFixe||i.isPairing;});
   var check=STATE.checks[activeCheckId()] || ensureOpenCheck(STATE.selectedTable);
+  var sends=[];
+  kitchenSendBatch=sends;
+  try {
 
   if (regularItems.length) {
     consumePosInventory(regularItems);
@@ -10100,7 +10249,7 @@ function sendOrder(opts) {
     STATE.orders.push(localOrder);
     if (!STATE._localOrders) STATE._localOrders=[];
     STATE._localOrders.push(localOrder);
-    if (fbReady) fbDb.collection('orders').add(order).then(function(ref){ publishActiveOrder(order, ref.id); });
+    postKitchenTicket(order, 'orders', localOrder);
   }
 
   tastingItems.forEach(function(ti){
@@ -10115,11 +10264,18 @@ function sendOrder(opts) {
         items:[{id:'pair_'+Date.now(),name:ti.name,station:'Bar',cookTime:2,modifiers:[],selectedMod:null}],
         status:'new', sentAt:Date.now(), clearedAt:null
       };
-      if (fbReady) fbDb.collection('orders').add(pairingOrder).then(function(ref){ publishActiveOrder(pairingOrder, ref.id); });
+      postKitchenTicket(pairingOrder);
     }
   });
 
-  toast(opts.fireCourse!=null?'Course fired to kitchen':(opts.stay?'Sent — staying on table':'Order sent to kitchen'));
+  } finally { kitchenSendBatch=null; }
+  var sentMsg=opts.fireCourse!=null?'Course fired to kitchen':(opts.stay?'Sent — staying on table':'Order sent to kitchen');
+  if (sends.length) {
+    toast('Sending…');
+    Promise.all(sends).then(function(){ toast(sentMsg); }, function(){ toast('Not sent to kitchen — tap to retry'); });
+  } else {
+    toast(sentMsg);
+  }
   var ids={};
   bundle.forEach(function(i){ ids[i.lineId]=1; });
   STATE.currentOrder=STATE.currentOrder.filter(function(i){ return !ids[i.lineId]; });
@@ -10214,8 +10370,11 @@ function fireDiningCourse(to, quiet, idx){
     serviceCourse: nextCourse.serviceCourse!=null?Number(nextCourse.serviceCourse):null,
     ticketPos: diningCourseTicketPos(nextCourse, i)
   };
-  if (fbReady) fbDb.collection('orders').add(courseOrder).then(function(ref){ publishActiveOrder(courseOrder, ref.id); });
-  if (!quiet) toast('Fired: '+firedName);
+  var fired=postKitchenTicket(courseOrder);
+  if (!quiet) {
+    toast('Sending…');
+    fired.then(function(){ toast('Fired: '+firedName); }, function(){ toast('Not sent to kitchen — tap to retry'); });
+  }
   return true;
 }
 function fireNextCourse(orderId, idx) {
