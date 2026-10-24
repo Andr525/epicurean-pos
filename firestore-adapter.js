@@ -7,6 +7,7 @@ var POLL_FAST_MS = 5000;
 var POLL_SLOW_MS = 15000;
 var POLL_FULL_COLLECTION_MS = 60000;
 var POLL_MAX_MS = 600000;
+var BUSINESS_DAY_START_HOUR = 5;
 var REQUEST_TIMEOUT_MS = 10000;
 var REQUEST_RETRY_LIMIT = 3;
 var RETRY_BASE_MS = 200;
@@ -311,9 +312,11 @@ function createNamedFirestoreAdapter() {
     return page('');
   }
 
-  function startOfLocalDayMs() {
+  function businessDayStartMs() {
     var now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    var start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), BUSINESS_DAY_START_HOUR, 0, 0, 0);
+    if (now.getTime() < start.getTime()) start.setDate(start.getDate() - 1);
+    return start.getTime();
   }
 
   function queryOrdersToday() {
@@ -324,7 +327,7 @@ function createNamedFirestoreAdapter() {
           fieldFilter: {
             field: { fieldPath: 'sentAt' },
             op: 'GREATER_THAN_OR_EQUAL',
-            value: { integerValue: String(startOfLocalDayMs()) }
+            value: { integerValue: String(businessDayStartMs()) }
           }
         }
       }

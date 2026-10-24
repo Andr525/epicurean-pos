@@ -423,14 +423,12 @@ async function main() {
       await b.context.close();
     }
 
-    // T4 — the POS must see every order from today. sentAt is local midnight so the
-    // filtered orders poll includes the whole 1,200-doc batch.
+    // T4 — the POS must see every order in the current business day. sentAt is now,
+    // which is always at or after the 05:00 cutoff.
     {
       const errors = [];
       fake.reset();
-      const startOfDay = new Date();
-      startOfDay.setHours(0, 0, 0, 0);
-      const sentAt = startOfDay.getTime();
+      const sentAt = Date.now();
       for (let i = 0; i < 1200; i++) {
         const id = 'ord_' + String(i).padStart(4, '0');
         fake.put('orders', id, { table: '9', status: 'new', sentAt: sentAt, items: [{ name: 'Seed ' + i }] });

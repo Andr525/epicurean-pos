@@ -27,6 +27,30 @@ function sleep(ms) {
   return new Promise((resolve) => realSetTimeout(resolve, ms));
 }
 
+function localDate(year, month, day, hour, minute) {
+  return new Date(year, month - 1, day, hour, minute, 0, 0);
+}
+
+function businessDayStartMs(now = new Date()) {
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 5, 0, 0, 0);
+  if (now.getTime() < start.getTime()) start.setDate(start.getDate() - 1);
+  return start.getTime();
+}
+
+function installClock(fixed) {
+  const RealDate = global.Date;
+  function MockDate(...args) {
+    if (args.length === 0) return new RealDate(fixed.getTime());
+    return new RealDate(...args);
+  }
+  MockDate.now = () => fixed.getTime();
+  MockDate.parse = RealDate.parse;
+  MockDate.UTC = RealDate.UTC;
+  MockDate.prototype = RealDate.prototype;
+  global.Date = MockDate;
+  return () => { global.Date = RealDate; };
+}
+
 function installTimerSpy() {
   const entries = [];
   const meta = new Map();
@@ -359,6 +383,7 @@ try {
       spy.firePending(60000);
       assert.equal(await waitFor(() => callErrors >= 1, 8000), true);
       assert.equal(await waitFor(() => spy.entries.some((entry) => !entry.cleared && !entry.fired && entry.ms === 120000), 2000), true);
+      fake.put('calls', 'late', { status: 'active' });
       spy.firePending(120000);
       assert.equal(await waitFor(() => callOk >= 2, 4000), true);
       assert.equal(await waitFor(() => spy.entries.some((entry) => !entry.cleared && !entry.fired && entry.ms === 60000), 2000), true);
@@ -372,9 +397,7 @@ try {
     fake.reset();
     const api = loadAdapter(fake);
     const db = api.createNamedFirestoreAdapter();
-    const start = new Date();
-    start.setHours(0, 0, 0, 0);
-    const today = start.getTime();
+    const today = businessDayStartMs();
     fake.put('orders', 'yesterday', { table: '9', sentAt: today - 1, status: 'new' });
     for (let i = 0; i < 1200; i++) {
       fake.put('orders', 'ord_' + String(i).padStart(4, '0'), { table: '9', sentAt: today, status: 'new' });
@@ -400,6 +423,51 @@ try {
     const full = await db.collection('orders').where('table', '==', '9').get();
     assert.equal(full.size, 1201);
     unsub();
+  });
+
+  await record('business day cutoff is 05:00, and a 23:00 order remains at 00:30', async () => {
+    assert.match(source, /BUSINESS_DAY_START_HOUR\s*=\s*5/);
+    const early = localDate(2026, 10, 23, 4, 59).getTime();
+    const boundary = localDate(2026, 10, 23, 5, 0).getTime();
+    const late = localDate(2026, 10, 23, 23, 0).getTime();
+    const beforeFive = localDate(2026, 10, 24, 4, 59).getTime();
+    const open = localDate(2026, 10, 24, 5, 0).getTime();
+    function seed() {
+      fake.reset();
+      fake.put('orders', 'early', { sentAt: early, table: '1' });
+      fake.put('orders', 'boundary', { sentAt: boundary, table: '1' });
+      fake.put('orders', 'late', { sentAt: late, table: '1' });
+      fake.put('orders', 'beforeFive', { sentAt: beforeFive, table: '1' });
+      fake.put('orders', 'open', { sentAt: open, table: '1' });
+    }
+    async function pollAt(when) {
+      seed();
+      const restore = installClock(when);
+      try {
+        const db = loadAdapter(fake).createNamedFirestoreAdapter();
+        let ids = null;
+        const unsub = db.collection('orders').onSnapshot((snap) => {
+          ids = [];
+          snap.forEach((doc) => ids.push(doc.id));
+          ids.sort();
+        });
+        assert.equal(await waitFor(() => ids !== null, 3000), true);
+        const query = fake.requests.filter((req) => req.method === 'POST' && req.path.endsWith('/documents:runQuery')).pop();
+        const filter = query.body.structuredQuery.where.fieldFilter;
+        assert.equal(filter.field.fieldPath, 'sentAt');
+        assert.equal(filter.op, 'GREATER_THAN_OR_EQUAL');
+        unsub();
+        return { ids, cutoff: Number(filter.value.integerValue) };
+      } finally {
+        restore();
+      }
+    }
+    const night = await pollAt(localDate(2026, 10, 24, 0, 30));
+    assert.equal(night.cutoff, localDate(2026, 10, 23, 5, 0).getTime());
+    assert.deepEqual(night.ids, ['beforeFive', 'boundary', 'late', 'open']);
+    const noon = await pollAt(localDate(2026, 10, 24, 12, 0));
+    assert.equal(noon.cutoff, localDate(2026, 10, 24, 5, 0).getTime());
+    assert.deepEqual(noon.ids, ['open']);
   });
 } finally {
   await fake.close();
