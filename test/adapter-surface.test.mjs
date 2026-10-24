@@ -20,8 +20,49 @@ function record(name, fn) {
     });
 }
 
+const realSetTimeout = global.setTimeout;
+const realClearTimeout = global.clearTimeout;
+
 function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return new Promise((resolve) => realSetTimeout(resolve, ms));
+}
+
+function installTimerSpy() {
+  const entries = [];
+  const meta = new Map();
+  global.setTimeout = (fn, ms, ...args) => {
+    const info = { fn, ms, args, cleared: false, fired: false, realId: 0 };
+    info.realId = realSetTimeout(() => {
+      if (info.cleared || info.fired) return;
+      info.fired = true;
+      fn(...args);
+    }, ms);
+    meta.set(info.realId, info);
+    entries.push(info);
+    return info.realId;
+  };
+  global.clearTimeout = (id) => {
+    const info = meta.get(id);
+    if (info) info.cleared = true;
+    realClearTimeout(id);
+  };
+  return {
+    entries,
+    restore() {
+      global.setTimeout = realSetTimeout;
+      global.clearTimeout = realClearTimeout;
+    },
+    firePending(ms) {
+      const timer = entries.filter((entry) => !entry.cleared && !entry.fired && entry.ms === ms).pop();
+      if (!timer) {
+        const pending = entries.filter((entry) => !entry.cleared && !entry.fired).map((entry) => entry.ms);
+        throw new Error('no pending timer ' + ms + ' (' + pending.join(', ') + ')');
+      }
+      timer.fired = true;
+      realClearTimeout(timer.realId);
+      timer.fn(...timer.args);
+    }
+  };
 }
 
 async function waitFor(fn, ms) {
@@ -91,7 +132,7 @@ try {
     assert.equal(fake.get('orders', 'a').table, '2');
     await got.ref.set({ table: '3', name: 'Probe' });
     assert.equal(fake.get('orders', 'a').table, '3');
-    const added = await db.collection('orders').add({ table: '4', status: 'new' });
+    const added = await db.collection('orders').add({ table: '4', status: 'new', sentAt: Date.now() });
     assert.equal(typeof added.id, 'string');
     assert.equal(fake.get('orders', added.id).table, '4');
     const snap = await db.collection('orders').where('table', '==', '4').get();
@@ -114,12 +155,13 @@ try {
     assert.ok(api.EH_SYNC.lastOk);
   });
 
-  await record('two listeners share one list request', async () => {
+  await record('two listeners share one orders query', async () => {
     fake.reset();
     const api = loadAdapter(fake);
     const db = api.createNamedFirestoreAdapter();
-    fake.put('orders', 'a', { table: '1' });
-    fake.put('orders', 'b', { table: '2' });
+    const now = Date.now();
+    fake.put('orders', 'a', { table: '1', sentAt: now });
+    fake.put('orders', 'b', { table: '2', sentAt: now });
     let full = 0;
     let filtered = 0;
     const unsubAll = db.collection('orders').onSnapshot(() => { full += 1; });
@@ -129,8 +171,10 @@ try {
     assert.equal(typeof unsubAll, 'function');
     assert.equal(typeof unsubFiltered, 'function');
     assert.equal(await waitFor(() => full >= 1 && filtered === 1, 2000), true);
+    const queries = fake.requests.filter((req) => req.method === 'POST' && req.path.endsWith('/documents:runQuery'));
     const lists = fake.requests.filter((req) => req.method === 'GET' && req.path.endsWith('/orders'));
-    assert.equal(lists.length, 1);
+    assert.equal(queries.length, 1);
+    assert.equal(lists.length, 0);
     unsubAll();
     unsubFiltered();
   });
@@ -250,6 +294,112 @@ try {
     assert.equal(typeof unsub, 'function');
     assert.equal(await waitFor(() => reported != null, 4000), true);
     assert.ok(api.EH_SYNC.lastError);
+  });
+
+  await record('lost add response then 409 resolves as success', async () => {
+    fake.reset();
+    const api = loadAdapter(fake);
+    const db = api.createNamedFirestoreAdapter();
+    fake.failNext(1, 'lose');
+    const doc = await db.collection('orders').add({ table: '1', status: 'new', sentAt: Date.now() });
+    assert.equal(doc.exists, true);
+    assert.equal(fake.get('orders', doc.id).table, '1');
+    assert.equal(fake.count('orders'), 1);
+    const posts = fake.requests.filter((req) => req.method === 'POST' && req.path.endsWith('/orders'));
+    assert.equal(posts.length, 2);
+    assert.equal(posts[0].fault, 'lose');
+    assert.equal(api.EH_SYNC.lastError, null);
+  });
+
+  await record('poll interval doubles after repeated 429 and resets after success', async () => {
+    fake.reset();
+    const api = loadAdapter(fake);
+    const db = api.createNamedFirestoreAdapter();
+    const spy = installTimerSpy();
+    const unsubs = [];
+    try {
+      fake.put('boh_shared', 'menu', { items: [] });
+      fake.failNext(1, 429);
+      let menuReads = 0;
+      unsubs.push(db.collection('boh_shared').doc('menu').onSnapshot(() => { menuReads += 1; }));
+      assert.equal(await waitFor(() => menuReads >= 1, 4000), true);
+      assert.equal(await waitFor(() => spy.entries.some((entry) => !entry.cleared && !entry.fired && entry.ms === 5000), 2000), true);
+
+      unsubs.splice(0).forEach((unsub) => unsub());
+      fake.reset();
+      const again = loadAdapter(fake);
+      const retried = again.createNamedFirestoreAdapter();
+      fake.put('boh_shared', 'menu', { items: [] });
+      fake.failNext(4, 429);
+      let menuErrors = 0;
+      let menuOk = 0;
+      unsubs.push(retried.collection('boh_shared').doc('menu').onSnapshot(() => { menuOk += 1; }, () => { menuErrors += 1; }));
+      assert.equal(await waitFor(() => menuErrors >= 1, 8000), true);
+      assert.equal(await waitFor(() => spy.entries.some((entry) => !entry.cleared && !entry.fired && entry.ms === 10000), 2000), true);
+      spy.firePending(10000);
+      assert.equal(await waitFor(() => menuOk >= 1, 4000), true);
+      assert.equal(await waitFor(() => spy.entries.some((entry) => !entry.cleared && !entry.fired && entry.ms === 5000), 2000), true);
+
+      unsubs.splice(0).forEach((unsub) => unsub());
+      for (const name of ['checks', 'calls', 'messages']) {
+        let seen = false;
+        const unsub = retried.collection(name).onSnapshot(() => { seen = true; });
+        unsubs.push(unsub);
+        assert.equal(await waitFor(() => seen, 2000), true, name);
+        assert.equal(await waitFor(() => spy.entries.some((entry) => !entry.cleared && !entry.fired && entry.ms === 60000), 2000), true, name);
+        unsub();
+      }
+
+      let callErrors = 0;
+      let callOk = 0;
+      unsubs.push(retried.collection('calls').onSnapshot(() => { callOk += 1; }, () => { callErrors += 1; }));
+      assert.equal(await waitFor(() => callOk >= 1, 2000), true);
+      assert.equal(await waitFor(() => spy.entries.some((entry) => !entry.cleared && !entry.fired && entry.ms === 60000), 2000), true);
+      fake.failNext(4, 429);
+      spy.firePending(60000);
+      assert.equal(await waitFor(() => callErrors >= 1, 8000), true);
+      assert.equal(await waitFor(() => spy.entries.some((entry) => !entry.cleared && !entry.fired && entry.ms === 120000), 2000), true);
+      spy.firePending(120000);
+      assert.equal(await waitFor(() => callOk >= 2, 4000), true);
+      assert.equal(await waitFor(() => spy.entries.some((entry) => !entry.cleared && !entry.fired && entry.ms === 60000), 2000), true);
+    } finally {
+      unsubs.forEach((unsub) => unsub());
+      spy.restore();
+    }
+  });
+
+  await record('orders poll is a filtered query and still returns 1200 from today', async () => {
+    fake.reset();
+    const api = loadAdapter(fake);
+    const db = api.createNamedFirestoreAdapter();
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const today = start.getTime();
+    fake.put('orders', 'yesterday', { table: '9', sentAt: today - 1, status: 'new' });
+    for (let i = 0; i < 1200; i++) {
+      fake.put('orders', 'ord_' + String(i).padStart(4, '0'), { table: '9', sentAt: today, status: 'new' });
+    }
+    let size = -1;
+    let sawYesterday = false;
+    const unsub = db.collection('orders').onSnapshot((snap) => {
+      size = snap.size;
+      sawYesterday = false;
+      snap.forEach((doc) => { if (doc.id === 'yesterday') sawYesterday = true; });
+    });
+    assert.equal(await waitFor(() => size === 1200, 4000), true);
+    assert.equal(sawYesterday, false);
+    const queries = fake.requests.filter((req) => req.method === 'POST' && req.path.endsWith('/documents:runQuery'));
+    const lists = fake.requests.filter((req) => req.method === 'GET' && req.path.endsWith('/orders'));
+    assert.equal(queries.length, 1);
+    assert.equal(lists.length, 0);
+    const filter = queries[0].body.structuredQuery.where.fieldFilter;
+    assert.equal(queries[0].body.structuredQuery.from[0].collectionId, 'orders');
+    assert.equal(filter.field.fieldPath, 'sentAt');
+    assert.equal(filter.op, 'GREATER_THAN_OR_EQUAL');
+    assert.equal(Number(filter.value.integerValue), today);
+    const full = await db.collection('orders').where('table', '==', '9').get();
+    assert.equal(full.size, 1201);
+    unsub();
   });
 } finally {
   await fake.close();

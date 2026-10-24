@@ -5,6 +5,8 @@
 var ADAPTER_VERSION = 'phase1';
 var POLL_FAST_MS = 5000;
 var POLL_SLOW_MS = 15000;
+var POLL_FULL_COLLECTION_MS = 60000;
+var POLL_MAX_MS = 600000;
 var REQUEST_TIMEOUT_MS = 10000;
 var REQUEST_RETRY_LIMIT = 3;
 var RETRY_BASE_MS = 200;
@@ -20,7 +22,15 @@ function createNamedFirestoreAdapter() {
   function pollDelay(collection, id) {
     if (collection === 'orders') return POLL_FAST_MS;
     if (collection === 'boh_shared' && (id === 'menu' || id === 'active_orders')) return POLL_FAST_MS;
+    if (!id && (collection === 'checks' || collection === 'calls' || collection === 'messages')) return POLL_FULL_COLLECTION_MS;
     return POLL_SLOW_MS;
+  }
+
+  function nextInterval(current, base, error) {
+    var interval = current || base;
+    if (!error) return base;
+    if (isRateLimited(error)) return Math.min(interval * 2, POLL_MAX_MS);
+    return interval;
   }
 
   function delay(ms) {
@@ -55,6 +65,10 @@ function createNamedFirestoreAdapter() {
     return statusOf(error) === 429 || code === 'RESOURCE_EXHAUSTED' || code === 'http-429';
   }
 
+  function isAlreadyExists(error) {
+    return String(error && error.code || '') === 'ALREADY_EXISTS';
+  }
+
   function isServerError(error) {
     var status = statusOf(error);
     return status >= 500 && status <= 599;
@@ -85,7 +99,7 @@ function createNamedFirestoreAdapter() {
     return base * Math.pow(2, attempt);
   }
 
-  function request(method, url, body) {
+  function request(method, url, body, options) {
     var tokenRefreshed = false;
     function attempt(n) {
       return ensureAuth().then(function(user) {
@@ -138,6 +152,10 @@ function createNamedFirestoreAdapter() {
               throw refreshError;
             });
           }
+        }
+        if (options && options.idempotentDocument && n > 0 && isAlreadyExists(error)) {
+          EH_SYNC.lastOk = Date.now();
+          return options.idempotentDocument;
         }
         var retryable = isNetworkError(error) || isServerError(error) || isRateLimited(error);
         if (retryable && n < REQUEST_RETRY_LIMIT) {
@@ -268,7 +286,10 @@ function createNamedFirestoreAdapter() {
 
   function addDoc(collection, data) {
     var id = 'web_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
-    return request('POST', root() + '/' + encodeURIComponent(collection) + '?documentId=' + encodeURIComponent(id), { fields: encodeFields(data) }).then(function(json) {
+    var fields = encodeFields(data);
+    var payload = { fields: fields };
+    var created = { name: root() + '/' + collection + '/' + id, fields: fields };
+    return request('POST', root() + '/' + encodeURIComponent(collection) + '?documentId=' + encodeURIComponent(id), payload, { idempotentDocument: created }).then(function(json) {
       return docFrom(json, id, collection);
     });
   }
@@ -288,6 +309,39 @@ function createNamedFirestoreAdapter() {
       });
     }
     return page('');
+  }
+
+  function startOfLocalDayMs() {
+    var now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  }
+
+  function queryOrdersToday() {
+    var body = {
+      structuredQuery: {
+        from: [{ collectionId: 'orders' }],
+        where: {
+          fieldFilter: {
+            field: { fieldPath: 'sentAt' },
+            op: 'GREATER_THAN_OR_EQUAL',
+            value: { integerValue: String(startOfLocalDayMs()) }
+          }
+        }
+      }
+    };
+    return request('POST', root() + ':runQuery', body).then(function(rows) {
+      var docs = [];
+      var list = Array.isArray(rows) ? rows : [];
+      list.forEach(function(row) {
+        if (row && row.document) docs.push(docFrom(row.document, '', 'orders'));
+      });
+      return docs;
+    });
+  }
+
+  function fetchPolledCollection(collection) {
+    if (collection === 'orders') return queryOrdersToday();
+    return listDocs(collection);
   }
 
   function snapshot(docs) {
@@ -345,7 +399,7 @@ function createNamedFirestoreAdapter() {
     bucket.timer = setTimeout(function() {
       bucket.timer = null;
       runCollection(collection);
-    }, pollDelay(collection));
+    }, bucket.interval || pollDelay(collection));
   }
 
   function runCollection(collection) {
@@ -354,11 +408,13 @@ function createNamedFirestoreAdapter() {
     if (bucket.timer) { clearTimeout(bucket.timer); bucket.timer = null; }
     var token = {};
     bucket.token = token;
-    var pending = listDocs(collection);
+    var pending = fetchPolledCollection(collection);
     bucket.inFlight = pending;
+    var base = pollDelay(collection);
     pending.then(function(docs) {
       if (collectionPolls[collection] !== bucket || bucket.token !== token) return;
       bucket.inFlight = null;
+      bucket.interval = nextInterval(bucket.interval, base, null);
       bucket.lastDocs = docs;
       bucket.subs.slice().forEach(function(sub) {
         if (sub.active) deliver(sub, docs);
@@ -367,6 +423,7 @@ function createNamedFirestoreAdapter() {
     }, function(error) {
       if (collectionPolls[collection] !== bucket || bucket.token !== token) return;
       bucket.inFlight = null;
+      bucket.interval = nextInterval(bucket.interval, base, error);
       bucket.subs.slice().forEach(function(sub) {
         if (sub.active) reportError(sub.onError, error);
       });
@@ -406,19 +463,23 @@ function createNamedFirestoreAdapter() {
   function watchDoc(collection, id, callback, onError) {
     var active = true;
     var timer = null;
+    var base = pollDelay(collection, id);
+    var interval = base;
     function arm() {
       if (!active) return;
-      timer = setTimeout(run, pollDelay(collection, id));
+      timer = setTimeout(run, interval);
     }
     function run() {
       if (!active) return;
       getDoc(collection, id).then(function(doc) {
         if (!active) return;
+        interval = nextInterval(interval, base, null);
         try { callback(doc); }
         catch (error) { reportError(onError, error); }
         arm();
       }, function(error) {
         if (!active) return;
+        interval = nextInterval(interval, base, error);
         reportError(onError, error);
         arm();
       });
