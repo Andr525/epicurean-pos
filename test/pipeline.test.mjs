@@ -342,6 +342,40 @@ async function plantAndSend(page, name, table) {
   }, { name, table });
 }
 
+// Records every toast text, so a "sent" toast that flashed and was replaced is still seen.
+async function watchToasts(page) {
+  await page.evaluate(() => {
+    window.__toasts = [];
+    const el = document.getElementById('toast');
+    if (!el) return;
+    new MutationObserver(() => { window.__toasts.push(el.textContent || ''); })
+      .observe(el, { childList: true, characterData: true, subtree: true });
+  });
+}
+
+function claimsSent(texts) {
+  return texts.some((text) => /sent|fired/i.test(text) && !/not sent/i.test(text));
+}
+
+async function readOutbox(page) {
+  return page.evaluate(() => {
+    try { return JSON.parse(localStorage.getItem('eh_outbox_v1') || '[]'); } catch (error) { return ['unreadable']; }
+  });
+}
+
+async function seatedOnFloor(page) {
+  return waitFor(() => page.evaluate(() => (STATE.rooms || []).length > 0).catch(() => false), 10000);
+}
+
+function feedEntries(fake) {
+  const feed = fake.get('boh_shared', 'active_orders');
+  return feed && Array.isArray(feed.list) ? feed.list : [];
+}
+
+function writesTo(fake, collection, id) {
+  return fake.requests.filter((req) => req.method === 'PATCH' && !req.fault && req.path.endsWith('/' + collection + '/' + id)).length;
+}
+
 async function main() {
   writeCallSites();
   if (process.env.CALLS_ONLY) return;
@@ -378,22 +412,45 @@ async function main() {
     }
 
     // T2 — a blocked send must not tell the waiter the order was sent unless both writes landed.
+    // The network is blocked for every Firestore request. After it comes back, the
+    // automatic retry must deliver exactly one orders doc and one active_orders entry.
     {
       const errors = [];
       fake.reset();
-      fake.block((req) => req.method === 'POST' && req.collection === 'orders');
+      fake.put('boh_shared', 'tables', JSON.parse(JSON.stringify(TABLES)));
       const { context, page } = await openApp(browser, pos.origin, fake.root, errors);
-      await sleep(400);
+      await seatedOnFloor(page);
+      await watchToasts(page);
+      fake.block(() => true);
       const sent = await plantAndSend(page, 'Blocked Plate', '1');
-      await sleep(1500);
-      const orders = fake.count('orders');
-      const feed = fake.get('boh_shared', 'active_orders');
-      const feedCount = feed && Array.isArray(feed.list) ? feed.list.length : 0;
-      const claimed = /sent|fired/i.test(sent.toast);
-      const durable = orders > 0 && feedCount > 0;
-      const ok = !(claimed && !durable);
-      record('T2 blocked send must not show sent without an orders doc and active_orders entry', ok, 'toast="' + sent.toast + '" orders=' + orders + ' active_orders=' + feedCount, errors.concat(sent.thrown ? [sent.thrown] : []));
+      const tile = await waitFor(() => page.evaluate(() => {
+        const el = document.querySelector('[data-table="1"] .kitchen-send-badge.failed');
+        return el ? el.textContent : '';
+      }).catch(() => ''), 10000);
+      await page.evaluate(() => tapTable('1'));
+      const view = await waitFor(() => page.evaluate(() => {
+        const el = document.querySelector('#order-top .kitchen-send-badge.failed');
+        return el ? el.textContent : '';
+      }).catch(() => ''), 5000);
+      const blockedToasts = await page.evaluate(() => window.__toasts.slice());
+      const blockedOrders = fake.count('orders');
+      const blockedFeed = feedEntries(fake).length;
       fake.unblock();
+      const delivered = await waitFor(async () => {
+        const box = await readOutbox(page);
+        return fake.count('orders') >= 1 && feedEntries(fake).length >= 1 && box.length === 0;
+      }, 40000);
+      await sleep(500);
+      const orders = fake.count('orders');
+      const feedCount = feedEntries(fake).length;
+      const cleared = await page.evaluate(() => !document.querySelector('.kitchen-send-badge.failed'));
+      const claimed = claimsSent(blockedToasts);
+      const ok = !claimed && /Not sent to kitchen/.test(tile || '') && /Not sent to kitchen/.test(view || '')
+        && blockedOrders === 0 && !!delivered && orders === 1 && feedCount === 1 && cleared;
+      record('T2 blocked send must not show sent without an orders doc and active_orders entry', ok,
+        'blocked: toasts=[' + blockedToasts.join(' | ') + '] tile="' + (tile || 'none') + '" orderView="' + (view || 'none') + '" orders=' + blockedOrders + ' active_orders=' + blockedFeed +
+        '; unblocked: orders=' + orders + ' active_orders=' + feedCount + ' badgeCleared=' + cleared,
+        errors.concat(sent.thrown ? [sent.thrown] : []));
       await context.close();
     }
 
@@ -606,6 +663,178 @@ async function main() {
           if (kds) await kds.context.close();
         }
       }
+    }
+
+    // T9 — a ticket still in the outbox when the page reloads is delivered once by the new page.
+    {
+      const errors = [];
+      fake.reset();
+      const { context, page } = await openApp(browser, pos.origin, fake.root, errors);
+      await sleep(400);
+      fake.block(() => true);
+      const sent = await plantAndSend(page, 'Reload Plate', '1');
+      const pending = await waitFor(async () => {
+        const box = await readOutbox(page);
+        return box.length === 1 && box[0].state === 'failed' ? box : null;
+      }, 10000);
+      const id = pending ? pending[0].id : '';
+      fake.unblock();
+      const reloadAt = Date.now();
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      const delivered = await waitFor(async () => {
+        const box = await readOutbox(page).catch(() => ['reloading']);
+        return fake.count('orders') >= 1 && feedEntries(fake).length >= 1 && box.length === 0;
+      }, 15000);
+      await sleep(1500);
+      const orders = fake.count('orders');
+      const feedIds = feedEntries(fake).map((item) => item.id);
+      const afterReload = fake.requests.filter((req) => req.method === 'PATCH' && !req.fault && req.at >= reloadAt && req.path.endsWith('/orders/' + id)).length;
+      const box = await readOutbox(page);
+      const ok = !!id && !!delivered && orders === 1 && fake.get('orders', id) && feedIds.length === 1 && feedIds[0] === id && afterReload >= 1 && box.length === 0;
+      record('T9 reload with a pending outbox delivers the ticket exactly once', ok,
+        'outbox before reload=' + (pending ? pending.length : 0) + ' orders=' + orders + ' active_orders=' + feedIds.length + ' sameId=' + (feedIds[0] === id) + ' ordersWritesAfterReload=' + afterReload + ' outbox after=' + box.length,
+        errors.concat(sent.thrown ? [sent.thrown] : []));
+      await context.close();
+    }
+
+    // T10 — the orders write lands but every response is lost; the retry must not duplicate it.
+    {
+      const errors = [];
+      fake.reset();
+      const { context, page } = await openApp(browser, pos.origin, fake.root, errors);
+      await sleep(400);
+      await watchToasts(page);
+      // Chrome silently resends a request whose kept-alive socket closes, so the
+      // fault stays on until the outbox records a failed attempt.
+      const lose = fake.failWhen((req) => req.method === 'PATCH' && req.collection === 'orders', 1000, 'lose');
+      const sent = await plantAndSend(page, 'Lost Plate', '1');
+      const failed = await waitFor(async () => {
+        const box = await readOutbox(page);
+        return box.length === 1 && box[0].state === 'failed' ? box : null;
+      }, 10000);
+      lose.left = 0;
+      const landedWhileLost = fake.count('orders');
+      const toastsWhileLost = await page.evaluate(() => window.__toasts.slice());
+      const delivered = await waitFor(async () => {
+        const box = await readOutbox(page);
+        return feedEntries(fake).length >= 1 && box.length === 0;
+      }, 15000);
+      await sleep(800);
+      const writes = fake.requests.filter((req) => req.method === 'PATCH' && req.path.includes('/orders/')).length;
+      const orders = fake.count('orders');
+      const feedCount = feedEntries(fake).length;
+      const toasts = await page.evaluate(() => window.__toasts.slice());
+      const ok = !!failed && landedWhileLost === 1 && !claimsSent(toastsWhileLost) && !!delivered && orders === 1 && feedCount === 1 && writes >= 2;
+      record('T10 lost write response then retry makes no duplicate', ok,
+        'failed attempt seen=' + !!failed + ' orders while response lost=' + landedWhileLost + ' orders PATCH attempts=' + writes + ' orders=' + orders + ' active_orders=' + feedCount + ' toasts=[' + toasts.join(' | ') + ']',
+        errors.concat(sent.thrown ? [sent.thrown] : []));
+      await context.close();
+    }
+
+    // T11 — orders doc lands, the feed write fails; tapping retry completes only the feed.
+    {
+      const errors = [];
+      fake.reset();
+      fake.put('boh_shared', 'tables', JSON.parse(JSON.stringify(TABLES)));
+      const { context, page } = await openApp(browser, pos.origin, fake.root, errors);
+      await seatedOnFloor(page);
+      for (const digit of ['3', '0', '0', '1']) {
+        await page.locator('#numpad button', { hasText: new RegExp('^' + digit + '$') }).click();
+      }
+      await page.waitForFunction(() => STATE.currentServer && STATE.currentServer.code === '3001', { timeout: 8000 });
+      await page.evaluate(() => document.querySelector('button[data-tab="tables"]').click());
+      await watchToasts(page);
+      fake.failWhen((req) => req.method === 'PATCH' && req.collection === 'boh_shared' && req.id === 'active_orders', 4, 500);
+      const sent = await plantAndSend(page, 'Feed Plate', '1');
+      await page.evaluate(() => tapTable('1'));
+      const banner = await waitFor(() => page.evaluate(() => {
+        const el = document.querySelector('#order-top .kitchen-send-badge.failed');
+        return el ? el.textContent : '';
+      }).catch(() => ''), 10000);
+      const box = await readOutbox(page);
+      const id = box[0] ? box[0].id : '';
+      const writtenFlag = box[0] ? !!box[0].written : false;
+      const ordersBefore = fake.count('orders');
+      const feedBefore = feedEntries(fake).length;
+      const toastsBefore = await page.evaluate(() => window.__toasts.slice());
+      if (banner) await page.locator('#order-top .kitchen-send-badge.failed').click();
+      const delivered = await waitFor(async () => {
+        const left = await readOutbox(page);
+        return feedEntries(fake).length >= 1 && left.length === 0;
+      }, 10000);
+      await sleep(800);
+      const ordersWrites = id ? writesTo(fake, 'orders', id) : -1;
+      const feedIds = feedEntries(fake).map((item) => item.id);
+      const toasts = await page.evaluate(() => window.__toasts.slice());
+      const ok = !!banner && writtenFlag && ordersBefore === 1 && feedBefore === 0 && !claimsSent(toastsBefore)
+        && !!delivered && ordersWrites === 1 && fake.count('orders') === 1 && feedIds.length === 1 && feedIds[0] === id
+        && toasts.includes('Order sent to kitchen');
+      record('T11 orders written but feed fails, retry completes only the feed', ok,
+        'banner="' + (banner || 'none') + '" written=' + writtenFlag + ' before: orders=' + ordersBefore + ' active_orders=' + feedBefore +
+        '; after tap: orders writes=' + ordersWrites + ' orders=' + fake.count('orders') + ' active_orders=' + feedIds.length + ' sameId=' + (feedIds[0] === id) + ' toasts=[' + toasts.join(' | ') + ']',
+        errors.concat(sent.thrown ? [sent.thrown] : []));
+      await context.close();
+    }
+
+    // T12 — a blocked allergy note must not be marked sent; after unblock the retry
+    // delivers it once and only then marks it sent.
+    {
+      const errors = [];
+      fake.reset();
+      fake.put('boh_shared', 'tables', JSON.parse(JSON.stringify(TABLES)));
+      const { context, page } = await openApp(browser, pos.origin, fake.root, errors);
+      await seatedOnFloor(page);
+      await watchToasts(page);
+      fake.block(() => true);
+      const sent = await page.evaluate(() => {
+        STATE.currentServer = STATE.currentServer || { name: 'Andre Mendoza', code: '3001', role: 'Food Master' };
+        STATE.selectedTable = '1';
+        const sess = sessionOf('1');
+        sess.guestCount = 2;
+        sess.seatedAt = sess.seatedAt || Date.now();
+        sess.kitchenNote = 'Shellfish allergy — no shrimp';
+        let thrown = '';
+        try { sendKitchenAllergyNote(); } catch (error) { thrown = String(error && error.stack || error); }
+        return { thrown, flagAtSend: sessionOf('1').kitchenNoteSent === true };
+      });
+      const failed = await waitFor(async () => {
+        const box = await readOutbox(page);
+        return box.length === 1 && box[0].state === 'failed' ? box : null;
+      }, 10000);
+      const id = failed ? failed[0].id : '';
+      await page.evaluate(() => tapTable('1'));
+      const view = await waitFor(() => page.evaluate(() => {
+        const el = document.querySelector('#order-top .kitchen-send-badge.failed');
+        return el ? el.textContent : '';
+      }).catch(() => ''), 5000);
+      await page.evaluate(() => document.querySelector('button[data-tab="tables"]').click());
+      const tile = await waitFor(() => page.evaluate(() => {
+        const el = document.querySelector('[data-table="1"] .kitchen-send-badge.failed');
+        return el ? el.textContent : '';
+      }).catch(() => ''), 5000);
+      const flagBlocked = await page.evaluate(() => sessionOf('1').kitchenNoteSent === true);
+      const blockedToasts = await page.evaluate(() => window.__toasts.slice());
+      const blockedOrders = fake.count('orders');
+      fake.unblock();
+      const delivered = await waitFor(async () => {
+        const box = await readOutbox(page);
+        return fake.count('orders') >= 1 && feedEntries(fake).length >= 1 && box.length === 0;
+      }, 40000);
+      await sleep(500);
+      const landed = id ? fake.requests.filter((req) => req.method === 'PATCH' && !req.fault && !req.blocked && req.path.endsWith('/orders/' + id)).length : -1;
+      const feed = feedEntries(fake);
+      const note = fake.get('orders', id) || {};
+      const flagAfter = await page.evaluate(() => sessionOf('1').kitchenNoteSent === true);
+      const cleared = await page.evaluate(() => !document.querySelector('.kitchen-send-badge.failed'));
+      const ok = !sent.flagAtSend && !!failed && !flagBlocked && !claimsSent(blockedToasts)
+        && /Not sent to kitchen/.test(tile || '') && /Not sent to kitchen/.test(view || '') && blockedOrders === 0
+        && !!delivered && landed === 1 && fake.count('orders') === 1 && note.isKitchenNote === true
+        && feed.length === 1 && feed[0].id === id && flagAfter && cleared;
+      record('T12 blocked allergy note stays not sent until the kitchen has it', ok,
+        'blocked: flagAtSend=' + sent.flagAtSend + ' flag=' + flagBlocked + ' toasts=[' + blockedToasts.join(' | ') + '] tile="' + (tile || 'none') + '" orderView="' + (view || 'none') + '" orders=' + blockedOrders +
+        '; unblocked: orders writes=' + landed + ' orders=' + fake.count('orders') + ' isKitchenNote=' + (note.isKitchenNote === true) + ' active_orders=' + feed.length + ' sameId=' + (!!feed[0] && feed[0].id === id) + ' flag=' + flagAfter + ' badgeCleared=' + cleared,
+        errors.concat(sent.thrown ? [sent.thrown] : []));
+      await context.close();
     }
   } finally {
     writeResults();
