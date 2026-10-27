@@ -775,6 +775,67 @@ async function main() {
         errors.concat(sent.thrown ? [sent.thrown] : []));
       await context.close();
     }
+
+    // T12 — a blocked allergy note must not be marked sent; after unblock the retry
+    // delivers it once and only then marks it sent.
+    {
+      const errors = [];
+      fake.reset();
+      fake.put('boh_shared', 'tables', JSON.parse(JSON.stringify(TABLES)));
+      const { context, page } = await openApp(browser, pos.origin, fake.root, errors);
+      await seatedOnFloor(page);
+      await watchToasts(page);
+      fake.block(() => true);
+      const sent = await page.evaluate(() => {
+        STATE.currentServer = STATE.currentServer || { name: 'Andre Mendoza', code: '3001', role: 'Food Master' };
+        STATE.selectedTable = '1';
+        const sess = sessionOf('1');
+        sess.guestCount = 2;
+        sess.seatedAt = sess.seatedAt || Date.now();
+        sess.kitchenNote = 'Shellfish allergy — no shrimp';
+        let thrown = '';
+        try { sendKitchenAllergyNote(); } catch (error) { thrown = String(error && error.stack || error); }
+        return { thrown, flagAtSend: sessionOf('1').kitchenNoteSent === true };
+      });
+      const failed = await waitFor(async () => {
+        const box = await readOutbox(page);
+        return box.length === 1 && box[0].state === 'failed' ? box : null;
+      }, 10000);
+      const id = failed ? failed[0].id : '';
+      await page.evaluate(() => tapTable('1'));
+      const view = await waitFor(() => page.evaluate(() => {
+        const el = document.querySelector('#order-top .kitchen-send-badge.failed');
+        return el ? el.textContent : '';
+      }).catch(() => ''), 5000);
+      await page.evaluate(() => document.querySelector('button[data-tab="tables"]').click());
+      const tile = await waitFor(() => page.evaluate(() => {
+        const el = document.querySelector('[data-table="1"] .kitchen-send-badge.failed');
+        return el ? el.textContent : '';
+      }).catch(() => ''), 5000);
+      const flagBlocked = await page.evaluate(() => sessionOf('1').kitchenNoteSent === true);
+      const blockedToasts = await page.evaluate(() => window.__toasts.slice());
+      const blockedOrders = fake.count('orders');
+      fake.unblock();
+      const delivered = await waitFor(async () => {
+        const box = await readOutbox(page);
+        return fake.count('orders') >= 1 && feedEntries(fake).length >= 1 && box.length === 0;
+      }, 40000);
+      await sleep(500);
+      const landed = id ? fake.requests.filter((req) => req.method === 'PATCH' && !req.fault && !req.blocked && req.path.endsWith('/orders/' + id)).length : -1;
+      const feed = feedEntries(fake);
+      const note = fake.get('orders', id) || {};
+      const flagAfter = await page.evaluate(() => sessionOf('1').kitchenNoteSent === true);
+      const cleared = await page.evaluate(() => !document.querySelector('.kitchen-send-badge.failed'));
+      const ok = !sent.flagAtSend && !!failed && !flagBlocked && !claimsSent(blockedToasts)
+        && /Not sent to kitchen/.test(tile || '') && /Not sent to kitchen/.test(view || '') && blockedOrders === 0
+        && !!delivered && landed === 1 && fake.count('orders') === 1 && note.isKitchenNote === true
+        && feed.length === 1 && feed[0].id === id && flagAfter && cleared;
+      record('T12 blocked allergy note stays not sent until the kitchen has it', ok,
+        'blocked: flagAtSend=' + sent.flagAtSend + ' flag=' + flagBlocked + ' toasts=[' + blockedToasts.join(' | ') + '] tile="' + (tile || 'none') + '" orderView="' + (view || 'none') + '" orders=' + blockedOrders +
+        '; unblocked: orders writes=' + landed + ' orders=' + fake.count('orders') + ' isKitchenNote=' + (note.isKitchenNote === true) + ' active_orders=' + feed.length + ' sameId=' + (!!feed[0] && feed[0].id === id) + ' flag=' + flagAfter + ' badgeCleared=' + cleared,
+        errors.concat(sent.thrown ? [sent.thrown] : []));
+      await context.close();
+    }
   } finally {
     writeResults();
     await browser.close();

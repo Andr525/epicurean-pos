@@ -8777,7 +8777,6 @@ function sendKitchenAllergyNote(){
   if (!STATE._localOrders) STATE._localOrders=[];
   STATE._localOrders.push(local);
   var noted=postKitchenTicket(order, 'orders', local);
-  sess.kitchenNoteSent=true;
   toast('Sending…');
   noted.then(function(){ toast('Allergy note sent to kitchen'); }, function(){ toast('Not sent to kitchen — tap to retry'); });
   closeSheet();
@@ -10043,6 +10042,10 @@ function deliverKitchenTicket(entry){
     kitchenOutbox = kitchenOutbox.filter(function(e){ return e !== entry && e.id !== entry.id; });
     saveKitchenOutbox();
     if (entry.local) entry.local.sendState = 'ok';
+    if (entry.order.isKitchenNote) {
+      var noteSess = STATE.tableSessions[String(entry.order.table)];
+      if (noteSess) noteSess.kitchenNoteSent = true;
+    }
     paintKitchenSendState();
     scheduleKitchenOutbox();
     return entry.id;
