@@ -61,7 +61,7 @@ html,body { height:100%; overflow:hidden; }
 body { font-family:var(--font); color:var(--text); background:var(--bg); -webkit-font-smoothing:antialiased; }
 
 /* Screens */
-.screen { display:none; height:100vh; flex-direction:column; }
+.screen { display:none; height:100vh; height:100dvh; flex-direction:column; }
 .screen.active { display:flex; }
 
 /* LOGIN */
@@ -1295,12 +1295,21 @@ body.hh-on .floor-retry { background:#fff; color:#000; border-color:#c5ced8; }
   padding:0.45rem 0.7rem calc(0.5rem + env(safe-area-inset-bottom));
   background:#12151c; color:#f4efe6; border-top:1px solid rgba(201,168,76,0.85);
 }
-body.tableside .app-content, body.hh-table .app-content { padding-bottom:92px; }
+body.tableside .app-content, body.hh-table .app-content { padding-bottom:calc(92px + env(safe-area-inset-bottom)); }
 @media (min-width:768px) {
   body.tableside .voice-dock, body.hh-table .voice-dock { bottom:74px; }
 }
 @media (max-width:767px) {
   body.hh-on.hh-table .app-content { overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  /* app-content is a column flex scroller, so its padding-bottom is not part of
+     the scroll height and the last category stays under the fixed voice dock.
+     The spacer is inside the menu column, where it does add scroll room,
+     including the home-indicator inset. */
+  body.hh-on.hh-table .ts-console::after,
+  body.hh-on.tableside .ts-console::after {
+    content:''; display:block; flex:0 0 auto;
+    height:calc(92px + env(safe-area-inset-bottom));
+  }
   body.hh-on.hh-table .ts-console { height:auto; overflow:visible; }
   body.hh-on.hh-table .add-items-pane { flex:1 0 auto; min-height:52vh; }
   body.hh-on.voice-live .voice-test, body.hh-on.voice-live .allergy-strip { display:none; }
