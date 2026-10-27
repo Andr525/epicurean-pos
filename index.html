@@ -273,6 +273,8 @@ body { font-family:var(--font); color:var(--text); background:var(--bg); -webkit
 .payment-card .pay-total { font-size:1.8rem; font-weight:700; color:var(--primary-light); margin-bottom:1.5rem; text-align:center; }
 .payment-card .pay-items { font-size:0.8rem; color:var(--text-secondary); margin-bottom:1rem; padding:0.8rem; background:var(--surface-2); border-radius:var(--radius-sm); }
 .payment-card .pay-items div { padding:0.2rem 0; display:flex; justify-content:space-between; }
+.payment-card .pay-items .pay-main { display:block; min-width:0; }
+.payment-card .pay-items .pay-detail { display:block; font-size:0.72rem; line-height:1.3; font-weight:500; }
 
 .tip-section { margin-bottom:1.2rem; }
 .tip-section label { font-size:0.8rem; color:var(--text-secondary); display:block; margin-bottom:0.5rem; }
@@ -1918,6 +1920,10 @@ function togglePriorityPosition(seat){ return toggleFemalePosition(seat); }
 function positionLabel(seat){
   if (seat==='table' || seat==='TABLE' || seat==null || seat==='') return 'Share';
   return String(seat)+(isPriorityPosition(seat)?'A':'');
+}
+function paySeatLabel(seat){
+  var label=positionLabel(seat);
+  return label==='Share' ? 'Share' : ('Seat '+label);
 }
 function positionStatesOf(table){
   var s=sessionOf(table==null?STATE.selectedTable:table);
@@ -9919,7 +9925,11 @@ function printCheck(){
   var html='<h1>Epicurean House</h1><h2>Table '+esc(String(STATE.selectedTable))+' · '+(sessionOf(STATE.selectedTable).guestCount||'')+' guests</h2>';
   html+='<p>'+seatedLabelFor(STATE.selectedTable)+'</p><table style="width:100%;border-collapse:collapse;">';
   rows.forEach(function(r){
-    html+='<tr><td>'+esc(r.name)+' · '+seatName(r.seat)+' · '+r.status+'</td><td style="text-align:right;">$'+((Number(r.price)||0)*r.qty).toFixed(2)+'</td></tr>';
+    var mods=r.mods==null?'':String(r.mods).trim();
+    var bits=[esc(r.name), esc(paySeatLabel(r.seat))];
+    if (mods) bits.push(esc(mods));
+    bits.push(esc(String(r.status||'')));
+    html+='<tr><td>'+bits.join(' · ')+'</td><td style="text-align:right;">$'+((Number(r.price)||0)*r.qty).toFixed(2)+'</td></tr>';
   });
   html+='</table><p style="font-weight:800;margin-top:1rem;">Total $'+tot.grand.toFixed(2)+'</p>';
   document.getElementById('print-root').innerHTML=html;
@@ -10903,7 +10913,11 @@ function openPayment(subtotal) {
 
   html += '<div class="pay-items">';
   guestCheckItems().forEach(function(i){
-    html += '<div><span>'+esc(i.name)+(i.qty>1?' ×'+i.qty:'')+'</span><span>$'+((Number(i.price)||0)*i.qty).toFixed(2)+'</span></div>';
+    var mods=i.mods==null?'':String(i.mods).trim();
+    html += '<div><span class="pay-main">'+esc(i.name)+(i.qty>1?' ×'+i.qty:'')+
+      '<span class="pay-detail">'+esc(paySeatLabel(i.seat))+'</span>'+
+      (mods?'<span class="pay-detail">'+esc(mods)+'</span>':'')+
+      '</span><span>$'+((Number(i.price)||0)*i.qty).toFixed(2)+'</span></div>';
   });
   html += '<div style="border-top:1px solid var(--border);margin-top:0.4rem;padding-top:0.4rem;font-weight:600;"><span>Subtotal</span><span>$'+subtotal.toFixed(2)+'</span></div>';
   html += '</div>';
