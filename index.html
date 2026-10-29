@@ -33,6 +33,8 @@
 <script src="voice-cocktails.js?v=65"></script>
 <script src="voice-price.js?v=67"></script>
 <script src="voice-service.js?v=67"></script>
+<script src="voice-order.js?v=68-review"></script>
+<script src="voice-order-bridge.js?v=68-review"></script>
 <script async src="https://sandbox.web.squarecdn.com/v1/square.js"></script>
 <style>
 :root {
@@ -1297,23 +1299,17 @@ body.hh-on .floor-retry { background:#fff; color:#000; border-color:#c5ced8; }
   padding:0.45rem 0.7rem calc(0.5rem + env(safe-area-inset-bottom));
   background:#12151c; color:#f4efe6; border-top:1px solid rgba(201,168,76,0.85);
 }
-body.tableside .app-content, body.hh-table .app-content { padding-bottom:calc(92px + env(safe-area-inset-bottom)); }
+body.tableside .app-content, body.hh-table .app-content { padding-bottom:calc(92px + env(safe-area-inset-bottom)); scroll-padding-bottom:100px; }
+#order-top { padding-bottom:calc(100px + env(safe-area-inset-bottom)); flex:0 0 auto; }
+#voice-pricing-menu { min-height:44px; font-size:16px; scroll-margin-block:100px; }
 @media (min-width:768px) {
   body.tableside .voice-dock, body.hh-table .voice-dock { bottom:74px; }
 }
 @media (max-width:767px) {
   body.hh-on.hh-table .app-content { overflow-y:auto; -webkit-overflow-scrolling:touch; }
-  /* app-content is a column flex scroller, so its padding-bottom is not part of
-     the scroll height and the last category stays under the fixed voice dock.
-     The spacer is inside the menu column, where it does add scroll room,
-     including the home-indicator inset. */
-  body.hh-on.hh-table .ts-console::after,
-  body.hh-on.tableside .ts-console::after {
-    content:''; display:block; flex:0 0 auto;
-    height:calc(92px + env(safe-area-inset-bottom));
-  }
-  body.hh-on.hh-table .ts-console { height:auto; overflow:visible; }
-  body.hh-on.hh-table .add-items-pane { flex:1 0 auto; min-height:52vh; }
+  body.hh-on.hh-table .ts-console { height:auto; overflow:visible; flex-shrink:0; }
+  body.hh-on.hh-table .ts-console.toast-go.has-dining .add-items-pane,
+  body.hh-on.hh-table .add-items-pane { flex:0 0 auto; min-height:52vh; }
   body.hh-on.voice-live .voice-test, body.hh-on.voice-live .allergy-strip { display:none; }
 }
 .voice-dock button {
@@ -1772,7 +1768,7 @@ function guestCheckItems(checkId){
     if (!lineBelongsToCheck(i, cid, table)) return;
     rows.push({
       lineId:i.lineId, name:i.name, qty:parseInt(i.qty,10)||1, price:Number(i.price)||0,
-      seat:i.seat||'table', course:i.course||null, notes:i.notes||'', mods:i.selectedMod||'',
+      seat:i.seat||'table', seatPriority:i.seatPriority!=null?!!i.seatPriority:null, course:i.course||null, notes:i.notes||'', mods:i.selectedMod||'',
       status:i.held?'held':'unsent', checkId:i.checkId||cid,
       extraPlate:!!i.extraPlate, pfExtra:!!i.pfExtra, pfCourseKind:i.pfCourseKind||null,
       ticketPos:i.ticketPos!=null?Number(i.ticketPos):null,
@@ -1790,7 +1786,7 @@ function guestCheckItems(checkId){
         sentMap[lid]={
           lineId:lid, name:i.name, qty:0,
           price:found?Number(found.price)||Number(i.price)||0:Number(i.price)||0,
-          seat:i.seat||'table', course:i.course||null, notes:i.notes||'', mods:i.selectedMod||'',
+          seat:i.seat||'table', seatPriority:i.seatPriority!=null?!!i.seatPriority:null, course:i.course||null, notes:i.notes||'', mods:i.selectedMod||'',
           status:'sent', checkId:itemCid,
           extraPlate:!!i.extraPlate, pfExtra:!!i.pfExtra, pfCourseKind:i.pfCourseKind||null,
           ticketPos:i.ticketPos!=null?Number(i.ticketPos):null,
@@ -1835,16 +1831,29 @@ function persistCheck(check){
   if (!check) return;
   check.guest=check.guest||{ items:[], totals:{ subtotal:0 } };
   if (String(check.table)===String(STATE.selectedTable)) {
+    (STATE.currentOrder||[]).filter(function(line){return String(line.table)===String(check.table);}).forEach(attachOrderGuestSafety);
     check.guest.items=guestCheckItems(check.id);
     check.guest.totals={ subtotal:checkItemsTotal(check.id) };
     check.guestCount=sessionOf(check.table).guestCount||check.guestCount;
     check.seatedAt=sessionOf(check.table).seatedAt||check.seatedAt;
     check.femalePositions=Object.assign({}, femalePositionsOf(check.table));
   }
+  // Safety data is part of the saved check, not only volatile table-session memory.
+  var safety=sessionOf(check.table);
+  check.allergies=JSON.parse(JSON.stringify(safety.allergies||{table:[]}));
+  check.kitchenNote=String(safety.kitchenNote||'');
+  check.positionSubs=JSON.parse(JSON.stringify(safety.positionSubs||{}));
+  check.safetyRevision=safety.safetyRevision||0;
   check.updatedAt=Date.now();
   STATE.checks[check.id]=check;
   if (!fbReady) return;
   fbDb.collection('checks').doc(check.id).set(check).catch(function(e){ console.warn('Check save:', e); });
+}
+function persistTableSafety(){
+  var sess=sessionOf(STATE.selectedTable);
+  sess.safetyRevision=Math.max(Date.now(),(sess.safetyRevision||0)+1);
+  (STATE.currentOrder||[]).filter(function(line){return String(line.table)===String(STATE.selectedTable);}).forEach(attachOrderGuestSafety);
+  tableCheckIds(STATE.selectedTable).forEach(function(id){persistCheck(STATE.checks[id]);});
 }
 function closeOpenCheck(table, status){
   var sess=sessionOf(table);
@@ -1863,6 +1872,12 @@ function ingestOpenChecks(list){
     sess.checkId=ch.id;
     if (ch.seatedAt && !sess.seatedAt) sess.seatedAt=ch.seatedAt;
     if (ch.guestCount) sess.guestCount=ch.guestCount;
+    // Restore only fields present: a legacy record cannot silently clear restrictions.
+    var restoreSafety=(ch.safetyRevision||0)>=(sess.safetyRevision||0);
+    if(restoreSafety) sess.safetyRevision=ch.safetyRevision||0;
+    if(restoreSafety&&ch.allergies&&typeof ch.allergies==='object'&&!Array.isArray(ch.allergies)) sess.allergies=JSON.parse(JSON.stringify(ch.allergies));
+    if(restoreSafety&&ch.kitchenNote!=null) sess.kitchenNote=String(ch.kitchenNote);
+    if(restoreSafety&&ch.positionSubs&&typeof ch.positionSubs==='object'&&!Array.isArray(ch.positionSubs)) sess.positionSubs=JSON.parse(JSON.stringify(ch.positionSubs));
     if (ch.femalePositions && typeof ch.femalePositions==='object') {
       sess.femalePositions=sess.femalePositions||{};
       Object.keys(ch.femalePositions).forEach(function(k){
@@ -1875,6 +1890,9 @@ function ingestOpenChecks(list){
 function seatAllergies(seat){
   var s = sessionOf(STATE.selectedTable);
   var k = String(seat==null?'table':seat);
+  // Legacy checks used numeric allergy keys even for an A-labelled seat.
+  var check=STATE.checks[activeCheckId()];
+  if(!(check&&Array.isArray(check.positionIdentities)) && /^\d+A$/.test(k)) k=String(parseInt(k,10));
   if (!s.allergies[k]) s.allergies[k] = [];
   return s.allergies[k];
 }
@@ -2109,6 +2127,7 @@ function listPrixFixeExtraDishes(){
   function add(pf, course, opt){
     if (!opt || opt.headingOnly || !String(opt.name||'').trim()) return;
     var courseLabel=(course && (course.label||course.name||course.course)) || opt.course || '';
+    if(/entremet/i.test(courseLabel)||(course&&course.mode==='entremets')) return;
     var kind=pfCourseKind(courseLabel);
     var id=String(opt.id||opt.dishId||opt.name||'');
     var key=String((pf && pf.id) || 'pf')+'::'+id+'::'+kind;
@@ -2184,6 +2203,7 @@ function beginAddPrixFixeExtra(key){
     lineId:genId(),
     table:STATE.selectedTable,
     seat:STATE.activeSeat,
+    seatPriority:/A$/.test(selectedPositionIdentity()),
     course:course,
     held:false,
     checkId:activeCheckId(),
@@ -2228,20 +2248,32 @@ function normSeatKey(seat){
   if (seat==='table' || seat==='TABLE' || seat==null || seat==='') return 'table';
   return String(seat);
 }
-function seatHasPrixFixe(seat){
-  var s=normSeatKey(seat==null?STATE.activeSeat:seat);
+function orderPositionIdentity(line){ var seat=String(line.seat);if(seat==='table'||/^\d+A$/.test(seat)) return seat;return seat+(line.seatPriority!=null?(line.seatPriority?'A':''):(isPriorityPosition(line.seat)?'A':'')); }
+function checkPositionIdentities(){
+  var check=STATE.checks[activeCheckId()];
+  if(check && Array.isArray(check.positionIdentities)) return check.positionIdentities.slice();
+  return Array.from({length:sessionOf(STATE.selectedTable).guestCount||2},function(_,i){return positionLabel(i+1);});
+}
+function selectedPositionIdentity(){ return STATE.activePositionCheck===activeCheckId() && STATE.activePositionIdentity && checkPositionIdentities().includes(STATE.activePositionIdentity) && parseInt(STATE.activePositionIdentity,10)===Number(STATE.activeSeat) ? STATE.activePositionIdentity : positionLabel(STATE.activeSeat); }
+function setActivePositionIdentity(identity){
+  if(!checkPositionIdentities().includes(identity)) return;
+  STATE.activePositionIdentity=identity;STATE.activePositionCheck=activeCheckId();STATE.activeSeat=parseInt(identity,10);STATE.allergySeat=identity;STATE.allergyOpen=true;if(STATE.pendingItem)assignPendingPosition(identity);renderOrder();paintChrome();
+}
+function seatHasPrixFixe(seat, priority){
+  var base=seat==null?STATE.activeSeat:seat;
+  var s=priority!=null ? String(base)+(priority?'A':'') : (String(base)===String(STATE.activeSeat)?selectedPositionIdentity():positionLabel(base));
   var inDining=tableDiningOrders().some(function(to){
     if (!to || to.status==='void') return false;
     if (to.type==='tasting' && !to.prixFixeId) return false;
-    return normSeatKey(to.seat)===s;
+    return orderPositionIdentity(to)===s;
   });
   if (inDining) return true;
   return (STATE.currentOrder||[]).some(function(i){
-    return i && i.isPrixFixe && String(i.table)===String(STATE.selectedTable) && normSeatKey(i.seat)===s;
+    return i && i.isPrixFixe && String(i.table)===String(STATE.selectedTable) && orderPositionIdentity(i)===s;
   });
 }
 function warnPrixFixeAlreadyOnSeat(){
-  toast('This seat already has the $89 prix fixe. Extra dishes go through Add items.');
+  toast('This position already has a prix-fixe menu. Extra dishes go through Add items.');
 }
 function extraDishSearchOnly(){
   if (!tableHasDining()) return false;
@@ -2272,6 +2304,7 @@ function closeSheet(){
   flushDeferredCatalog();
 }
 function openSheet(html){
+  STATE.manualOrderingPosition=selectedPositionIdentity();
   var el=document.getElementById('sheet-overlay');
   el.innerHTML='<div class="sheet">'+html+'</div>';
   el.classList.add('show');
@@ -2283,7 +2316,7 @@ document.addEventListener('click', function(e){
   var ov=document.getElementById('sheet-overlay');
   if (!ov || !ov.classList.contains('show')) return;
   var t=e.target;
-  if (t && t.closest && t.closest('.sheet, .guest-keypad')) return;
+  if (t && t.closest && t.closest('.sheet, .guest-keypad, #manual-live-check')) return;
   e.preventDefault();
   e.stopPropagation();
 }, true);
@@ -2420,11 +2453,43 @@ function backToFloor(){
   STATE.hhMode='service';
   switchTab('tables');
 }
+// Label equivalence only: never infer allergens from recipes or free-text notes.
+function normalizeAllergenLabel(value){
+  var label=String(value==null?'':value).normalize('NFKC').trim().toLowerCase()
+    .replace(/\(s\)/g,'s').replace(/[-_\s]+/g,' ');
+  var aliases={'nut':'nuts','nuts':'nuts','tree nut':'tree nut','tree nuts':'tree nut',
+    'treenut':'tree nut','treenuts':'tree nut','peanut':'peanut','peanuts':'peanut',
+    'groundnut':'peanut','groundnuts':'peanut','ground nut':'peanut','ground nuts':'peanut',
+    'egg':'egg','eggs':'egg','sulfite':'sulfites','sulfites':'sulfites',
+    'sulphite':'sulfites','sulphites':'sulfites'};
+  if(Object.prototype.hasOwnProperty.call(aliases,label)) return aliases[label];
+  // This input is BOH/guest allergen metadata, never a dish name or substitution note.
+  // Resolve named nuts and annotated labels; ambiguous nut metadata fails closed.
+  var tokens=label.replace(/[^a-z ]/g,' ').split(/\s+/).filter(Boolean);
+  var treeNames=/^(?:almonds?|hazelnuts?|filberts?|walnuts?|cashews?|pecans?|pistachios?|macadamias?|brazilnuts?|pinenuts?)$/;
+  var tree=/\btree ?nuts?\b/.test(label)||/\b(?:brazil|pine) nuts?\b/.test(label)||tokens.some(function(t){return treeNames.test(t);});
+  var peanut=/\b(?:peanuts?|ground ?nuts?)\b/.test(label);
+  var unknown=tokens.some(function(t){return /nuts?$/.test(t)&&!treeNames.test(t)&&
+    !/^(?:nut|nuts|peanuts?|groundnuts?|treenuts?|donuts?|doughnuts?)$/.test(t);});
+  if(unknown||(tree&&peanut)) return 'unknown nut';
+  if(tree) return 'tree nut';
+  if(peanut) return 'peanut';
+  if(tokens.some(function(t){return /^nuts?$/.test(t);})) return 'unknown nut';
+  return label;
+}
+function allergensConflict(left,right){
+  var a=normalizeAllergenLabel(left),b=normalizeAllergenLabel(right);
+  if(!a||!b) return false;
+  return a===b || (a==='unknown nut'&&/^(nuts|tree nut|peanut)$/.test(b)) ||
+    (b==='unknown nut'&&/^(nuts|tree nut|peanut)$/.test(a)) || (a==='nuts'&&(b==='tree nut'||b==='peanut')) ||
+    (b==='nuts'&&(a==='tree nut'||a==='peanut'));
+}
 function allergenHits(item, seat){
   var listed=asList(item && item.allergens);
-  var a=listed.map(function(x){return String(x).toLowerCase();});
-  var g=seatAllergies(seat).map(function(x){return String(x).toLowerCase();});
-  return listed.filter(function(x){ return g.indexOf(String(x).toLowerCase())>-1; });
+  var identity=String(seat==null?'table':seat);
+  if(/^\d+$/.test(identity)&&item&&item.seatPriority!=null) identity+=(item.seatPriority?'A':'');
+  var g=seatAllergies(identity).concat(seatAllergies('table'));
+  return listed.filter(function(x){ return g.some(function(y){return allergensConflict(x,y);}); });
 }
 var SEATABLE = {table:1, stool:1, outdoor:1, couch:1};
 
@@ -2925,7 +2990,7 @@ function rebuildPosCatalog(){
     if (typeof EPICUREAN_VOICE!=='undefined') EPICUREAN_VOICE.applyApprovedKeywords(mapped);
     items.push(mapped);
   });
-  SEED_DRINK_EXTRAS.forEach(function(it){
+  if(!STATE.menuLive) SEED_DRINK_EXTRAS.forEach(function(it){
     var exists=items.some(function(x){
       if (!x) return false;
       if (x.id===it.id) return true;
@@ -3560,6 +3625,9 @@ function failLogin(){
   updateDots();
 }
 function finishLogin(staff){
+  stopVoiceSession();
+  if (window.EPICUREAN_ORDER_SESSION) window.EPICUREAN_ORDER_SESSION.reset();
+  STATE.voiceTurn=null; STATE.voiceBatch=null; STATE.voiceStatus='';
   STATE._loginBusy=true;
   var err=document.getElementById('pin-error');
   if (err) err.textContent='';
@@ -3602,6 +3670,9 @@ function attemptLogin() {
   failLogin();
 }
 function logout() {
+  stopVoiceSession();
+  if (window.EPICUREAN_ORDER_SESSION) window.EPICUREAN_ORDER_SESSION.reset();
+  STATE.voiceTurn=null; STATE.voiceBatch=null; STATE.voiceDrafts=[]; STATE.voiceStatus=''; STATE.voiceLastTranscript=''; STATE.voicePrixFixeId=null;
   try { closeOverflow(); } catch (e) {}
   try { closeSheet(); } catch (e) {}
   STATE.currentServer=null;
@@ -5294,6 +5365,11 @@ function toggleStationTable(){ stationsAreBohOnly(); }
 
 function selectTable(t) {
   t = resolveTableNumber(t);
+  if (String(t)!==String(STATE.selectedTable)) {
+    stopVoiceSession();
+    if (window.EPICUREAN_ORDER_SESSION) window.EPICUREAN_ORDER_SESSION.reset();
+    STATE.voiceTurn=null; STATE.voiceBatch=null;
+  }
   var obj=findFloorTable(t);
   STATE.selectedTable = t;
   if (fbReady) {
@@ -5451,12 +5527,13 @@ function unsentFor(table){
   return STATE.currentOrder.filter(function(i){ return String(i.table)===String(t); });
 }
 function setActiveSeat(seat){
+  STATE.activePositionIdentity=null;
   var same=String(STATE.activeSeat)===String(seat);
   if (same && seat!=='table' && seat!=null && seat!=='') toggleFemalePosition(seat);
   STATE.activeSeat=seat;
   STATE.allergySeat=seat;
   STATE.allergyOpen=true;
-  if (STATE.pendingItem) STATE.pendingItem.seat=seat;
+  if (STATE.pendingItem) assignPendingPosition(selectedPositionIdentity());
   renderOrder();
   paintChrome();
 }
@@ -5473,9 +5550,11 @@ function openSeatPicker(){
   var cur=STATE.activeSeat;
   var html='<h2>Seat</h2><p class="sheet-sub">Share the plate, or put it on a seat.</p><div class="seat-pick-list">';
   html+='<button type="button" class="'+(cur==='table'?'active':'')+'" onclick="setActiveSeat(\'table\');closeSheet()">Share</button>';
-  for (var i=1;i<=n;i++){
-    html+='<button type="button" class="'+(String(cur)===String(i)?'active':'')+'" onclick="setActiveSeat('+i+');closeSheet()">'+esc(positionLabel(i))+'</button>';
-  }
+  var explicit=STATE.checks[activeCheckId()]&&Array.isArray(STATE.checks[activeCheckId()].positionIdentities);
+  checkPositionIdentities().forEach(function(identity){
+    var i=parseInt(identity,10);
+    html+='<button type="button" class="'+(selectedPositionIdentity()===identity?'active':'')+'" onclick="'+esc((explicit?'setActivePositionIdentity('+JSON.stringify(identity)+')':'setActiveSeat('+i+')')+';closeSheet()')+'">'+esc(identity)+'</button>';
+  });
   html+='<button type="button" onclick="closeSheet();addGuestSeat()">+ Add seat</button></div>';
   html+='<button class="ghost-btn" onclick="closeSheet()">Cancel</button>';
   openSheet(html);
@@ -5483,13 +5562,13 @@ function openSeatPicker(){
 function renderSeatBar(){
   var n=sessionOf(STATE.selectedTable).guestCount||STATE.guestCount||2;
   var html='<div class="seat-bar">';
-  html+='<button type="button" class="seat-now" onclick="openSeatPicker()">'+esc(positionLabel(STATE.activeSeat))+' ▾</button>';
+  html+='<button type="button" class="seat-now" onclick="openSeatPicker()">'+esc(selectedPositionIdentity())+' ▾</button>';
   html+='<button type="button" class="seat-chip'+(STATE.activeSeat==='table'?' active':'')+'" onclick="setActiveSeat(\'table\')">Share</button>';
-  for (var i=1;i<=n;i++){
-    var pst=positionState(i);
-    var mark=(pst.pass?' PASS':'')+(pst.noDrink?' NO DRINK':'');
-    html+='<button type="button" class="seat-chip'+(String(STATE.activeSeat)===String(i)?' active':'')+'" data-seat="'+i+'" onclick="setActiveSeat('+i+')">'+esc(positionLabel(i)+mark)+'</button>';
-  }
+  var explicit=STATE.checks[activeCheckId()]&&Array.isArray(STATE.checks[activeCheckId()].positionIdentities);
+  checkPositionIdentities().forEach(function(identity){
+    var i=parseInt(identity,10),pst=positionState(i),mark=(pst.pass?' PASS':'')+(pst.noDrink?' NO DRINK':'');
+    html+='<button type="button" class="seat-chip'+(selectedPositionIdentity()===identity?' active':'')+'" data-seat="'+(explicit?identity:i)+'" onclick="'+esc(explicit?'setActivePositionIdentity('+JSON.stringify(identity)+')':'setActiveSeat('+i+')')+'">'+esc(identity+mark)+'</button>';
+  });
   html+='<button type="button" class="seat-chip add-seat" onclick="addGuestSeat()">+ Add</button></div>';
   return html;
 }
@@ -5562,7 +5641,7 @@ function renderPrixFixeRows(q){
   });
   (STATE.tastingMenus||[]).forEach(function(tm){
     if (q && !itemMatchesSearch(tm, q)) return;
-    html+='<div class="menu-item-row tasting-row" onclick="addTastingMenu('+JSON.stringify(String(tm.id))+')">'+
+    html+='<div class="menu-item-row tasting-row" onclick="'+esc('addTastingMenu('+JSON.stringify(String(tm.id))+')')+'">'+
       '<div class="item-info"><div class="item-name">✦ '+esc(tm.name)+'</div>'+
       '<div class="item-meta">'+(tm.courses?tm.courses.length:0)+' courses · Fire one by one</div></div>'+
       '<div class="item-price">'+posLineMoney(Number(tm.price)||0)+'</div></div>';
@@ -5795,6 +5874,7 @@ function collectWorkingCheckGroups(){
       selectKey:opts.selectKey,
       status:opts.status||'unsent',
       lineId:opts.lineId||'',
+      priority:opts.priority!=null?opts.priority:null,
       qty:opts.qty||1
     });
     if (opts.note && g.notes.indexOf(opts.note)<0) g.notes.push(opts.note);
@@ -5812,7 +5892,7 @@ function collectWorkingCheckGroups(){
     if (line && line.lineId) boundPkg[line.lineId]=1;
     addPlate({
       bucket:'pkg', opName:pkgName, pkg:true, pfComp:false,
-      unit:unit, seat:to.seat, temp:'',
+      unit:unit, seat:to.seat, priority:to.seatPriority, temp:'',
       selectKey:line&&line.lineId?line.lineId:('pkg|'+to.id),
       status:'unsent', qty:1
     });
@@ -5834,10 +5914,10 @@ function collectWorkingCheckGroups(){
         bucket:'welcome',
         opName:welcomeBits.filter(Boolean).join(' · ') || 'Welcome',
         pfComp:true, pkg:false, unit:0,
-        seat:to.seat, temp:'',
+        seat:to.seat, priority:to.seatPriority, temp:'',
         selectKey:diningLineKey(to.id, welcomeIdx),
         status:welcomeStatus, kind:'welcome',
-        note:positionSubForSeat('welcome', to.seat),
+        note:positionSubForSeat('welcome', to.seat, to.seatPriority),
         ticketPos:defaultTicketPosForKind('welcome'),
         rowFire:true
       });
@@ -5846,15 +5926,15 @@ function collectWorkingCheckGroups(){
       if (isWelcomeTrioCourse(c)) return;
       if (hideEntremetUntilDessert(c, to)) return;
       if (isEntremetCourse(c)) {
-        var entremetName=positionSubForSeat('entremet', to.seat) || operationalDishName(c.choice||c.name||'', c);
+        var entremetName=positionSubForSeat('entremet', to.seat, to.seatPriority) || operationalDishName(c.choice||c.name||'', c);
         addPlate({
           bucket:'entremet',
           opName:entremetName || 'Entremet',
           pfComp:true, pkg:false, unit:0,
-          seat:to.seat, temp:'',
+          seat:to.seat, priority:to.seatPriority, temp:'',
           selectKey:diningLineKey(to.id, i),
           status:c.fired?'sent':(c.skipped?'held':'unsent'),
-          note:positionSubForSeat('entremet', to.seat) && entremetName!==positionSubForSeat('entremet', to.seat) ? positionSubForSeat('entremet', to.seat) : '',
+          note:positionSubForSeat('entremet', to.seat, to.seatPriority) && entremetName!==positionSubForSeat('entremet', to.seat, to.seatPriority) ? positionSubForSeat('entremet', to.seat, to.seatPriority) : '',
           kind:'entremet',
           ticketPos:diningCourseTicketPos(c,i),
           rowFire:true
@@ -5868,7 +5948,7 @@ function collectWorkingCheckGroups(){
         bucket:workingDisplayBucket(c),
         opName:operationalDishName(raw, c),
         pfComp:true, pkg:false, unit:0,
-        seat:to.seat, temp:workingPlateTemp(c),
+        seat:to.seat, priority:to.seatPriority, temp:workingPlateTemp(c),
         selectKey:diningLineKey(to.id, i),
         status:c.fired?'sent':(c.skipped?'held':'unsent'),
         note:c.modNote||'',
@@ -6170,6 +6250,7 @@ function replaceSelectedItem(){
   STATE._replaceLineId=line.lineId;
   STATE._replaceCtx={
     seat:line.seat,
+    seatPriority:line.seatPriority!=null?line.seatPriority:isPriorityPosition(line.seat),
     serviceCourse:line.serviceCourse!=null?line.serviceCourse:line.course,
     ticketPos:line.ticketPos,
     checkId:line.checkId,
@@ -6917,7 +6998,8 @@ function voiceSeatOf(parsed){
   if (parsed && parsed.positionTouched && parsed.seat!=null) return parsed.seat;
   return STATE.activeSeat;
 }
-function voiceResolveVocab(body){
+function voiceResolveVocab(body, options){
+  options=options||{};
   var catalog=voiceCatalogApi();
   if (!catalog) return {action:'none'};
   var entries=voiceVocabEntries();
@@ -6971,7 +7053,7 @@ function voiceResolveVocab(body){
   }
   if (left.temp) mods[voiceTempGroup(item)]=left.temp;
   var preset={mods:mods, notes:notes.filter(Boolean).join(' · ')};
-  if (!voiceCanPrice(item)) {
+  if (!options.deferPrice && !voiceCanPrice(item)) {
     var why='no à la carte price';
     if (left.temp) why+=' · '+left.temp;
     if (preset.notes) why+=' · '+preset.notes;
@@ -7159,6 +7241,7 @@ function voiceRunBatch(act){
 function voiceCommitBatch(){
   var batch=STATE.voiceBatch||[];
   if (!batch.length) return false;
+  if(batch.some(orderLineAllergyWarning)) return false;
   STATE.voiceBatch=null;
   STATE._voiceSuppressSpeech=true;
   try {
@@ -7195,6 +7278,7 @@ function voiceApplyCorrection(act){
     voiceSpeak('Which item should move to position '+toLabel+'?');
     return;
   }
+  if(orderLineAllergyWarning(Object.assign({},target,{seat:act.to.seat,seatPriority:!!act.to.priority}))) return;
   target.seat=act.to.seat;
   target.seatPriority=!!act.to.priority;
   applyVoiceSeat(act.to.seat, !!act.to.priority);
@@ -7392,6 +7476,7 @@ function submitVoiceTest(){
   var el=document.getElementById('voice-test-input');
   var text=el ? el.value : '';
   if (!String(text||'').trim()) return;
+  if(window.receiveVoiceTranscript) return window.receiveVoiceTranscript(text);
   applyVoiceCommand(text);
 }
 window.EPICUREAN_VOICE_TRANSCRIBE_URL='https://us-central1-epicurean-house-at-the-choc-st.cloudfunctions.net/voiceTranscribe';
@@ -7432,9 +7517,11 @@ function postVoiceClip(url, blob){
   return voiceAuthToken().catch(function(){ return ''; }).then(function(token){
     var headers={};
     if (token) headers.Authorization='Bearer '+token;
-    return fetch(url, { method:'POST', headers:headers, body:body });
+    var abort=new AbortController();
+    var timeout=setTimeout(function(){abort.abort();},20000);
+    return fetch(url, { method:'POST', headers:headers, body:body, signal:abort.signal }).finally(function(){clearTimeout(timeout);});
   }).then(function(res){
-    if (!res.ok) throw new Error('transcribe');
+    if (!res.ok) throw new Error('transcribe HTTP '+res.status);
     return res.json();
   }).then(function(data){ return data && (data.transcript||data.text) || ''; });
 }
@@ -7516,10 +7603,11 @@ function voiceSpeak(text){
       try { STATE._voiceRec.recorder.stop(); } catch (err) {}
     }
     synth.cancel();
+    var speechToken=STATE._voiceToken||0;
     var uttered=new window.SpeechSynthesisUtterance(text);
     uttered.rate=1.02;
     var release=function(){
-      if (!STATE._voiceHoldSpeech) return;
+      if (!STATE._voiceHoldSpeech || speechToken!==(STATE._voiceToken||0)) return;
       STATE._voiceHoldSpeech=false;
       if (ensureVoiceSession().on) startVoiceClip(ensureVoiceSession().stream);
     };
@@ -7536,14 +7624,15 @@ function releaseVoiceClip(session){
   clearTimeout(session.timer);
   clearTimeout(session.watch);
   clearInterval(session.levelTimer);
+  try { if(session.source) session.source.disconnect(); if(session.analyser) session.analyser.disconnect(); } catch(e) {}
 }
 function continueVoiceSession(){
   var sess=ensureVoiceSession();
   if (!sess.on || STATE._voiceHoldSpeech) return;
   startVoiceClip(sess.stream);
 }
-function finishVoiceClip(){
-  var session=STATE._voiceRec;
+function finishVoiceClip(session){
+  session=session||STATE._voiceRec;
   if (!session || session.done) return;
   session.done=true;
   var cancelled=!!session.cancelled;
@@ -7554,10 +7643,15 @@ function finishVoiceClip(){
   var chunks=session.chunks||[];
   var mime=session.mime||'audio/mp4';
   releaseVoiceClip(session);
-  STATE._voiceRec=null;
+  if (STATE._voiceRec===session) STATE._voiceRec=null;
   STATE.voicePhase=ensureVoiceSession().on ? 'listening' : '';
   if (STATE.activeTab==='order') renderOrder();
-  if (cancelled || suppressed) return;
+  if (cancelled || suppressed || token!==STATE._voiceToken || !ensureVoiceSession().on) return;
+  if (window.receiveVoiceTranscript) {
+    var commandSession=ensureVoiceSession(); commandSession.on=false; clearTimeout(commandSession.idle);
+    stopVoiceTracks(commandSession.stream); commandSession.stream=null; STATE.voicePhase='hearing';
+    if(STATE._voiceAudio) { try { STATE._voiceAudio.close(); } catch(e) {} STATE._voiceAudio=null; }
+  }
   if (monitored && !heard) { continueVoiceSession(); return; }
   var blob;
   try { blob=new Blob(chunks, { type:mime }); } catch (e) { blob=new Blob(chunks); }
@@ -7565,26 +7659,33 @@ function finishVoiceClip(){
   var pending;
   if (window.EPICUREAN_VOICE_TRANSCRIBE) pending=Promise.resolve().then(function(){ return window.EPICUREAN_VOICE_TRANSCRIBE(blob); });
   else pending=voicePcmBlob(blob).catch(function(){ return blob; }).then(function(out){ return postVoiceClip(window.EPICUREAN_VOICE_TRANSCRIBE_URL, out||blob); });
+  STATE._voiceRequestToken=token;
   pending.then(function(text){
     if (token!==STATE._voiceToken) return;
     var useful=String(text||'').trim();
     if (useful) {
       voiceNoteActivity();
+      if (session.table!==String(STATE.selectedTable) || session.staff!==String(STATE.currentServer&&STATE.currentServer.code) || session.check!==activeCheckId()) return;
+      STATE.voiceLastTranscript=useful;
+      if (window.receiveVoiceTranscript) return Promise.resolve(window.receiveVoiceTranscript(useful, 'clip-'+token)).then(continueVoiceSession);
       applyVoiceCommand(useful);
     }
     continueVoiceSession();
-  }).catch(function(){
+  }).catch(function(err){
     if (token!==STATE._voiceToken) return;
-    toast('Voice did not hear that');
+    STATE.voiceStatus=/401/.test(err&&err.message||'')?'Voice authentication expired. Log in again.':((err&&err.name==='AbortError')?'Voice request timed out. Check unchanged.':'Voice did not hear that: transcription failed. Check unchanged.');
+    toast(STATE.voiceStatus);
     continueVoiceSession();
-  });
+  }).finally(function(){if(STATE._voiceRequestToken===token) STATE._voiceRequestToken=null;});
 }
 function stopVoiceCapture(cancel){
   var session=STATE._voiceRec;
   if (!session) return;
   if (cancel) {
-    session.cancelled=true;
+    session.cancelled=true; session.done=true;
     STATE._voiceToken=(STATE._voiceToken||0)+1;
+    releaseVoiceClip(session);
+    if(STATE._voiceRec===session) STATE._voiceRec=null;
   }
   clearTimeout(session.timer);
   clearTimeout(session.watch);
@@ -7592,7 +7693,7 @@ function stopVoiceCapture(cancel){
   if (session.recorder && session.recorder.state!=='inactive') {
     try { session.recorder.stop(); return; } catch (e) {}
   }
-  finishVoiceClip();
+  finishVoiceClip(session);
 }
 function voiceArmAudio(session){
   var Ctx=window.AudioContext||window.webkitAudioContext;
@@ -7612,7 +7713,7 @@ function voiceWatchSpeech(session){
     analyser.fftSize=1024;
     source.connect(analyser);
   } catch (e) { return; }
-  session.audioCtx=null;
+  session.source=source; session.analyser=analyser;
   session.monitored=true;
   var data=new Uint8Array(analyser.fftSize);
   var noise=0, samples=0, quietSince=0;
@@ -7629,10 +7730,10 @@ function voiceWatchSpeech(session){
     if (speaking) { session.heard=true; quietSince=0; voiceNoteActivity(); return; }
     if (session.heard) {
       if (!quietSince) quietSince=now;
-      if (now-quietSince>(window.VOICE_SILENCE_MS||900)) stopVoiceCapture(false);
+      if (!window.receiveVoiceTranscript && now-quietSince>(window.VOICE_SILENCE_MS||900)) stopVoiceCapture(false);
       return;
     }
-    if (now-(session.startedAt||now)>(window.VOICE_NOSPEECH_MS||4000)) stopVoiceCapture(false);
+    if (!window.receiveVoiceTranscript && now-(session.startedAt||now)>(window.VOICE_NOSPEECH_MS||4000)) stopVoiceCapture(false);
   }, 80);
 }
 function startVoiceClip(stream){
@@ -7640,7 +7741,7 @@ function startVoiceClip(stream){
   if (!sess.on || !voiceStreamLive(stream) || STATE._voiceHoldSpeech) return;
   if (STATE._voiceRec && !STATE._voiceRec.done) return;
   var token=(STATE._voiceToken=(STATE._voiceToken||0)+1);
-  var session={ token:token, cancelled:false, done:false, heard:false, monitored:false, chunks:[], mime:voiceMimeType(), startedAt:Date.now(), stream:stream };
+  var session={ table:String(STATE.selectedTable), check:activeCheckId(), staff:String(STATE.currentServer&&STATE.currentServer.code), token:token, cancelled:false, done:false, heard:false, monitored:false, chunks:[], mime:voiceMimeType(), startedAt:Date.now(), stream:stream };
   STATE._voiceRec=session;
   STATE.voicePhase='listening';
   voiceArmAudio(session);
@@ -7653,28 +7754,35 @@ function startVoiceClip(stream){
   }
   session.recorder=rec;
   rec.ondataavailable=function(ev){ if (ev.data && ev.data.size) session.chunks.push(ev.data); };
-  rec.onerror=function(){ stopVoiceCapture(false); toast('Voice did not hear that'); };
-  rec.onstop=function(){ finishVoiceClip(); };
+  rec.onerror=function(){ if(STATE._voiceRec!==session) return; stopVoiceCapture(true); STATE.voiceStatus='Recording failed. Please repeat the command.'; toast(STATE.voiceStatus); };
+  rec.onstop=function(){ finishVoiceClip(session); };
   try { rec.start(); }
   catch (e) {
     session.cancelled=true;
-    finishVoiceClip();
+    finishVoiceClip(session);
     toast('Microphone did not start');
     return;
   }
   voiceWatchSpeech(session);
-  session.timer=setTimeout(function(){ if (STATE._voiceRec===session) stopVoiceCapture(false); }, window.VOICE_CAPTURE_MS||8000);
-  session.watch=setTimeout(function(){ if (STATE._voiceRec===session) stopVoiceCapture(false); }, window.VOICE_WATCH_MS||12000);
+  session.timer=setTimeout(function(){
+    if (STATE._voiceRec!==session) return;
+    if(window.receiveVoiceTranscript) { stopVoiceCapture(true); stopVoiceSession(); STATE.voiceStatus='Recording limit reached. Please repeat a shorter command.'; renderOrder(); }
+    else stopVoiceCapture(false);
+  }, window.VOICE_CAPTURE_MS||(window.receiveVoiceTranscript?30000:8000));
+  session.watch=setTimeout(function(){ if (STATE._voiceRec===session) stopVoiceCapture(true); }, window.VOICE_WATCH_MS||(window.receiveVoiceTranscript?35000:12000));
 }
 function stopVoiceSession(reason){
   var sess=ensureVoiceSession();
   sess.on=false;
+  STATE._voiceToken=(STATE._voiceToken||0)+1;
+  try { if(window.speechSynthesis) window.speechSynthesis.cancel(); } catch(e) {}
   clearTimeout(sess.idle);
   STATE.voicePhase='';
   STATE._voiceHoldSpeech=false;
   if (STATE._voiceRec) stopVoiceCapture(true);
   stopVoiceTracks(sess.stream);
   sess.stream=null;
+  if (STATE._voiceAudio) { try { STATE._voiceAudio.close(); } catch(e) {} STATE._voiceAudio=null; }
   if (reason==='quiet') toast('Voice off');
   if (STATE.activeTab==='order') renderOrder();
 }
@@ -7682,12 +7790,13 @@ function voiceBindRecovery(){
   if (window._voiceRecoveryBound) return;
   window._voiceRecoveryBound=true;
   document.addEventListener('visibilitychange', function(){
-    if (!document.hidden) voiceRecoverStream();
+    if (document.hidden && window.receiveVoiceTranscript) stopVoiceSession();
+    else if (!document.hidden) voiceRecoverStream();
   });
 }
 function voiceWatchTrack(stream){
   (stream&&stream.getTracks?stream.getTracks():[]).forEach(function(track){
-    track.onended=function(){ voiceRecoverStream(); };
+    track.onended=function(){ if(ensureVoiceSession().on&&ensureVoiceSession().stream===stream) voiceRecoverStream(); };
   });
 }
 function voiceRecoverStream(){
@@ -7701,8 +7810,11 @@ function voiceRecoverStream(){
     return;
   }
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+  var recoveryToken=STATE._voiceToken||0;
   navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:true, noiseSuppression:true, channelCount:1 } }).then(function(stream){
+    if(recoveryToken!==(STATE._voiceToken||0)||!STATE.currentServer) {stopVoiceTracks(stream);return;}
     if (!sess.on) { stopVoiceTracks(stream); return; }
+    if(STATE._voiceRec) { stopVoiceCapture(true); recoveryToken=STATE._voiceToken||0; }
     stopVoiceTracks(sess.stream);
     sess.stream=stream;
     voiceWatchTrack(stream);
@@ -7712,16 +7824,20 @@ function voiceRecoverStream(){
   });
 }
 function startVoiceMicrophone(){
+  if(window.receiveVoiceTranscript && STATE._voiceRequestToken===STATE._voiceToken && STATE._voiceRequestToken!=null) {toast('Finishing the previous command. Please wait.');return;}
   if (STATE._voiceRec && STATE._voiceRec.recorder && STATE._voiceRec.recorder.state!=='inactive') {
     stopVoiceCapture(false);
     return;
   }
-  if (!STATE.selectedTable) { toast('Open a table first'); return; }
+  if (!STATE.currentServer || !STATE.selectedTable) { toast('Log in and open a table first'); return; }
   if (!voiceTranscriberReady()) { toast('Voice transcription is not connected'); return; }
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) {
     toast('Microphone is not available');
     return;
   }
+  try {if(window.speechSynthesis) window.speechSynthesis.cancel();} catch(e) {}
+  STATE._voiceHoldSpeech=false;
+  STATE._voiceToken=(STATE._voiceToken||0)+1;
   var sess=ensureVoiceSession();
   sess.on=true;
   if (!sess.lastUseful) sess.lastUseful=Date.now();
@@ -7731,13 +7847,16 @@ function startVoiceMicrophone(){
   STATE.voicePhase='listening';
   toast('Listening');
   renderOrder();
+  var permissionToken=STATE._voiceToken||0;
   var ready=voiceStreamLive(sess.stream) ? Promise.resolve(sess.stream) : navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:true, noiseSuppression:true, channelCount:1 } });
   ready.then(function(stream){
+    if(permissionToken!==(STATE._voiceToken||0) || !sess.on || !STATE.currentServer) { stopVoiceTracks(stream); return; }
     sess.stream=stream;
     voiceWatchTrack(stream);
     if (!sess.on) { stopVoiceTracks(stream); sess.stream=null; return; }
     startVoiceClip(stream);
   }).catch(function(err){
+    if(permissionToken!==(STATE._voiceToken||0)) return;
     sess.on=false;
     STATE.voicePhase='';
     STATE._voiceRec=null;
@@ -7797,11 +7916,11 @@ function voiceTestHtml(){
 }
 function voiceMicHtml(){
   var on=!!(STATE.voiceSession && STATE.voiceSession.on);
-  var label=on ? (STATE.voicePhase==='hearing' ? 'Hearing' : 'Listening') : 'Mic';
-  var status=STATE.voiceStatus || (on ? 'Listening' : 'Tap Mic, then speak');
+  var label=on ? (window.receiveVoiceTranscript?'Finish command':(STATE.voicePhase==='hearing' ? 'Hearing' : 'Listening')) : 'Mic';
+  var status=STATE.voiceStatus || (on ? 'Say Foodmaster, then your command' : 'Tap Mic. Say Foodmaster to order; confirm before adding.');
   var html='<div class="voice-dock" data-voice-mic="1">';
   html+='<button type="button" class="'+(on?'on':'')+'" onclick="startVoiceMicrophone()">'+label+'</button>';
-  html+='<div class="voice-live-status">'+esc(status)+'</div>';
+  html+='<div class="voice-live-status">'+esc(status)+(window.receiveVoiceTranscript&&STATE.voiceLastTranscript?('<br>Heard: '+esc(STATE.voiceLastTranscript)):'')+'</div>';
   if (on) html+='<button type="button" onclick="stopVoiceSession()">Off</button>';
   return html+'</div>';
 }
@@ -7814,6 +7933,11 @@ function orderTopHtml(){
   html+=renderGuestAllergyStrip();
   html+=renderSeatBar();
   html+=voiceTestHtml();
+  if(window.voicePricingHtml) html+=voicePricingHtml();
+  if(window.EPICUREAN_ORDER_SESSION) {
+    var vs=window.EPICUREAN_ORDER_SESSION.state();
+    if(vs.proposal.length || vs.error) html+='<div class="voice-draft"><b>'+esc(STATE.voiceStatus||'Review voice proposal')+'</b><div class="voice-draft-acts"><button type="button" onclick="receiveVoiceTranscript(&quot;Foodmaster confirm&quot;)">Confirm unsent</button><button type="button" onclick="receiveVoiceTranscript(&quot;Foodmaster cancel&quot;)">Cancel proposal</button></div></div>';
+  }
   return html+'</div>';
 }
 function mountVoiceDock(){
@@ -7925,13 +8049,14 @@ function renderGuestAllergyStrip(){
     if (cur.length) bits.push(seatName(seat)+' '+cur.join(', '));
   }
   collect('table');
-  for (var i=1;i<=n;i++) collect(i);
+  checkPositionIdentities().forEach(collect);
   if (dining) {
     return '<div class="allergy-strip compact-line"><span>'+(bits.length?esc(bits.join(' · ')):'Allergies — tap a guest to flag')+'</span>'+
       '<button type="button" onclick="openAllergyEditor()">Edit</button>'+
       '<button type="button" onclick="sendKitchenAllergyNote()">Send note</button></div>';
   }
-  var open=STATE.allergySeat!=null?STATE.allergySeat:(STATE.activeSeat||'table');
+  var open=STATE.allergySeat!=null?String(STATE.allergySeat):selectedPositionIdentity();
+  if(open!=='table'&&!checkPositionIdentities().includes(open)) open=selectedPositionIdentity();
   var html='<div class="allergy-strip"><div class="as-label">Allergies — tap a guest, then flag</div><div class="as-guests">';
   function pill(seat){
     var cur=seatAllergies(seat);
@@ -7940,7 +8065,7 @@ function renderGuestAllergyStrip(){
       esc(seatName(seat))+(cur.length?' · '+cur.length:'')+'</button>';
   }
   pill('table');
-  for (var i=1;i<=n;i++) pill(i);
+  checkPositionIdentities().forEach(pill);
   html+='</div>';
   var cur=seatAllergies(open);
   html+='<div class="allergy-guest"><b>'+esc(seatName(open))+'</b><div class="chip-row">';
@@ -7984,11 +8109,12 @@ function renderMenuGrid(){
   if (STATE.menuFamily==='drinks') return renderBeverageSearchPanel();
   var nav=STATE.menuNav||{level:'root'};
   var items=STATE.menuItems.length?STATE.menuItems:(STATE.menuLive?[]:SEED_ITEMS);
+  if(window.manualFoodMatch) items=items.filter(function(i){return !isBeverageCatalogItem(i)&&(!STATE.mobileMenuCategory||['pf','tasting'].includes(STATE.mobileMenuCategory)||manualFoodMatch(i,STATE.mobileMenuCategory));});
   var tiles=[];
   var top='';
   var findQ=String(STATE.menuSearch||'').trim();
   if (findQ) {
-    if (extraDishSearchOnly()) {
+    if (extraDishSearchOnly()&&!window.manualFoodMatch) {
       matchPrixFixeExtraDishes(findQ).forEach(function(d){ tiles.push(prixFixeExtraTileHtml(d)); });
       if (!tiles.length) {
         return '<p style="color:var(--text-muted);font-size:0.85rem;padding:0.8rem 0.2rem;">No matching prix fixe dishes. Drinks and wine have their own window.</p>';
@@ -8005,6 +8131,13 @@ function renderMenuGrid(){
       return '<p style="color:var(--text-muted);font-size:0.85rem;padding:0.8rem 0.2rem;">No matches.</p>';
     }
     return paginateTiles(tiles, 'list');
+  }
+  if(window.manualFoodMatch&&STATE.mobileMenuCategory&&STATE.menuFamily!=='drinks'&&!['pf','tasting'].includes(STATE.mobileMenuCategory)){
+    items.filter(function(item){return !isBeverageCatalogItem(item)&&manualFoodMatch(item,STATE.mobileMenuCategory);}).forEach(function(item){
+      var click=item.eightySixed?'toast("86 — not available")':'beginAddItem('+JSON.stringify(String(item.id))+')';
+      tiles.push('<button type="button" class="ts-tile" onclick="'+esc(click)+'">'+esc(item.name)+'<span class="price">'+posLineMoney(Number(item.price)||0)+'</span></button>');
+    });
+    return tiles.length?paginateTiles(tiles,'list'):'<p>No published BOH items in this category.</p>';
   }
   if (nav.level==='root') {
     tiles.push('<button type="button" class="ts-tile food" onclick="setMenuFamily(\'food\')">FOOD</button>');
@@ -8031,7 +8164,7 @@ function renderMenuGrid(){
     });
   } else if (STATE.orderCat==='__tasting__') {
     (STATE.tastingMenus||[]).forEach(function(tm){
-      tiles.push('<button type="button" class="ts-tile prix" onclick="addTastingMenu('+JSON.stringify(String(tm.id))+')">'+esc(tm.name)+'<span class="price">'+posLineMoney(Number(tm.price)||0)+'</span></button>');
+      tiles.push('<button type="button" class="ts-tile prix" onclick="'+esc('addTastingMenu('+JSON.stringify(String(tm.id))+')')+'">'+esc(tm.name)+'<span class="price">'+posLineMoney(Number(tm.price)||0)+'</span></button>');
     });
   } else {
     var catItems=items.filter(function(i){
@@ -8062,7 +8195,7 @@ var WINE_WINDOW_SIZE=50;
 function wineRowHtml(item){
   var click=item.eightySixed ? 'toast("86 — not available")' : 'beginAddItem('+JSON.stringify(String(item.id))+')';
   var vin=itemVinCode(item);
-  return '<button type="button" class="wine-row'+(item.eightySixed?' sold':'')+'" onclick=\''+click+'\'><span>'+esc(item.name)+(vin?' <span class="wine-meta">'+esc(vin)+'</span>':'')+'</span><span class="price">'+posLineMoney(Number(item.price)||0)+'</span></button>';
+  return '<button type="button" data-item-id="'+esc(item.id)+'" class="wine-row'+(item.eightySixed?' sold':'')+'" onclick=\''+click+'\'><span>'+esc(item.name)+(vin?' <span class="wine-meta">'+esc(vin)+'</span>':'')+'</span><span class="price">'+posLineMoney(Number(item.price)||0)+'</span></button>';
 }
 function wineWindowRows(items, start, size){
   start=Math.max(0, start||0);
@@ -8079,6 +8212,7 @@ function renderWineWindow(items, backHtml){
   if (backHtml) html+=backHtml;
   html+='<div class="wine-window-list" id="wine-window-list">'+wineWindowRows(STATE._wineWinItems, start, size)+'</div>';
   if (STATE._wineWinItems.length>size) {
+    if(window.manualWinePage) html+='<div class="manual-wine-pages"><button type="button" data-wine-page="previous" onclick="manualWinePage(-1)">Previous wines</button><button type="button" data-wine-page="next" onclick="manualWinePage(1)">Next wines</button></div>';
     html+='<div class="wine-meta" style="padding:0.35rem 0.4rem">'+(start+1)+'–'+Math.min(STATE._wineWinItems.length, start+size)+' of '+STATE._wineWinItems.length+'</div>';
   }
   return html+'</div>';
@@ -8117,6 +8251,7 @@ function isBeverageCatalogItem(item){
 }
 function ensureBeverageIndex(){
   var items=STATE.menuItems.length?STATE.menuItems:SEED_ITEMS;
+  if(window.manualDrinkMatch&&STATE.mobileMenuCategory) items=items.filter(function(i){return manualDrinkMatch(i,STATE.mobileMenuCategory);});
   var fp=String(STATE._catalogFp||'')+'|'+posIdsFingerprint(items);
   if (STATE._bevIndex && STATE._bevIndex.fp===fp) return STATE._bevIndex;
   STATE._bevIndex={
@@ -8223,7 +8358,7 @@ function renderTastingItems() {
 function findTastingMenu(tmId){
   var lists=[STATE.tastingMenus, typeof SEED_TASTING_MENUS!=='undefined'?SEED_TASTING_MENUS:[]];
   for (var i=0;i<lists.length;i++){
-    var hit=(lists[i]||[]).filter(function(t){ return t && t.id===tmId; })[0];
+    var hit=(lists[i]||[]).filter(function(t){ return t && String(t.id)===String(tmId); })[0];
     if (hit) return hit;
   }
   return null;
@@ -8275,10 +8410,12 @@ function addTastingMenu(tmId) {
   var tm=findTastingMenu(tmId);
   if (!tm) return;
   var courses=(tm.courses||[]).map(hydrateDiningCourse);
+  if(manualMenuAllergyWarning(courses,selectedPositionIdentity())) return;
   STATE.currentOrder.push({
     lineId:genId(),
     table:STATE.selectedTable,
     seat:STATE.activeSeat,
+    seatPriority:/A$/.test(selectedPositionIdentity()),
     course:1,
     held:false,
     qty:1,
@@ -8315,14 +8452,16 @@ function openTastingTempSheet(to){
     });
     html+='</div>';
   });
-  html+='<button class="primary-btn" onclick="confirmTastingTemps('+JSON.stringify(String(to.id))+')">Confirm</button>';
+  html+='<button class="primary-btn" onclick="'+esc('confirmTastingTemps('+JSON.stringify(String(to.id))+')')+'">Confirm</button>';
   html+='<button class="ghost-btn" onclick="closeSheet()">Cancel</button>';
   openSheet(html);
+  STATE.manualOrderingPosition=orderPositionIdentity(to);
 }
 function confirmTastingTemps(toId){
   var to=(STATE.activeTastingOrders||[]).filter(function(o){ return o.id===toId; })[0];
   if (!to) { closeSheet(); return; }
   var ask=diningCourses(to).filter(function(c){ return c && c.askTemp && !c.headingOnly; });
+  if(manualMenuAllergyWarning(ask,orderPositionIdentity(to),to.table)) return;
   ask.forEach(function(c,i){
     var el=document.querySelector('input[name="tm-ask-'+i+'"]:checked');
     if (!el) return;
@@ -8337,6 +8476,7 @@ function openTastingCourseModifySheet(toId, idx){
   if (!to) return;
   var c=diningCourses(to)[idx];
   if (!c) return;
+  STATE.manualOrderingPosition=orderPositionIdentity(to);
   if (c.fired) { toast('Already fired'); return; }
   var temps=c.askTemp?prixFixeTempOptions(c.askTemp, c):[];
   var html='<h2>'+esc(operationalDishName(c.choice||c.name,c))+'</h2>';
@@ -8353,12 +8493,14 @@ function openTastingCourseModifySheet(toId, idx){
   html+='<button class="primary-btn" onclick="saveTastingCourseModify('+JSON.stringify(String(toId))+','+idx+')">Save</button>';
   html+='<button class="ghost-btn" onclick="closeSheet()">Cancel</button>';
   openSheet(html);
+  STATE.manualOrderingPosition=orderPositionIdentity(to);
 }
 function saveTastingCourseModify(toId, idx){
   var to=(STATE.activeTastingOrders||[]).filter(function(o){ return o.id===toId; })[0];
   if (!to) return;
   var c=diningCourses(to)[idx];
   if (!c) return;
+  if(manualMenuAllergyWarning([c],orderPositionIdentity(to),to.table)) return;
   var noteEl=document.getElementById('tm-mod-note');
   if (noteEl) c.modNote=String(noteEl.value||'').trim();
   var tEl=document.querySelector('input[name="tm-mod-temp"]:checked');
@@ -8371,14 +8513,18 @@ function saveTastingCourseModify(toId, idx){
 }
 
 function addPairing(tmId, pairingId) {
-  var tm=STATE.tastingMenus.find(t=>t.id===tmId);
+  var tm=STATE.tastingMenus.find(t=>String(t.id)===String(tmId));
   if (!tm) return;
-  var p=tm.pairings.find(x=>x.id===pairingId);
+  var p=(tm.pairings||[]).find(x=>String(x.id)===String(pairingId));
   if (!p) return;
+  if(!Array.isArray(p.allergens)){openSheet('<h2>Pairing unavailable</h2><p>Published BOH pairing allergen data is required. No item added.</p><button onclick="closeSheet()">Back</button>');return;}
+  if(manualMenuAllergyWarning([{name:p.name,allergens:p.allergens}],selectedPositionIdentity())) return;
+  if(p.price==null||String(p.price).trim()===''||!isFinite(Number(p.price))||Number(p.price)<0||!String(p.name||'').trim()){openSheet('<h2>Pairing unavailable</h2><p>Published BOH pairing identity and price are required. No item added.</p><button onclick="closeSheet()">Back</button>');return;}
   STATE.currentOrder.push({
     lineId:genId(),
     table:STATE.selectedTable,
     seat:STATE.activeSeat,
+    seatPriority:/A$/.test(selectedPositionIdentity()),
     course:1,
     held:false,
     qty:1,
@@ -8389,8 +8535,12 @@ function addPairing(tmId, pairingId) {
     station:'Bar',
     cookTime:0,
     isPairing:true,
+    checkId:activeCheckId(),
+    allergens:p.allergens.slice(),
+    positionSubs:JSON.parse(JSON.stringify(sessionOf(STATE.selectedTable).positionSubs||{})),
     selectedMod:null
   });
+  attachOrderGuestSafety(STATE.currentOrder[STATE.currentOrder.length-1]);
   toast('+ '+p.name);
   renderOrder();
 }
@@ -8620,7 +8770,7 @@ function guestAllergyHits(allergens){
   Object.keys(seats).forEach(function(k){
     (seats[k]||[]).forEach(function(a){
       listed.forEach(function(x){
-        if (String(x).toLowerCase()===String(a).toLowerCase() && flagged.indexOf(x)<0) flagged.push(x);
+        if (allergensConflict(x,a) && flagged.indexOf(x)<0) flagged.push(x);
       });
     });
   });
@@ -8643,17 +8793,26 @@ function suggestedAllergyNote(flags){
   if (flags.some(function(a){ return /nut/.test(a); })) notes.push('ALLERGY NUTS — no nut garnish on entremet.');
   return notes.join(' ');
 }
-function courseAllergyKitchenNote(c){
-  var flags=flaggedAllergies();
+function exactPositionAllergyContext(identity, table){
+  table=table==null?STATE.selectedTable:table;identity=String(identity);
+  var sess=sessionOf(table),check=STATE.checks[String(table)===String(STATE.selectedTable)?activeCheckId():sess.checkId];
+  var key=identity;
+  if(!(check&&Array.isArray(check.positionIdentities))&&/^\d+A$/.test(key)) key=String(parseInt(key,10));
+  var own=asList(sess.allergies&&sess.allergies[key]),shared=asList(sess.allergies&&sess.allergies.table);
+  if(identity==='table') own=Array.from(new Set(Object.keys(sess.allergies||{}).filter(function(k){return k!=='table';}).flatMap(function(k){return asList(sess.allergies[k]);})));
+  return {position:identity,table:String(table),allergens:own,tableAllergies:shared,effectiveAllergens:Array.from(new Set(shared.concat(own)))};
+}
+function courseAllergyKitchenNote(c, identity, table){
+  var flags=identity==null?flaggedAllergies():exactPositionAllergyContext(identity,table).effectiveAllergens;
   var name=String((c&&(c.choice||c.name||c.course))||'').toLowerCase();
   var notes=[];
-  function has(a){ return flags.some(function(x){ return String(x).toLowerCase()===a; }); }
+  function has(a){ return flags.some(function(x){ return allergensConflict(x,a); }); }
   if (has('fish') && /salmon/.test(name)) notes.push('ALLERGY FISH — replace this salmon. Keep ticket as Salmon.');
   if (has('gluten') && /salmon/.test(name)) notes.push('ALLERGY GLUTEN — no bread / no brioche.');
   if (has('gluten') && /zucchini/.test(name)) notes.push('ALLERGY GLUTEN — replace breaded zucchini.');
   if (has('shellfish') && /shrimp/.test(name)) notes.push('ALLERGY SHELLFISH — replace shrimp.');
   if ((has('tree nut')||has('nuts')) && /coconut|sorbet|entremet/.test(name)) notes.push('ALLERGY NUTS — no nut garnish.');
-  return notes.join(' ');
+  return notes.length ? (identity==null?'':'Position '+identity+' — ')+notes.join(' ') : '';
 }
 function dessertHasBeenChosen(to){
   if (to && to.dessertChosen) return true;
@@ -8673,6 +8832,8 @@ function hideEntremetUntilDessert(c, to){
   return !dessertHasBeenChosen(to);
 }
 function mergedPositionSubs(kind){
+  var saved=sessionOf(STATE.selectedTable).positionSubs;
+  if(saved&&Object.prototype.hasOwnProperty.call(saved,kind)) return Object.assign({},saved[kind]);
   var map={};
   tableDiningOrders().forEach(function(to){
     var src=(to.positionSubs && to.positionSubs[kind]) || {};
@@ -8686,19 +8847,22 @@ function mergedPositionSubs(kind){
   });
   return map;
 }
-function positionSubForSeat(kind, seat){
-  var map=mergedPositionSubs(kind);
-  var key=String(seat);
-  return map[key] || map[positionLabel(seat)] || '';
+function positionSubForSeat(kind, seat, priority){
+  var map=mergedPositionSubs(kind),identity=String(seat),check=STATE.checks[activeCheckId()];
+  var exact=check&&Array.isArray(check.positionIdentities);
+  if(!exact&&map[String(parseInt(identity,10))]) return map[String(parseInt(identity,10))];
+  if(/^\d+$/.test(identity)) identity+=priority!=null?(priority?'A':''):(exact&&checkPositionIdentities().includes(identity)?'':(isPriorityPosition(seat)?'A':''));
+  return map[identity]||'';
 }
 function diningPositionSubNote(to, c){
   if (!to || !c) return '';
   var kind=isWelcomeTrioCourse(c)?'welcome':(isEntremetCourse(c)?'entremet':'');
   if (!kind) return '';
   var map=(c.positionSubs && Object.keys(c.positionSubs).length)?c.positionSubs:((to.positionSubs&&to.positionSubs[kind])||{});
-  var text=map[String(to.seat)] || map[positionLabel(to.seat)] || '';
+  var identity=orderPositionIdentity(to),check=STATE.checks[to.checkId||activeCheckId()];
+  var text=map[identity]||(!(check&&Array.isArray(check.positionIdentities))?map[String(parseInt(identity,10))]:'')||'';
   if (!text) return '';
-  return positionLabel(to.seat)+' — '+text;
+  return identity+' — '+text;
 }
 function openPositionSubSheet(kind){
   var n=sessionOf(STATE.selectedTable).guestCount||2;
@@ -8706,38 +8870,42 @@ function openPositionSubSheet(kind){
   var title=kind==='entremet'?'Pre-dessert substitution':'Complimentary substitution';
   var std=kind==='entremet'?'Coconut-lime sorbet with rum glazed pineapple':'Salmon · Zucchini Milanese · Shrimp';
   var html='<h2>'+esc(title)+'</h2><p class="sheet-sub">Standard: '+esc(std)+'. Short replacement per position — does not rename the master dish.</p>';
-  for (var i=1;i<=n;i++){
-    html+='<label class="sheet-sub" style="display:block;margin:0.45rem 0 0.15rem">'+esc(positionLabel(i))+'</label>';
-    html+='<input class="search-box pos-sub-input" data-seat="'+i+'" value="'+esc(map[String(i)]||'')+'" placeholder="e.g. Salad instead of Zucchini">';
-  }
+  checkPositionIdentities().forEach(function(identity){
+    html+='<label class="sheet-sub" style="display:block;margin:0.45rem 0 0.15rem">'+esc(identity)+'</label>';
+    html+='<input class="search-box pos-sub-input" data-seat="'+esc(identity)+'" value="'+esc(map[identity]||'')+'" placeholder="Position-specific substitution note">';
+  });
   html+='<button class="primary-btn" onclick=\'savePositionSubs('+JSON.stringify(String(kind))+')\'>Save</button>';
   html+='<button class="ghost-btn" onclick="closeSheet()">Cancel</button>';
   openSheet(html);
 }
 function savePositionSubs(kind){
+  if(kind!=='welcome'&&kind!=='entremet') return;
   var map={};
   document.querySelectorAll('.pos-sub-input').forEach(function(el){
     var seat=String(el.getAttribute('data-seat')||'');
     var v=String(el.value||'').trim();
-    if (seat && v) map[seat]=v;
+    if (checkPositionIdentities().includes(seat) && v) map[seat]=v;
   });
+  var session=sessionOf(STATE.selectedTable);session.positionSubs=session.positionSubs||{};session.positionSubs[kind]=Object.assign({},map);
   tableDiningOrders().forEach(function(to){
     to.positionSubs=to.positionSubs||{};
+    var oldOrderMap=Object.assign({},to.positionSubs[kind]||{});
     to.positionSubs[kind]=Object.assign({}, map);
     diningCourses(to).forEach(function(c){
       if (kind==='welcome' && !isWelcomeTrioCourse(c)) return;
       if (kind==='entremet' && !isEntremetCourse(c)) return;
+      var oldMap=c.positionSubs&&Object.keys(c.positionSubs).length?c.positionSubs:oldOrderMap;
+      var priorLabels=Object.keys(oldMap).flatMap(function(k){return [k,positionLabel(parseInt(k,10))].map(function(label){return label+' — '+oldMap[k];});});
       c.positionSubs=Object.assign({}, map);
       var sub=diningPositionSubNote(to, c);
-      var keep=String(c.modNote||'').split(' · ').filter(function(p){
-        return p && p.indexOf('ALLERGY')>-1;
-      });
+      var keep=String(c.modNote||'').split(' · ').filter(function(p){return p&&priorLabels.indexOf(p)<0;});
       c.modNote=[sub].concat(keep).filter(Boolean).join(' · ');
     });
   });
+  applyDiningAllergyNotes();
   closeSheet();
   STATE.selectedLineIds={};
-  persistCheck(ensureOpenCheck(STATE.selectedTable));
+  ensureOpenCheck(STATE.selectedTable);persistTableSafety();
   renderOrder();
   toast('Substitution saved');
 }
@@ -8758,14 +8926,16 @@ function applyDiningAllergyNotes(){
   var tableNote=String(sessionOf(STATE.selectedTable).kitchenNote||'').trim();
   tableDiningOrders().forEach(function(to){
     diningCourses(to).forEach(function(c){
-      var auto=courseAllergyKitchenNote(c);
+      var identity=orderPositionIdentity(to);
+      c.allergyContext=exactPositionAllergyContext(identity,to.table);
+      var auto=courseAllergyKitchenNote(c,identity,to.table);
       var keep=String(c.modNote||'');
       var bits=[];
       var sub=diningPositionSubNote(to, c);
-      if (sub) bits.push(sub);
-      if (keep && keep.indexOf('ALLERGY')<0 && keep!==tableNote && keep!==sub) bits.push(keep);
-      if (auto) bits.push(auto);
-      if (tableNote) bits.push(tableNote);
+      var previous=(c.generatedSafetyNotes||[]).concat([courseAllergyKitchenNote(c),auto,sub,tableNote]);
+      keep.split(' · ').forEach(function(note){if(note&&previous.indexOf(note)<0) bits.push(note);});
+      c.generatedSafetyNotes=[sub,auto,tableNote].filter(Boolean);
+      bits=bits.concat(c.generatedSafetyNotes);
       var seen={};
       c.modNote=bits.filter(function(b){ if (!b || seen[b]) return false; seen[b]=1; return true; }).join(' · ');
     });
@@ -8775,18 +8945,26 @@ function saveAllergyKitchenNote(){
   var el=document.getElementById('allergy-kitchen-note');
   if (el) sessionOf(STATE.selectedTable).kitchenNote=String(el.value||'').trim();
   applyDiningAllergyNotes();
+  ensureOpenCheck(STATE.selectedTable);persistTableSafety();
+}
+function buildKitchenAllergyNote(){
+  var check=STATE.checks[activeCheckId()],table=String(STATE.selectedTable),sess=sessionOf(table);
+  if(!check||check.status!=='open'||String(check.table)!==table) return null;
+  var tableAllergies=asList(sess.allergies&&sess.allergies.table);
+  var positions=checkPositionIdentities().map(function(identity){
+    var allergens=asList(seatAllergies(identity));
+    return {position:identity,allergens:allergens,effectiveAllergens:Array.from(new Set(tableAllergies.concat(allergens))),substitutions:{welcome:positionSubForSeat('welcome',identity),entremet:positionSubForSeat('entremet',identity)}};
+  });
+  var body=['Table restrictions: '+(tableAllergies.join(', ')||'none')].concat(positions.map(function(p){
+    return 'Position '+p.position+' — guest restrictions: '+(p.allergens.join(', ')||'none')+'; effective restrictions: '+(p.effectiveAllergens.join(', ')||'none')+Object.keys(p.substitutions).filter(function(k){return p.substitutions[k];}).map(function(k){return '; '+k+': '+p.substitutions[k];}).join('');
+  }));
+  if(sess.kitchenNote) body.push('Table note: '+String(sess.kitchenNote));
+  return {table:STATE.selectedTable,checkId:check.id,server:STATE.currentServer?STATE.currentServer.name:'Unknown',allergyContext:{version:1,table:table,checkId:check.id,tableAllergies:tableAllergies,positions:positions,kitchenNote:String(sess.kitchenNote||'')},items:[{id:'note_'+Date.now(),name:'KITCHEN NOTE — allergies',station:'Expo',cookTime:0,modifiers:[],selectedMod:body.join(' · '),notes:body.join(' · ')}],status:'new',sentAt:Date.now(),clearedAt:null,isKitchenNote:true};
 }
 function sendKitchenAllergyNote(){
   saveAllergyKitchenNote();
-  var flags=flaggedAllergies();
-  var sess=sessionOf(STATE.selectedTable);
-  var body=[suggestedAllergyNote(flags), String(sess.kitchenNote||'').trim(), flags.length?('Flags: '+flags.join(', ')):'No allergy flags'].filter(Boolean).join(' · ');
-  var order={
-    table: STATE.selectedTable,
-    server: STATE.currentServer?STATE.currentServer.name:'Unknown',
-    items:[{id:'note_'+Date.now(), name:'KITCHEN NOTE — allergies', station:'Expo', cookTime:0, modifiers:[], selectedMod:body, notes:body}],
-    status:'new', sentAt:Date.now(), clearedAt:null, isKitchenNote:true
-  };
+  var sess=sessionOf(STATE.selectedTable),order=buildKitchenAllergyNote();
+  if(!order){toast('Open the correct check before sending notes');return;}
   var local=Object.assign({id:genId()}, order);
   STATE.orders.push(local);
   if (!STATE._localOrders) STATE._localOrders=[];
@@ -8848,6 +9026,7 @@ function prixFixeTempOptions(kind, opt){
 }
 
 function openPrixFixeSelector(pfId) {
+  STATE.manualOrderingPosition=selectedPositionIdentity();STATE.manualSelectingPfId=pfId;
   if (seatHasPrixFixe(STATE.activeSeat)) {
     warnPrixFixeAlreadyOnSeat();
     return;
@@ -8889,7 +9068,7 @@ function openPrixFixeSelector(pfId) {
     html+='</div></div>';
   });
   html+='<div class="pf-course-select"><label>Modifier / kitchen note</label>';
-  html+='<input class="search-box" id="pf-mod-note" placeholder="No onion, extra sauce, allergy confirmed…"></div>';
+  html+='<input class="search-box" id="pf-mod-note" placeholder="Kitchen instructions — notes do not clear allergens"></div>';
   html+='<div class="pf-sel-actions"><button class="send-btn" onclick=\'confirmPrixFixe('+JSON.stringify(String(pf.id))+')\'>Add to Order</button>'+
     '<button class="cancel-pay-btn" onclick="backToOrderScreen()">Back to order</button></div></div>';
   ov.innerHTML=html;
@@ -8897,10 +9076,31 @@ function openPrixFixeSelector(pfId) {
 }
 
 function closePfSelector() {
+  STATE.manualOrderingPosition=null;STATE.manualSelectingPfId=null;
   var ov=document.getElementById('pf-overlay');
   if (ov) { ov.classList.remove('show'); ov.innerHTML=''; }
 }
 
+function attachOrderGuestSafety(line){
+  var identity=orderPositionIdentity(line),sess=sessionOf(line.table==null?STATE.selectedTable:line.table);
+  line.positionSubs=JSON.parse(JSON.stringify(sess.positionSubs||{}));
+  line.allergyContext=exactPositionAllergyContext(identity,line.table);
+  var check=STATE.checks[line.checkId||activeCheckId()],legacy=!(check&&Array.isArray(check.positionIdentities));
+  var key=legacy&&/^\d+A$/.test(identity)?String(parseInt(identity,10)):identity;
+  line.substitutionContext={position:identity,welcome:(line.positionSubs.welcome||{})[key]||'',entremet:(line.positionSubs.entremet||{})[key]||''};
+}
+function orderLineAllergyWarning(line){
+  return manualMenuAllergyWarning([{name:line.name,allergens:line.allergens}].concat(line.selections||line.courses||[]),orderPositionIdentity(line),line.table);
+}
+function manualMenuAllergyWarning(courses, identity, table){
+  var context=exactPositionAllergyContext(identity,table);
+  var conflicts=(courses||[]).filter(function(c){return !c.noneChoice&&!c.headingOnly;}).map(function(c){var hits=asList(c.allergens).filter(function(a){return context.effectiveAllergens.some(function(b){return allergensConflict(a,b);});});return hits.length?{name:c.choice||c.name||c.course,hits:hits}:null;}).filter(Boolean);
+  if(!conflicts.length) return false;
+  var html='<div class="manual-preadd-warning" role="alert">Position '+esc(identity)+' — allergy conflict: '+conflicts.map(function(c){return esc(c.name)+': '+esc(c.hits.join(', '));}).join(' · ')+'</div><p>Nothing added. A substitution note does not remove BOH allergens. Choose a compatible published option. No override is authorized; notes never resolve an allergen conflict.</p>';
+  var target=document.querySelector('#pf-overlay.show .pf-selector')||document.querySelector('#sheet-overlay.show .sheet');
+  if(target){var old=target.querySelector('[data-manual-allergy-block]');if(old)old.remove();var box=document.createElement('section');box.setAttribute('data-manual-allergy-block','1');box.innerHTML=html;target.prepend(box);if(box.scrollIntoView)box.scrollIntoView({block:'start'});}else {openSheet('<h2>Allergy warning</h2>'+html+'<button class="ghost-btn" onclick="closeSheet()">Back</button>');STATE.manualOrderingPosition=identity;}
+  return true;
+}
 function confirmPrixFixe(pfId) {
   if (seatHasPrixFixe(STATE.activeSeat)) {
     warnPrixFixeAlreadyOnSeat();
@@ -8943,6 +9143,7 @@ function confirmPrixFixe(pfId) {
   if (missingTemp) { toast('Choose temperature for '+missingTemp); return; }
   if (missingScoops) { toast('Choose scoops for '+missingScoops); return; }
   var selections=buildPrixFixeSelections(pf, picked);
+  if(manualMenuAllergyWarning(selections,selectedPositionIdentity())) return;
   selections.forEach(function(s,si){
     var ci=-1;
     (pf.courses||[]).forEach(function(c,i){
@@ -8960,7 +9161,7 @@ function confirmPrixFixe(pfId) {
   if (noteEl) kitchenNote=String(noteEl.value||'').trim();
   if (kitchenNote) selections.forEach(function(s){ s.modNote=s.modNote||kitchenNote; });
   selections.forEach(function(s){
-    var auto=courseAllergyKitchenNote(s);
+    var auto=courseAllergyKitchenNote(s,selectedPositionIdentity());
     if (auto && String(s.modNote||'').indexOf(auto)<0) s.modNote=s.modNote ? (s.modNote+' · '+auto) : auto;
   });
   var totalUpcharge=selections.reduce(function(s,x){ return s+(x.pending?0:(Number(x.upcharge)||0)); },0);
@@ -8971,6 +9172,7 @@ function confirmPrixFixe(pfId) {
     lineId:genId(),
     table:STATE.selectedTable,
     seat:STATE.activeSeat,
+    seatPriority:/A$/.test(selectedPositionIdentity()),
     course:1,
     held:false,
     qty:1,
@@ -9141,6 +9343,7 @@ function beginAddItem(itemId) {
     lineId:genId(),
     table:STATE.selectedTable,
     seat:STATE.activeSeat,
+    seatPriority:/A$/.test(selectedPositionIdentity()),
     course:defaultCourse(item),
     held:false,
     checkId:activeCheckId(),
@@ -9182,7 +9385,7 @@ function beginAddItem(itemId) {
   STATE.pendingItem.serviceCourse=STATE.pendingItem.course;
   if (STATE._replaceCtx) {
     var ctx=STATE._replaceCtx;
-    STATE.pendingItem.seat=ctx.seat;
+    if(!assignPendingPosition(String(ctx.seat)+(ctx.seatPriority?'A':''))){STATE.pendingItem=null;toast('Original exact position unavailable');return;}
     if (ctx.serviceCourse!=null) {
       STATE.pendingItem.course=ctx.serviceCourse;
       STATE.pendingItem.serviceCourse=ctx.serviceCourse;
@@ -9213,20 +9416,47 @@ function beginAddItem(itemId) {
   maybeAllergyThenAdd();
 }
 
+function assignPendingPosition(identity){
+  var p=STATE.pendingItem;identity=String(identity);
+  if(!p || (identity!=='table'&&!checkPositionIdentities().includes(identity))) return false;
+  if((p.checkId&&p.checkId!==activeCheckId()) || String(p.table)!==String(STATE.selectedTable)) return false;
+  p.seat=identity==='table'?'table':parseInt(identity,10);
+  p.seatPriority=identity!=='table'&&/A$/.test(identity);
+  return true;
+}
+function setPendingPosition(identity){
+  if(!assignPendingPosition(identity)){toast('Select an existing exact check position');return;}
+  renderModifierSheet();
+}
+function pendingPositionValid(p){
+  return !!p&&String(p.table)===String(STATE.selectedTable)&&(!p.checkId||p.checkId===activeCheckId())&&(p.seat==='table'?!p.seatPriority:checkPositionIdentities().includes(orderPositionIdentity(p)));
+}
+function addPendingGuestSeat(){
+  if(!pendingPositionValid(STATE.pendingItem)){toast('Finish the current check edit first');return;}
+  var sess=sessionOf(STATE.selectedTable),check=STATE.checks[activeCheckId()];
+  var next=Math.max(sess.guestCount||2,...checkPositionIdentities().map(function(p){return parseInt(p,10);})) + 1;
+  if(next>20){toast('Maximum position reached');return;}
+  sess.guestCount=next;STATE.guestCount=next;
+  if(check&&Array.isArray(check.positionIdentities)) check.positionIdentities.push(String(next));
+  // Explicit manual Add seat registers authority before selecting, never copies a suffix.
+  persistCheck(check||ensureOpenCheck(STATE.selectedTable));setPendingPosition(String(next));
+}
 function renderModifierSheet(){
   var p=STATE.pendingItem; if(!p) return;
   var html='<h2>'+p.name+'</h2>';
   if (p.extraPlate) {
-    html+='<p class="sheet-sub">'+esc(seatName(p.seat))+'</p>';
+    html+='<p class="sheet-sub">'+esc(seatName(orderPositionIdentity(p)))+'</p>';
   } else {
-    html+='<p class="sheet-sub">'+posLineMoney(p.price)+' · '+seatName(p.seat)+'</p>';
+    html+='<p class="sheet-sub">'+posLineMoney(p.price)+' · '+seatName(orderPositionIdentity(p))+'</p>';
   }
   if (isPosWineItem(p)) html+=wineGuideHtml(p);
   html+='<div class="tasting-section-label">Seat</div><div class="seat-pick-list">';
   var n=sessionOf(STATE.selectedTable).guestCount||2;
-  html+='<button type="button" class="'+(p.seat==='table'?'active':'')+'" onclick="STATE.pendingItem.seat=\'table\';renderModifierSheet()">Share</button>';
-  for (var i=1;i<=n;i++) html+='<button type="button" class="'+(String(p.seat)===String(i)?'active':'')+'" onclick="STATE.pendingItem.seat='+i+';renderModifierSheet()">Seat '+i+'</button>';
-  html+='<button type="button" onclick="var s=sessionOf(STATE.selectedTable);s.guestCount=Math.min(20,(s.guestCount||2)+1);STATE.guestCount=s.guestCount;STATE.pendingItem.seat=s.guestCount;renderModifierSheet()">+ Add seat</button></div>';
+  html+='<button type="button" data-pending-position="table" class="'+(p.seat==='table'?'active':'')+'" onclick="setPendingPosition(\'table\')">Share</button>';
+  checkPositionIdentities().forEach(function(identity){
+    html+='<button type="button" data-pending-position="'+esc(identity)+'" class="'+(orderPositionIdentity(p)===identity?'active':'')+'" onclick="'+esc('setPendingPosition('+JSON.stringify(identity)+')')+'">Seat '+esc(identity)+'</button>';
+  });
+  html+='<button type="button" onclick="addPendingGuestSeat()">+ Add seat</button></div>';
   html+='<div class="tasting-section-label">Quantity</div><div class="qty-row">';
   html+='<button type="button" onclick="STATE.pendingItem.qty=Math.max(1,(STATE.pendingItem.qty||1)-1);renderModifierSheet()">−</button>';
   html+='<div style="font-size:1.3rem;font-weight:800;">'+(p.qty||1)+'</div>';
@@ -9286,13 +9516,13 @@ function modifiersReady(p){
 }
 function maybeAllergyThenAdd(){
   var p=STATE.pendingItem; if(!p) return;
+  if(!pendingPositionValid(p)){toast('Invalid exact position or check; no item added');return;}
   var hits=allergenHits(p, p.seat);
   if (hits.length) {
     openSheet(
       '<h2>Allergy warning</h2>'+
-      '<div class="warn-banner">'+seatName(p.seat)+' flagged: '+hits.join(', ')+'. This item lists those allergens.</div>'+
-      '<p class="sheet-sub">'+p.name+' will not be added unless you confirm.</p>'+
-      '<button class="primary-btn" style="background:var(--danger);color:#fff;" onclick="commitPendingItem()">Send anyway</button>'+
+      '<div class="warn-banner">'+seatName(orderPositionIdentity(p))+' flagged: '+hits.join(', ')+'. This item lists those allergens.</div>'+
+      '<p class="sheet-sub">'+esc(p.name)+' cannot be added. No override is authorized. Notes do not remove allergens.</p>'+
       '<button class="ghost-btn" onclick="closeSheet()">Cancel</button>'
     );
     return;
@@ -9301,7 +9531,10 @@ function maybeAllergyThenAdd(){
 }
 function commitPendingItem(){
   var p=STATE.pendingItem; if(!p) return;
+  if(!pendingPositionValid(p)){toast('Invalid exact position or check; no item added');return;}
+  if(orderLineAllergyWarning(p)) return;
   if (!modifiersReady(p)) { toast('Choose required modifiers'); return; }
+  attachOrderGuestSafety(p);
   if (STATE._voiceCommit) p.voiceOrigin=true;
   settleVoiceDraftForItem(p.id);
   if (p.serviceCourse==null) p.serviceCourse=p.course||defaultCourse(p);
@@ -9336,7 +9569,7 @@ function commitPendingItem(){
     toast('Updated '+p.name);
   } else {
     STATE.currentOrder.push(p);
-    toast('+ '+p.name+' · '+seatName(p.seat));
+    toast('+ '+p.name+' · '+seatName(orderPositionIdentity(p)));
   }
   persistCheck(ensureOpenCheck(STATE.selectedTable));
   closeSheet();
@@ -9378,7 +9611,12 @@ function stayOrder(){
 function moveLineSeat(lineId, seat){
   var line=STATE.currentOrder.find(function(i){return i.lineId===lineId;});
   if (!line) return;
-  line.seat=seat;
+  var check=STATE.checks[activeCheckId()],identity=String(seat);
+  if(!(check&&Array.isArray(check.positionIdentities))&&/^\d+$/.test(identity)) identity=positionLabel(seat);
+  if(identity!=='table'&&!checkPositionIdentities().includes(identity)){toast('Invalid exact position');return;}
+  var candidate=Object.assign({},line,{seat:identity==='table'?'table':parseInt(identity,10),seatPriority:/A$/.test(identity)});
+  if(orderLineAllergyWarning(candidate)) return;
+  line.seat=candidate.seat;line.seatPriority=candidate.seatPriority;attachOrderGuestSafety(line);
   renderCheck();
   paintChrome();
 }
@@ -9386,6 +9624,7 @@ function moveLineSeat(lineId, seat){
 function bumpLineQty(lineId, d){
   var line=STATE.currentOrder.find(function(i){return i.lineId===lineId;});
   if (!line || line.held===undefined) return;
+  if(d>0&&orderLineAllergyWarning(line)) return;
   line.qty=Math.max(1,(parseInt(line.qty,10)||1)+d);
   persistCheck(ensureOpenCheck(STATE.selectedTable));
   renderOrder();
@@ -9422,6 +9661,7 @@ function createSisterCheck(table){
     },
     updatedAt:Date.now()
   };
+  if(Array.isArray(primary.positionIdentities)) check.positionIdentities=primary.positionIdentities.slice();
   STATE.checks[id]=check;
   sess.checkIds=tableCheckIds(table);
   if (sess.checkIds.indexOf(id)<0) sess.checkIds.push(id);
@@ -9429,6 +9669,7 @@ function createSisterCheck(table){
   return check;
 }
 function assignLineToCheck(lineId, checkId){
+  (STATE.activeTastingOrders||[]).forEach(function(to){if(to._boundLine===lineId) to.checkId=checkId;});
   unsentFor().forEach(function(i){ if (i.lineId===lineId) i.checkId=checkId; });
   STATE.orders.forEach(function(o){
     if (String(o.table)!==String(STATE.selectedTable)) return;
@@ -9504,12 +9745,12 @@ function splitBySeat(){
   var n=sessionOf(STATE.selectedTable).guestCount||STATE.guestCount||2;
   var bySeat={};
   unsentFor().forEach(function(i){
-    var sk=String(i.seat==null?'table':i.seat);
+    var sk=i.seat==null?'table':orderPositionIdentity(i);
     (bySeat[sk]=bySeat[sk]||[]).push(i);
   });
   STATE.orders.filter(function(o){ return String(o.table)===String(STATE.selectedTable)&&o.status==='new'; }).forEach(function(o){
     (o.items||[]).forEach(function(i){
-      var sk=String(i.seat==null?'table':i.seat);
+      var sk=i.seat==null?'table':orderPositionIdentity(i);
       (bySeat[sk]=bySeat[sk]||[]).push(i);
     });
   });
@@ -9624,6 +9865,7 @@ function transferCheckTo(newTable){
   dest.kitchenNote=sess.kitchenNote||'';
   dest.kitchenNoteSent=!!sess.kitchenNoteSent;
   dest.allergies=JSON.parse(JSON.stringify(sess.allergies||{table:[]}));
+  dest.positionSubs=JSON.parse(JSON.stringify(sess.positionSubs||{}));
   dest.femalePositions=Object.assign({}, sess.femalePositions||{});
   dest.positionStates=JSON.parse(JSON.stringify(sess.positionStates||{}));
   dest.checkId=sess.checkId||null;
@@ -9801,40 +10043,40 @@ function reapplyCombines(){
   });
 }
 function mergeChecksIntoTable(srcTable, destTable){
-  destTable=String(destTable);
-  srcTable=String(srcTable);
-  if (srcTable===destTable) return;
-  var srcIds=tableCheckIds(srcTable);
-  var srcHas = srcIds.length || unsentFor(srcTable).length || tableHasOrder(srcTable);
-  var destHas = tableCheckIds(destTable).length || unsentFor(destTable).length || tableHasOrder(destTable);
-  var srcSess=STATE.tableSessions[srcTable];
-  var destSess=sessionOf(destTable);
-  if (srcSess) {
-    destSess.guestCount=Math.max(destSess.guestCount||0, srcSess.guestCount||0) || destSess.guestCount;
-    destSess.seatedAt=destSess.seatedAt||srcSess.seatedAt;
-    destSess.allergies=destSess.allergies||srcSess.allergies;
+  destTable=String(destTable);srcTable=String(srcTable);
+  if(srcTable===destTable) return;
+  var srcIds=tableCheckIds(srcTable),destIds=tableCheckIds(destTable);
+  var srcSess=sessionOf(srcTable),destSess=sessionOf(destTable);
+  function identities(ids,sess){
+    var out=[],explicit=false;ids.forEach(function(id){if(Array.isArray(STATE.checks[id].positionIdentities)) explicit=true;(STATE.checks[id].positionIdentities||[]).forEach(function(p){if(out.indexOf(p)<0) out.push(p);});});
+    if(!out.length) for(var i=1;i<=(sess.guestCount||2);i++) out.push(String(i)+(sess.femalePositions&&sess.femalePositions[i]?'A':''));
+    Object.keys(sess.allergies||{}).concat(Object.keys((sess.positionSubs||{}).welcome||{}),Object.keys((sess.positionSubs||{}).entremet||{})).forEach(function(p){if(!explicit&&/^\d+$/.test(p)&&sess.femalePositions&&sess.femalePositions[p]) p+='A';if(/^\d+A?$/.test(p)&&out.indexOf(p)<0) out.push(p);});
+    return out;
   }
+  var dstPositions=identities(destIds,destSess),srcPositions=identities(srcIds,srcSess),mapping={},bases={};
+  var next=Math.max.apply(null,[0].concat(dstPositions.concat(srcPositions).map(function(p){return parseInt(p,10)||0;})))+1;
+  srcPositions.forEach(function(p){var base=parseInt(p,10);if(!bases[base]) bases[base]=dstPositions.some(function(d){return parseInt(d,10)===base;})?String(next++):String(base);mapping[p]=bases[base]+(/A$/.test(p)?'A':'');});
+  var all=dstPositions.concat(srcPositions.map(function(p){return mapping[p];}));
+  destSess.allergies=destSess.allergies||{table:[]};
+  destSess.allergies.table=Array.from(new Set(asList(destSess.allergies.table).concat(asList(srcSess.allergies&&srcSess.allergies.table))));
+  srcPositions.forEach(function(p){var explicit=srcIds.some(function(id){return Array.isArray(STATE.checks[id].positionIdentities);});var key=!explicit&&/A$/.test(p)?String(parseInt(p,10)):p;destSess.allergies[mapping[p]]=asList(srcSess.allergies&&srcSess.allergies[key]).slice();});
+  destSess.positionSubs=destSess.positionSubs||{};
+  ['welcome','entremet'].forEach(function(kind){var map=Object.assign({},destSess.positionSubs[kind]||{});Object.keys((srcSess.positionSubs||{})[kind]||{}).forEach(function(p){var identity=mapping[p]?p:(srcSess.femalePositions&&srcSess.femalePositions[p]?p+'A':p);if(mapping[identity]) map[mapping[identity]]=srcSess.positionSubs[kind][p];});destSess.positionSubs[kind]=map;});
+  destSess.kitchenNote=[destSess.kitchenNote,srcSess.kitchenNote?('From table '+srcTable+': '+srcSess.kitchenNote):''].filter(Boolean).join(' · ');
+  destSess.guestCount=all.length;destSess.seatedAt=destSess.seatedAt||srcSess.seatedAt;
+  destSess.safetyRevision=Math.max(Date.now(),(destSess.safetyRevision||0)+1,(srcSess.safetyRevision||0)+1);
+  var previousTable=STATE.selectedTable,previousView=STATE.viewCheckId;
+  STATE.selectedTable=destTable;STATE.viewCheckId=null;
+  var dest=ensureOpenCheck(destTable);destIds.forEach(function(id){STATE.checks[id].positionIdentities=all.slice();});dest.positionIdentities=all;dest.positionMerge={sourceTable:srcTable,positions:mapping};
+  function remap(line){var old=orderPositionIdentity(line),identity=mapping[old];if(identity){line.seat=parseInt(identity,10);line.seatPriority=/A$/.test(identity);}line.table=destTable;line.checkId=dest.id;attachOrderGuestSafety(line);}
+  STATE.currentOrder.forEach(function(i){if(String(i.table)===srcTable) remap(i);});
+  STATE.orders.forEach(function(o){if(String(o.table)===srcTable&&o.status==='new'){o.table=destTable;o.checkId=dest.id;(o.items||[]).forEach(remap);}});
+  (STATE.activeTastingOrders||[]).forEach(function(to){if(String(to.table)!==srcTable) return;remap(to);to.positionSubs=JSON.parse(JSON.stringify(destSess.positionSubs));diningCourses(to).forEach(function(c){var kind=isWelcomeTrioCourse(c)?'welcome':(isEntremetCourse(c)?'entremet':'');if(kind)c.positionSubs=Object.assign({},destSess.positionSubs[kind]);});});
+  srcIds.forEach(function(id){var ch=STATE.checks[id];if(ch){ch.status='merged';ch.mergedInto=dest.id;persistCheck(ch);}});
   delete STATE.tableSessions[srcTable];
-  if (!srcHas && !destHas) return;
-  var dest=ensureOpenCheck(destTable);
-  srcIds.forEach(function(id){
-    var ch=STATE.checks[id];
-    if (!ch) return;
-    ch.status='merged';
-    ch.mergedInto=dest.id;
-    persistCheck(ch);
-  });
-  STATE.currentOrder.forEach(function(i){
-    if (String(i.table)===srcTable) { i.table=destTable; i.checkId=dest.id; }
-  });
-  STATE.orders.forEach(function(o){
-    if (String(o.table)===srcTable && o.status==='new') {
-      o.table=destTable;
-      o.checkId=dest.id;
-      (o.items||[]).forEach(function(i){ i.checkId=dest.id; });
-    }
-  });
-  persistCheck(dest);
+  STATE.viewCheckId=dest.id;applyDiningAllergyNotes();persistTableSafety();
+  STATE.selectedTable=String(previousTable)===srcTable?destTable:previousTable;
+  STATE.viewCheckId=String(previousTable)===srcTable?dest.id:previousView;
 }
 function combineTables(a, b){
   a=resolveTableNumber(a);
@@ -9860,8 +10102,9 @@ function combineTables(a, b){
   mergeChecksIntoTable(drop, keep);
   var seats=keepObj.seats||2;
   var sess=sessionOf(keep);
-  sess.guestCount=seats;
-  STATE.guestCount=seats;
+  var mergedCheck=STATE.checks[sess.checkId];
+  sess.guestCount=mergedCheck&&mergedCheck.positionIdentities?mergedCheck.positionIdentities.length:seats;
+  STATE.guestCount=sess.guestCount;
   STATE.selectedTable=keep;
   var stayOnOrder=STATE.activeTab==='order';
   closeSheet();
@@ -9949,7 +10192,7 @@ function openAllergyEditor(){
     return h+'</div>';
   }
   html+=block('table');
-  for (var i=1;i<=n;i++) html+=block(i);
+  checkPositionIdentities().forEach(function(identity){html+=block(identity);});
   var suggested=suggestedAllergyNote(flaggedAllergies());
   html+='<div class="tasting-section-label">Note for the kitchen</div>';
   if (suggested) html+='<p class="sheet-sub">'+esc(suggested)+'</p>';
@@ -9959,10 +10202,16 @@ function openAllergyEditor(){
   openSheet(html);
 }
 function toggleAllergy(seat, name, stay){
+  seat=String(seat);
+  if(seat!=='table'&&!checkPositionIdentities().includes(seat)) return;
+  if(COMMON_ALLERGENS.indexOf(name)<0) return;
+  var note=document.getElementById('allergy-kitchen-note');
+  if(note) sessionOf(STATE.selectedTable).kitchenNote=String(note.value||'').trim();
   var list=seatAllergies(seat);
   var i=list.indexOf(name);
   if (i>-1) list.splice(i,1); else list.push(name);
   applyDiningAllergyNotes();
+  ensureOpenCheck(STATE.selectedTable);persistTableSafety();
   if (stay) { renderOrder(); return; }
   openAllergyEditor();
 }
@@ -10136,7 +10385,7 @@ function kitchenItemsFrom(lines){
       out.push({
         id:i.id, name:i.name, station:i.station, cookTime:i.cookTime||0,
         modifiers:i.modifiers||[], selectedMod:i.selectedMod||null,
-        seat:i.seat||'table', course:course, notes:i.notes||'',
+        seat:i.seat||'table', seatPriority:i.seatPriority!=null?!!i.seatPriority:null, course:course, notes:i.notes||'',
         qty:1, allergens:i.allergens||[], price:Number(i.price)||0,
         lineId:i.lineId, checkId:i.checkId||cid,
         extraPlate:!!i.extraPlate, pfExtra:!!i.pfExtra, pfCourseKind:i.pfCourseKind||null,
@@ -10156,6 +10405,7 @@ function kitchenItemsFrom(lines){
 
 function startDiningFromCheckLine(ti){
   if (!ti || !(ti.isTasting || ti.isPrixFixe)) return null;
+  attachOrderGuestSafety(ti);
   if (ti.diningOrderId) {
     return (STATE.activeTastingOrders||[]).filter(function(o){ return o.id===ti.diningOrderId; })[0] || null;
   }
@@ -10191,6 +10441,8 @@ function startDiningFromCheckLine(ti){
       status:'active',
       seat:ti.seat||STATE.activeSeat||'table',
       sentAt:Date.now(),
+      seatPriority:ti.seatPriority!=null?ti.seatPriority:isPriorityPosition(ti.seat),
+      checkId:ti.checkId||activeCheckId(),
       _boundLine:ti.lineId
     };
   } else {
@@ -10215,12 +10467,17 @@ function startDiningFromCheckLine(ti){
       status:'active',
       seat:ti.seat||STATE.activeSeat||'table',
       sentAt:Date.now(),
+      seatPriority:ti.seatPriority!=null?ti.seatPriority:isPriorityPosition(ti.seat),
+      checkId:ti.checkId||activeCheckId(),
       _boundLine:ti.lineId
     };
     if (dessertHasBeenChosen(dining)) dining.dessertChosen=true;
   }
   if (!STATE.activeTastingOrders) STATE.activeTastingOrders=[];
+  dining.positionSubs=JSON.parse(JSON.stringify(sessionOf(STATE.selectedTable).positionSubs||{}));
+  diningCourses(dining).forEach(function(c){var kind=isWelcomeTrioCourse(c)?'welcome':(isEntremetCourse(c)?'entremet':'');if(kind&&Object.prototype.hasOwnProperty.call(dining.positionSubs,kind)) c.positionSubs=Object.assign({},dining.positionSubs[kind]);});
   STATE.activeTastingOrders.push(dining);
+  applyDiningAllergyNotes();
   ti.diningOrderId=dining.id;
   postKitchenTicket(dining, 'tasting_orders');
   return dining;
@@ -10363,7 +10620,7 @@ function fireDiningCourse(to, quiet, idx){
   if (subNote && String(nextCourse.modNote||'').indexOf(subNote)<0) {
     nextCourse.modNote=nextCourse.modNote ? (nextCourse.modNote+' · '+subNote) : subNote;
   }
-  var allergyNote=courseAllergyKitchenNote(nextCourse);
+  var allergyNote=courseAllergyKitchenNote(nextCourse,orderPositionIdentity(to),to.table);
   var tableNote=String(sessionOf(to.table||STATE.selectedTable).kitchenNote||'').trim();
   if (allergyNote && notes.indexOf(allergyNote)<0) notes.push(allergyNote);
   if (tableNote && notes.indexOf(tableNote)<0) notes.push(tableNote);
@@ -10374,8 +10631,13 @@ function fireDiningCourse(to, quiet, idx){
   var courseOrder={
     table: to.table,
     server: to.server,
+    position:orderPositionIdentity(to),
+    checkId:to.checkId||activeCheckId(),
+    lineId:to._boundLine||null,
     tastingCourse:{
       type:isPf?'prix_fixe':'tasting',
+      position:orderPositionIdentity(to),
+      allergyContext:exactPositionAllergyContext(orderPositionIdentity(to),to.table),
       menuName:menuName,
       courseNum:i+1,
       totalCourses:courses.length,
@@ -10448,6 +10710,7 @@ function saveCourseNote(orderId, idx){
   var to=STATE.activeTastingOrders.find(function(o){ return o.id===orderId; });
   if (!to) return;
   var c=diningCourses(to)[idx];
+  if(!c||manualMenuAllergyWarning([c],orderPositionIdentity(to),to.table)) return;
   var el=document.getElementById('course-mod-note');
   if (c && el) c.modNote=String(el.value||'').trim();
   closeSheet();
@@ -10471,6 +10734,7 @@ function extraInvoiceEntries(){
       qty:parseInt(row.qty,10)||1,
       price:Number(row.price)||0,
       seat:row.seat,
+      seatPriority:line.seatPriority!=null?line.seatPriority:null,
       status:row.status,
       mods:row.mods,
       notes:row.notes,
@@ -10638,7 +10902,10 @@ function diningCourseOptions(to, c){
 }
 function applyOptionToDiningCourse(c, opt, extras){
   extras=extras||{};
-  if (!c || !opt) return;
+  if (!c || !opt) return false;
+  var owner=(STATE.activeTastingOrders||[]).find(function(to){return diningCourses(to).indexOf(c)>=0;});
+  if(!owner){toast('Open the owning check before editing a course');return false;}
+  if(manualMenuAllergyWarning([opt],orderPositionIdentity(owner),owner.table)) return false;
   c.pending=false;
   c.skipped=false;
   c.noneChoice=false;
@@ -10663,6 +10930,7 @@ function applyOptionToDiningCourse(c, opt, extras){
 function openDiningCourseEditor(toId, idx){
   var to=(STATE.activeTastingOrders||[]).find(function(o){ return o.id===toId; });
   if (!to) return;
+  STATE.manualOrderingPosition=orderPositionIdentity(to);
   var c=diningCourses(to)[idx];
   if (!c) return;
   if (c.fired || (c.skipped && !c.noneChoice)) { toast('Already fired'); return; }
@@ -10684,7 +10952,7 @@ function openDiningCourseEditor(toId, idx){
   html+='<div class="pf-course-select"><label>Choose one</label><div class="pf-options">';
   html+=pfNoneRadioHtml('pf-edit-opt', !!(c.noneChoice || /^none$/i.test(current)));
   options.forEach(function(o,oi){
-    var hits=guestAllergyHits(o.allergens);
+    var hits=allergenHits(Object.assign({},o,{seatPriority:to.seatPriority}),to.seat);
     var temps=prixFixeTempOptions(o.askTemp, o);
     var checked=current && String(o.name)===current;
     html+='<label class="pf-opt-label"><input type="radio" name="pf-edit-opt" value="'+oi+'"'+(checked?' checked':'')+'>'+
@@ -10735,7 +11003,9 @@ function confirmDiningCourseEdit(toId, idx){
     if (!tEl) { toast('Choose temperature'); return; }
     extras.temp=tEl.value;
   }
-  applyOptionToDiningCourse(c, opt, extras);
+  if(manualMenuAllergyWarning([opt],orderPositionIdentity(to),to.table)) return;
+  if(applyOptionToDiningCourse(c, opt, extras)===false) return;
+  applyDiningAllergyNotes();
   var line=(STATE.currentOrder||[]).filter(function(i){ return i.diningOrderId===to.id || i.lineId===to._boundLine; })[0];
   if (line && line.selections && line.selections[idx]) line.selections[idx]=Object.assign({}, c);
   closePfSelector();
@@ -10783,6 +11053,7 @@ function eraseDiningCourse(toId, idx, quiet){
 function openDessertSelector(orderId){
   var to=STATE.activeTastingOrders.find(function(o){ return o.id===orderId; });
   if (!to) return;
+  STATE.manualOrderingPosition=orderPositionIdentity(to);
   var options=dessertOptionsFor(to);
   if (!options.length) { toast('No dessert options on the menu'); return; }
   var later=diningCourses(to).filter(function(c){ return c.later || c.mode==='later'; })[0];
@@ -10828,11 +11099,13 @@ function toggleDessertScoops(active){
 function confirmDessert(orderId){
   var to=STATE.activeTastingOrders.find(function(o){ return o.id===orderId; });
   if (!to) return;
+  STATE.manualOrderingPosition=orderPositionIdentity(to);
   var options=dessertOptionsFor(to);
   var radios=document.querySelectorAll('input[name="dessert-opt"]');
   var sel=-1;
   radios.forEach(function(r){ if(r.checked) sel=r.value; });
   if (isPfNonePick(sel)) {
+    if(manualMenuAllergyWarning(diningCourses(to).filter(isEntremetCourse),orderPositionIdentity(to),to.table)) return;
     diningCourses(to).forEach(function(c){
       if (c.entremets || c.mode==='entremets') c.pending=false;
       if (c.later || c.mode==='later') applyNoneToDiningCourse(c,{later:true});
@@ -10861,6 +11134,7 @@ function confirmDessert(orderId){
   });
   var dessertAllergens=(opt.allergens||[]).slice();
   scoopAllergens.forEach(function(a){ if(dessertAllergens.indexOf(a)<0) dessertAllergens.push(a); });
+  if(manualMenuAllergyWarning([{name:opt.name,allergens:dessertAllergens}].concat(diningCourses(to).filter(isEntremetCourse)),orderPositionIdentity(to),to.table)) return;
   diningCourses(to).forEach(function(c){
     if (c.entremets || c.mode==='entremets'){
       c.pending=false;

@@ -1,0 +1,25 @@
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Direct call bypassed conflict
++ actual - expected
+
++ '{"lines":[{"id":"sf_d_napoleon","name":"Napoleon of chocolate painted fillo","desc":"Layered with chocolate-espresso mousse, bitter chocolate crumbs and praline cream","course":"Dolce","station":"Pastry","upcharge":0,"photoUrl":"","story":"","storyUrl":"","pairing":"Inniskillin Ice Wine “Vidal Pearl” 2021 · $30","pairWhite":"","pairRed":"","pairDessert":"Inniskillin Ice Wine “Vidal Pearl” 2021 · $30","order":60,"allergens":["Gluten","Dairy","Egg","Tree Nut"],"dietary":[],"chooseCount":0,"scoops":null,"cookNote":"","cookTime":0,"ingredients":"chocolate, fillo, espresso, praline","askTemp":"","sourceUrl":"","moreUrl":"","voiceKeyword":"NAPOLEON","voiceAliases":[],"i18n":{"es":{"name":"Napoleón de chocolate sobre fillo","desc":"Mousse de chocolate y espresso, migas de chocolate amargo y crema praliné"},"fr":{"name":"Napoléon au chocolat sur filo","desc":"Mousse chocolat-espresso, éclats de chocolat amer et crème praliné"},"zh":{"name":"巧克力千层酥（菲罗饼皮）","desc":"巧克力浓缩咖啡慕斯、苦巧克力碎、果仁糖奶油"}},"lineId":"LAB-conflict","table":"14","checkId":"chk_mv73fross6ab","seat":2,"seatPriority":true,"mods":{},"modifiers":[],"notes":"Replace nuts; confirmed safe","allergyConfirmed":true,"noneChoice":true,"positionSubs":{"welcome":{"2":"LAB 2 note","2A":"LAB 2A note"},"entremet":{"2A":"LAB 2A entremet"}},"allergyContext":{"position":"2A","table":"14","allergens":["Nuts"],"tableAllergies":[],"effectiveAllergens":["Nuts"]},"substitutionContext":{"position":"2A","welcome":"LAB 2A note","entremet":"LAB 2A entremet"},"serviceCourse":"Dolce"}],"dining":[],"orders":[],"allergies":{"1":[],"2":[],"3":[],"table":[],"2A":["Nuts"]}}'
+- '{"lines":[],"dining":[],"orders":[],"allergies":{"2":[],"table":[],"2A":["Nuts"]}}'
+
+    at file:///workspace/epicurean-pos/test/manual-allergy-paths.mjs:11:602
+    at test (file:///workspace/epicurean-pos/test/manual-allergy-paths.mjs:8:22)
+    at file:///workspace/epicurean-pos/test/manual-allergy-paths.mjs:11:2
+    at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+    at async node:internal/modules/esm/loader:643:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: '{"lines":[{"id":"sf_d_napoleon","name":"Napoleon of chocolate painted fillo","desc":"Layered with chocolate-espresso mousse, bitter chocolate crumbs and praline cream","course":"Dolce","station":"Pastry","upcharge":0,"photoUrl":"","story":"","storyUrl":"","pairing":"Inniskillin Ice Wine “Vidal Pearl” 2021 · $30","pairWhite":"","pairRed":"","pairDessert":"Inniskillin Ice Wine “Vidal Pearl” 2021 · $30","order":60,"allergens":["Gluten","Dairy","Egg","Tree Nut"],"dietary":[],"chooseCount":0,"scoops":null,"cookNote":"","cookTime":0,"ingredients":"chocolate, fillo, espresso, praline","askTemp":"","sourceUrl":"","moreUrl":"","voiceKeyword":"NAPOLEON","voiceAliases":[],"i18n":{"es":{"name":"Napoleón de chocolate sobre fillo","desc":"Mousse de chocolate y espresso, migas de chocolate amargo y crema praliné"},"fr":{"name":"Napoléon au chocolat sur filo","desc":"Mousse chocolat-espresso, éclats de chocolat amer et crème praliné"},"zh":{"name":"巧克力千层酥（菲罗饼皮）","desc":"巧克力浓缩咖啡慕斯、苦巧克力碎、果仁糖奶油"}},"lineId":"LAB-conflict","table":"14","checkId":"chk_mv73fross6ab","seat":2,"seatPriority":true,"mods":{},"modifiers":[],"notes":"Replace nuts; confirmed safe","allergyConfirmed":true,"noneChoice":true,"positionSubs":{"welcome":{"2":"LAB 2 note","2A":"LAB 2A note"},"entremet":{"2A":"LAB 2A entremet"}},"allergyContext":{"position":"2A","table":"14","allergens":["Nuts"],"tableAllergies":[],"effectiveAllergens":["Nuts"]},"substitutionContext":{"position":"2A","welcome":"LAB 2A note","entremet":"LAB 2A entremet"},"serviceCourse":"Dolce"}],"dining":[],"orders":[],"allergies":{"1":[],"2":[],"3":[],"table":[],"2A":["Nuts"]}}',
+  expected: '{"lines":[],"dining":[],"orders":[],"allergies":{"2":[],"table":[],"2A":["Nuts"]}}',
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.19.0

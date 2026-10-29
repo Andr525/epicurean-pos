@@ -1,0 +1,29 @@
+{
+  "baseline": "cfeceb8b211b334e4dc080f2dbed82c8c0e4e27f",
+  "exactFailure": {
+    "joinedSeatCourse": "unparsed: position 2appetizer",
+    "porkPriceGuard": "no à la carte price · Medium"
+  },
+  "appetizer": "unparsed: soft egg yolk",
+  "multiCourse": {
+    "utterance": "Position 2A appetizer soft egg yolk raviolo main course pork chop medium confirm",
+    "lines": [
+      "sf_m_pork"
+    ],
+    "drafts": [
+      "unparsed: soft egg yolk"
+    ]
+  },
+  "correction": {
+    "utterance": "Actually make that pork chop medium well instead",
+    "mods": {
+      "Temperature": "Medium"
+    },
+    "draft": ""
+  },
+  "logout": {
+    "server": null,
+    "voiceStillOn": true,
+    "lateTranscriptApplied": 1
+  }
+}

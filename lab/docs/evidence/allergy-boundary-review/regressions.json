@@ -1,0 +1,62 @@
+[
+  {
+    "command": "node test/manual-allergy-paths.mjs",
+    "exitCode": 0,
+    "evidence": "manual-allergy-paths.txt"
+  },
+  {
+    "command": "node test/manual-mobile-opt-in.mjs",
+    "exitCode": 0,
+    "evidence": "manual-mobile-opt-in.txt"
+  },
+  {
+    "command": "node test/manual-mobile-safety.mjs",
+    "exitCode": 0,
+    "evidence": "manual-mobile-safety.txt"
+  },
+  {
+    "command": "node test/manual-table-safety.mjs",
+    "exitCode": 0,
+    "evidence": "manual-table-safety.txt"
+  },
+  {
+    "command": "node test/REPRO-C1-phantom-3A.mjs",
+    "exitCode": 0,
+    "evidence": "REPRO-C1-phantom-3A.txt"
+  },
+  {
+    "command": "node test/manual-allergy-recovery-notes.mjs",
+    "exitCode": 0,
+    "evidence": "manual-allergy-recovery-notes.txt"
+  },
+  {
+    "command": "node test/manual-allergy-identity.mjs",
+    "exitCode": 0,
+    "evidence": "manual-allergy-identity.txt"
+  },
+  {
+    "command": "node test/service-workflow.mjs",
+    "exitCode": 0,
+    "evidence": "service-workflow.txt"
+  },
+  {
+    "command": "node test/fine-dining-check.mjs",
+    "exitCode": 0,
+    "evidence": "fine-dining-check.txt"
+  },
+  {
+    "command": "node test/table-geometry.mjs",
+    "exitCode": 0,
+    "evidence": "table-geometry.txt"
+  },
+  {
+    "command": "node test/handheld-refine.mjs",
+    "exitCode": 0,
+    "evidence": "handheld-refine.txt"
+  },
+  {
+    "command": "node lab/test/security.mjs",
+    "exitCode": 0,
+    "evidence": "security.txt"
+  }
+]

@@ -1,0 +1,12 @@
+{
+  "parent": "f873663",
+  "node": "24.19.0",
+  "sourceHashes": {
+    "index.html": "4f8c95bf74521a1f5f82d5460be2105d0e23a05bc1460d33a0d07406bc5aeb02",
+    "manual-mobile.js": "086be3ae2bb75c5cee4c62c45f3f3b5baa94f25d2718971ae975a7c492987992",
+    "test/manual-allergen-matching.mjs": "809f39fffa13fa1be6b9ff35f7daaf71c8e0aa1406f7910b063fb8429b62a9d1",
+    "test/manual-allergy-paths.mjs": "010aebb12adbbaf16d133ffd0d82059c571666a77b7cf13f477ddfb4cf4505c3"
+  },
+  "formalAcceptance": "0/60",
+  "physicalDeviceTested": false
+}

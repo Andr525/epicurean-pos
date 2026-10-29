@@ -1,0 +1,49 @@
+{
+  "baseCommit": "f13ebfa",
+  "localSecurityCommands": {
+    "passed": 12,
+    "failed": 0,
+    "report": "regressions.json"
+  },
+  "allergyPathGroups": {
+    "sourceBackedLocal": 11,
+    "simulatedPairingMetadata": 1,
+    "report": "manual-allergy-paths.txt"
+  },
+  "syntheticScreens": {
+    "passed": 5,
+    "failed": 0,
+    "report": "synthetic-screens.json"
+  },
+  "trustedChromiumCheckpoints": {
+    "passed": 16,
+    "failed": 0,
+    "report": "native-mobile.json"
+  },
+  "authenticPairingAcceptance": "BLOCKED",
+  "standaloneFoodCatalogAcceptance": "BLOCKED",
+  "physical": "NOT_RUN",
+  "durableDatabase": "NOT_TESTED",
+  "formalAccepted": 0,
+  "negativeControls": [
+    {
+      "command": "POS_SOURCE_COMMIT=f13ebfa node test/manual-allergy-paths.mjs",
+      "expectedExitCode": 1,
+      "evidence": "base-f13ebfa-allergy.txt"
+    },
+    {
+      "command": "POS_SOURCE_COMMIT=f13ebfa node test/manual-mobile-opt-in.mjs",
+      "expectedExitCode": 1,
+      "evidence": "base-f13ebfa-opt-in.txt"
+    }
+  ],
+  "sourceSha256": {
+    "index.html": "4896a4cb144982b4f01e865cbcf478ca82c121826d00cd11712245ead481c905",
+    "manual-mobile.js": "a5b7d5ba538c510817a2d667328c92e3627ed0e6c8e5d2498f6cc4faee1df963",
+    "lab/server.mjs": "029b9d5477853c2924bad782f4eb3121ad3a6e587de4c05797fa1721ce388ebc",
+    "test/manual-allergy-paths.mjs": "1a610d2494127b35c4f77c12119c6548ffca67d7e354404a7e5a45a1551f68eb",
+    "test/manual-mobile-opt-in.mjs": "ed733e29ebd897749aad122cbaf0af5f1905af6f4f8aff92503ef7faec5f14c8",
+    "lab/fixtures/scalini-dining.js": "4073c2157582157c0cfc1f817b83decf5641aee969d9afb61d1520acbc83a9dc",
+    "lab/fixtures/cellar.js": "4185a0fc10838a4d99c086c1aae334c6b248266812269974d5c67911f1b35b13"
+  }
+}

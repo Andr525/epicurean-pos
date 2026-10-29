@@ -1,0 +1,11 @@
+{
+  "deviceAccessApproved": false,
+  "scope": "isolated-pos-fixture-only",
+  "host": "PRIVATE_MAC_LAN_IP",
+  "additionalSpendingLimitMicroUsd": 0,
+  "expiresAt": "OWNER_SELECTED_TIME_MAX_ONE_HOUR",
+  "nativeAutomationApproved": false,
+  "udid": null,
+  "wdaBundleId": null,
+  "testOrigin": null
+}

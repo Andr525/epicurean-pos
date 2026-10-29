@@ -1,0 +1,23 @@
+{
+  "baseCommit": "f4346d7",
+  "physical": "NOT_RUN",
+  "formalAccepted": 0,
+  "nativeMobile": "native-mobile.json",
+  "syntheticScreens": "synthetic-screens.json",
+  "localRegressions": "regressions.json",
+  "negativeControl": {
+    "command": "POS_SOURCE_COMMIT=f4346d7 node test/manual-mobile-safety.mjs",
+    "exitCode": 1,
+    "evidence": "base-f4346d7.txt"
+  },
+  "sourceSha256": {
+    "index.html": "66a445344cc3128629e56987e298514c8db4e1fb09f4109b2a414b301df7920b",
+    "manual-mobile.js": "c85aa7533ec62316e344acb0d3488990db6d7c4094d59218d328ead851e92951",
+    "lab/server.mjs": "d277b55fb2474aa8bc7fe671f11624750ee94a12f8da8c24ab32c2c1dbc74400",
+    "lab/test/manual-mobile.mjs": "680d89ac6454acc7c982cdf6f81c71f59186fb0c43d8004ddcb1ddc0558d6178",
+    "test/manual-mobile-safety.mjs": "99609e83a0707a87b60a300af291f82548fd52a07b15994c546db42cb29d19d9",
+    "lab/fixtures/scalini-dining.js": "4073c2157582157c0cfc1f817b83decf5641aee969d9afb61d1520acbc83a9dc",
+    "lab/fixtures/cellar.js": "4185a0fc10838a4d99c086c1aae334c6b248266812269974d5c67911f1b35b13"
+  },
+  "nativeCheckpoints": 16
+}

@@ -1,0 +1,105 @@
+{
+  "baseCommit": "0545f74",
+  "tests": [
+    {
+      "command": "node test/manual-table-safety.mjs",
+      "exitCode": 0,
+      "result": "PASS",
+      "evidence": "manual-table-safety.txt"
+    },
+    {
+      "command": "node test/REPRO-C1-phantom-3A.mjs",
+      "exitCode": 0,
+      "result": "PASS",
+      "evidence": "REPRO-C1-phantom-3A.txt"
+    },
+    {
+      "command": "node test/REPRO-C2-C3-allergy-open.mjs",
+      "exitCode": 0,
+      "result": "PASS",
+      "evidence": "REPRO-C2-C3-allergy-open.txt"
+    },
+    {
+      "command": "node test/manual-allergy-identity.mjs",
+      "exitCode": 0,
+      "result": "PASS",
+      "evidence": "manual-allergy-identity.txt"
+    },
+    {
+      "command": "node test/manual-allergy-recovery-notes.mjs",
+      "exitCode": 0,
+      "result": "PASS",
+      "evidence": "manual-allergy-recovery-notes.txt"
+    },
+    {
+      "command": "node test/service-workflow.mjs",
+      "exitCode": 0,
+      "result": "PASS",
+      "evidence": "service-workflow.txt"
+    },
+    {
+      "command": "node test/fine-dining-check.mjs",
+      "exitCode": 0,
+      "result": "PASS",
+      "evidence": "fine-dining-check.txt"
+    },
+    {
+      "command": "node test/table-geometry.mjs",
+      "exitCode": 0,
+      "result": "PASS",
+      "evidence": "table-geometry.txt"
+    },
+    {
+      "command": "node test/handheld-refine.mjs",
+      "exitCode": 0,
+      "result": "PASS",
+      "evidence": "handheld-refine.txt"
+    },
+    {
+      "command": "node lab/test/security.mjs",
+      "exitCode": 0,
+      "result": "PASS",
+      "evidence": "security.txt"
+    }
+  ],
+  "mode": "local real-POS code; no database, emulator or physical device",
+  "negativeControl": {
+    "command": "POS_SOURCE_COMMIT=0545f74 node test/manual-table-safety.mjs",
+    "exitCode": 1,
+    "evidence": "base-0545f74.txt"
+  },
+  "formalAccepted": 0,
+  "browser": {
+    "passed": 5,
+    "failed": 0,
+    "aborted": 0,
+    "report": "screens.json",
+    "physicalDeviceTested": false
+  },
+  "retainedFailure": {
+    "report": "menu-obstruction-before.json",
+    "status": "FAIL before responsive flex layout repair",
+    "physicalDeviceTested": false
+  },
+  "sourceSha256": {
+    "index.html": "7638a0194d6f81b64ee0e5be04af47fc58ee98fc9bde596b42e15abecf9e109b",
+    "test/manual-table-safety.mjs": "c226be9cd3b5710e3229078e58d19dd3b587369147fc712caadd244f3b848c78",
+    "lab/bootstrap.js": "56970f956d0b3f93dd97a1477cd393bf2edeb46534d9cbeb0c122a5d8a8e0cd7",
+    "lab/suite.js": "4633fbcead1359b8498552b19319ae003e8c65ac05f8a6062390b48c1d055008",
+    "lab/fixtures/scalini-dining.js": "4073c2157582157c0cfc1f817b83decf5641aee969d9afb61d1520acbc83a9dc",
+    "lab/fixtures/cellar.js": "4185a0fc10838a4d99c086c1aae334c6b248266812269974d5c67911f1b35b13"
+  },
+  "handsOnSmoke": {
+    "status": "passed",
+    "driver": "Playwright trusted clicks in Chromium",
+    "physicalDeviceTested": false,
+    "steps": [
+      "Hands-on POS",
+      "PIN 5000",
+      "table 14",
+      "position 2A",
+      "position 2",
+      "STOP returns lab controls"
+    ]
+  }
+}

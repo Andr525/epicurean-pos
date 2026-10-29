@@ -1,0 +1,101 @@
+{
+  "passed": true,
+  "checkLines": 5,
+  "prixFixe": {
+    "id": "pf_scalini_89",
+    "price": 89
+  },
+  "actualBrowserAudioRequests": 17,
+  "audio": [
+    {
+      "bytes": 9002,
+      "mime": "audio/wav"
+    },
+    {
+      "bytes": 9002,
+      "mime": "audio/wav"
+    },
+    {
+      "bytes": 10922,
+      "mime": "audio/wav"
+    },
+    {
+      "bytes": 9002,
+      "mime": "audio/wav"
+    },
+    {
+      "bytes": 10922,
+      "mime": "audio/wav"
+    },
+    {
+      "bytes": 9002,
+      "mime": "audio/wav"
+    },
+    {
+      "bytes": 10922,
+      "mime": "audio/wav"
+    },
+    {
+      "bytes": 9002,
+      "mime": "audio/wav"
+    },
+    {
+      "bytes": 9002,
+      "mime": "audio/wav"
+    },
+    {
+      "bytes": 10922,
+      "mime": "audio/wav"
+    },
+    {
+      "bytes": 9002,
+      "mime": "audio/wav"
+    },
+    {
+      "bytes": 9002,
+      "mime": "audio/wav"
+    },
+    {
+      "bytes": 9002,
+      "mime": "audio/wav"
+    },
+    {
+      "bytes": 9002,
+      "mime": "audio/wav"
+    },
+    {
+      "bytes": 9002,
+      "mime": "audio/wav"
+    },
+    {
+      "bytes": 9002,
+      "mime": "audio/wav"
+    },
+    {
+      "bytes": 9002,
+      "mime": "audio/wav"
+    }
+  ],
+  "demonstrated": [
+    "guest gate",
+    "three courses",
+    "proposal correction",
+    "BOH prices",
+    "stable-line modifier correction",
+    "duplicate delivery",
+    "logout with pending HTTP",
+    "new session order",
+    "BOH 86 blocks confirmation",
+    "no SEND/FIRE",
+    "model price injection rejected",
+    "invalid multi-course atomicity",
+    "manual line protection",
+    "late model result rejected",
+    "exact pescatore/pork command",
+    "joined seat/course boundary",
+    "unpriced dishes fail safely",
+    "explicit prix-fixe basis",
+    "vague correction clarification",
+    "manual prix-fixe pricing and included courses"
+  ]
+}

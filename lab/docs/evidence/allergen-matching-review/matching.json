@@ -1,0 +1,108 @@
+{
+  "results": [
+    {
+      "guest": "Nuts",
+      "item": "Tree Nut",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Tree Nut",
+      "item": "Nuts",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Nuts",
+      "item": "Peanut",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Peanut",
+      "item": "Nuts",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Nut",
+      "item": "Tree Nuts",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "tree-nut(s)",
+      "item": "NUTS",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Nuts",
+      "item": "Groundnuts",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Peanuts",
+      "item": "peanut",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "TREE_NUTS",
+      "item": "Tree Nut",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Eggs",
+      "item": "Egg",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Sulphites",
+      "item": "Sulfite",
+      "result": "PASS",
+      "evidence": "synthetic label metadata; direct mutation blocked, order unchanged"
+    },
+    {
+      "guest": "Tree Nut",
+      "item": "Peanut",
+      "result": "PASS",
+      "evidence": "specific categories remain separate"
+    },
+    {
+      "guest": "Tree Nuts",
+      "item": "Groundnuts",
+      "result": "PASS",
+      "evidence": "specific categories remain separate"
+    },
+    {
+      "guest": "Peanut",
+      "item": "Tree Nut",
+      "result": "PASS",
+      "evidence": "specific categories remain separate"
+    },
+    {
+      "guest": "Fish",
+      "item": "Shellfish",
+      "result": "PASS",
+      "evidence": "specific categories remain separate"
+    },
+    {
+      "guest": "Nutmeg",
+      "item": "Nuts",
+      "result": "PASS",
+      "evidence": "specific categories remain separate"
+    },
+    {
+      "result": "PASS",
+      "evidence": "authentic compatible beverage added at 2A with original BOH price"
+    }
+  ],
+  "limitations": [
+    "Label variants use synthetic metadata only; no authentic peanut-bearing published dish supplied",
+    "No database, kitchen transport or physical device test"
+  ]
+}

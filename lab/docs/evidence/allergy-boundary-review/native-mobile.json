@@ -1,0 +1,75 @@
+{
+  "results": [
+    {
+      "case": "PF check remains visible",
+      "result": "PASS"
+    },
+    {
+      "case": "Full check preserves picker draft",
+      "result": "PASS"
+    },
+    {
+      "case": "Immediate guest/course/price/unsent",
+      "result": "PASS"
+    },
+    {
+      "case": "Allergy editor check visible",
+      "result": "PASS"
+    },
+    {
+      "case": "PF check remains visible",
+      "result": "PASS"
+    },
+    {
+      "case": "Allergy blocks add despite substitution note",
+      "result": "PASS"
+    },
+    {
+      "case": "Allergy editor check visible",
+      "result": "PASS"
+    },
+    {
+      "case": "PF check remains visible",
+      "result": "PASS"
+    },
+    {
+      "case": "No unsupported entremet/extra sale from food search",
+      "result": "PASS"
+    },
+    {
+      "case": "Drinks browsing check visible",
+      "result": "PASS"
+    },
+    {
+      "case": "Full Wine List native pagination",
+      "result": "PASS",
+      "pages": 73,
+      "records": 3612
+    },
+    {
+      "case": "Beverage modifier check visible",
+      "result": "PASS"
+    },
+    {
+      "case": "Expanded full unsent check",
+      "result": "PASS"
+    },
+    {
+      "case": "Tasting temperature selection check visible",
+      "result": "PASS"
+    },
+    {
+      "case": "Landscape check and scrollable tasting sheet",
+      "result": "PASS"
+    },
+    {
+      "case": "Tasting temperatures confirmed without duplicate order",
+      "result": "PASS"
+    }
+  ],
+  "failure": null,
+  "external": [],
+  "errors": [],
+  "physicalDeviceTested": false,
+  "mode": "trusted Chromium clicks; isolated actual POS BOH snapshot"
+}
