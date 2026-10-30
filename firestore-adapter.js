@@ -468,17 +468,31 @@ function createNamedFirestoreAdapter() {
     var timer = null;
     var base = pollDelay(collection, id);
     var interval = base;
+    var delivered = false;
+    var lastSignature = '';
     function arm() {
       if (!active) return;
       timer = setTimeout(run, interval);
+    }
+    // The real Firebase onSnapshot fires only when a document changes. Polling must
+    // do the same, or every poll rebuilds the screen (flicker, scroll jumps, lost taps).
+    function signatureOf(doc) {
+      if (!doc || !doc.exists) return 'missing';
+      try { return 'doc:' + JSON.stringify(doc.data()); }
+      catch (e) { return 'doc:unserializable:' + Date.now(); }
     }
     function run() {
       if (!active) return;
       getDoc(collection, id).then(function(doc) {
         if (!active) return;
         interval = nextInterval(interval, base, null);
-        try { callback(doc); }
-        catch (error) { reportError(onError, error); }
+        var signature = signatureOf(doc);
+        if (!delivered || signature !== lastSignature) {
+          delivered = true;
+          lastSignature = signature;
+          try { callback(doc); }
+          catch (error) { reportError(onError, error); }
+        }
         arm();
       }, function(error) {
         if (!active) return;

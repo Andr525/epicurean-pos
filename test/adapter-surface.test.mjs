@@ -469,6 +469,35 @@ try {
     assert.equal(noon.cutoff, localDate(2026, 10, 24, 5, 0).getTime());
     assert.deepEqual(noon.ids, ['open']);
   });
+  await record('a doc watcher fires only when the document changes', async () => {
+    fake.reset();
+    const api = loadAdapter(fake);
+    const db = api.createNamedFirestoreAdapter();
+    const spy = installTimerSpy();
+    let calls = 0;
+    let unsub = () => {};
+    try {
+      fake.put('boh_shared', 'menu', { items: [{ id: 'a' }] });
+      unsub = db.collection('boh_shared').doc('menu').onSnapshot(() => { calls += 1; });
+      assert.equal(await waitFor(() => calls >= 1, 3000), true);
+      for (let i = 0; i < 3; i++) {
+        const before = fake.requests.length;
+        spy.firePending(5000);
+        assert.equal(await waitFor(() => fake.requests.length > before, 3000), true);
+        await sleep(150);
+      }
+      assert.equal(calls, 1, 'unchanged document must not call back again');
+      fake.put('boh_shared', 'menu', { items: [{ id: 'a' }, { id: 'b' }] });
+      const before = fake.requests.length;
+      spy.firePending(5000);
+      assert.equal(await waitFor(() => calls >= 2, 3000), true, 'changed document must call back');
+      assert.equal(calls, 2);
+      assert.ok(fake.requests.length > before);
+    } finally {
+      unsub();
+      spy.restore();
+    }
+  });
 } finally {
   await fake.close();
 }
