@@ -7907,6 +7907,9 @@ function voiceRevisionLabel(){
   if (s.stale || !s.index) return 'STALE';
   return s.revision;
 }
+function devControlsOn(){
+  try { return /[?&]devControls=1\b/.test(location.search); } catch (e) { return false; }
+}
 function voiceTestHtml(){
   return '<div class="voice-test" data-voice-test="1"><label for="voice-test-input">VOICE TEST</label>'+
     '<div class="voice-test-row"><input id="voice-test-input" autocomplete="off" enterkeyhint="done" placeholder="3A CHAMPAGNE" '+
@@ -7932,8 +7935,10 @@ function orderTopHtml(){
   html+=liveCheckHtml();
   html+=renderGuestAllergyStrip();
   html+=renderSeatBar();
-  html+=voiceTestHtml();
-  if(window.voicePricingHtml) html+=voicePricingHtml();
+  if (devControlsOn()) {
+    html+=voiceTestHtml();
+    if(window.voicePricingHtml) html+=voicePricingHtml();
+  }
   if(window.EPICUREAN_ORDER_SESSION) {
     var vs=window.EPICUREAN_ORDER_SESSION.state();
     if(vs.proposal.length || vs.error) html+='<div class="voice-draft"><b>'+esc(STATE.voiceStatus||'Review voice proposal')+'</b><div class="voice-draft-acts"><button type="button" onclick="receiveVoiceTranscript(&quot;Foodmaster confirm&quot;)">Confirm unsent</button><button type="button" onclick="receiveVoiceTranscript(&quot;Foodmaster cancel&quot;)">Cancel proposal</button></div></div>';
@@ -7970,6 +7975,9 @@ function renderOrder() {
       return;
     }
   }
+  var navKey=fp.split('|').slice(0,8).join('|');
+  var keepPaneScroll=(pane && STATE._menuNavKey===navKey && STATE.selectedTable===STATE._menuNavTable) ? pane.scrollTop : null;
+  var keepContentScroll=c.scrollTop;
   var html='<div class="'+cls+'">';
   html+=orderTopHtml();
   html+='<div class="add-items-pane'+(STATE.menuOpen===false?' menu-closed':'')+'" id="add-items-pane" data-open="'+(STATE.menuOpen===false?'false':'true')+'">';
@@ -7979,8 +7987,16 @@ function renderOrder() {
   html+='</div></div>';
   c.innerHTML=html;
   STATE._menuPaneFp=fp;
+  STATE._menuNavKey=navKey;
+  STATE._menuNavTable=STATE.selectedTable;
   paintChrome();
-  revealAddItemsContent();
+  if (keepPaneScroll!==null) {
+    var np=document.getElementById('add-items-pane');
+    if (np) np.scrollTop=keepPaneScroll;
+    c.scrollTop=keepContentScroll;
+  } else {
+    revealAddItemsContent();
+  }
   scrollActiveSeatChip();
   bindWineWindowScroll();
 }
@@ -9914,6 +9930,39 @@ function transferCheckTo(newTable){
   paintChrome();
   toast('Moved to table '+newTable);
 }
+var IDLE_TABLE_MS=60*60*1000;
+function sweepIdleTables(){
+  if (!STATE.tableSessions) return;
+  var now=Date.now(), cleared=[];
+  Object.keys(STATE.tableSessions).forEach(function(t){
+    var sess=STATE.tableSessions[t];
+    if (!sess || !sess.seatedAt || now-sess.seatedAt<IDLE_TABLE_MS) return;
+    if (String(STATE.selectedTable)===String(t) && STATE.activeTab==='order') return;
+    if (tableServiceState(t)!=='seated') return;
+    var ids=[];
+    if (sess.checkId) ids.push(sess.checkId);
+    (sess.checkIds||[]).forEach(function(id){ if (ids.indexOf(id)<0) ids.push(id); });
+    var hasItems=ids.some(function(id){
+      var ch=STATE.checks[id];
+      return ch && ch.status==='open' && ((ch.items&&ch.items.length)||(ch.lines&&ch.lines.length));
+    });
+    if (hasItems) return;
+    ids.forEach(function(id){
+      var ch=STATE.checks[id];
+      if (!ch || ch.status!=='open') return;
+      ch.status='void'; ch.voidedAt=now; ch.voidReason='idle-1h'; ch.table=t;
+      try { persistCheck(ch); } catch (e) {}
+    });
+    delete STATE.tableSessions[t];
+    cleared.push(t);
+  });
+  if (cleared.length) {
+    try { toast('Table '+cleared.join(', ')+' cleared (unused 1 hour)'); } catch (e) {}
+    try { if (STATE.activeTab==='floor' || STATE.activeTab==='tables') paintChrome(); } catch (e) {}
+  }
+  return cleared;
+}
+setInterval(function(){ try { if (STATE.currentServer) sweepIdleTables(); } catch (e) {} }, 60000);
 function clearAccidentalTable(tNum){
   tNum=String(tNum||STATE.selectedTable||'');
   if (tableServiceState(tNum)!=='seated') { toast('This table has an order'); return; }
