@@ -1287,6 +1287,10 @@ body.hh-on .ts-tile.back { color:#000; background:#fff; }
 body.hh-on .table-card { background:#fff; color:#000; border:1px solid #c5ced8; }
 body.hh-on .floor-empty-note { color:#333; }
 body.hh-on .floor-retry { background:#fff; color:#000; border-color:#c5ced8; }
+.drink-groups { display:flex; gap:6px; overflow-x:auto; padding:2px 0 8px; -webkit-overflow-scrolling:touch; }
+.drink-group { flex:0 0 auto; min-height:44px; padding:0 14px; border-radius:22px; border:1px solid var(--border,#555); background:transparent; color:inherit; font-size:0.9rem; font-weight:700; white-space:nowrap; }
+.drink-group.on { background:var(--primary); color:#1a1008; border-color:var(--primary); }
+.drink-group .n { margin-left:6px; font-size:0.72rem; opacity:0.7; font-weight:600; }
 .voice-test { margin:0.35rem 0 0.7rem; padding:0.55rem 0.65rem; border:1px dashed var(--primary); border-radius:12px; background:rgba(184,115,51,0.08); }
 .voice-test label { display:block; font-size:0.72rem; font-weight:800; letter-spacing:0.08em; color:var(--primary-light); margin-bottom:0.35rem; }
 .voice-test-row { display:flex; gap:8px; }
@@ -6455,7 +6459,7 @@ function startSeatTicker(){
 }
 function menuNavFingerprint(){
   var nav=STATE.menuNav||{};
-  return [nav.level||'', nav.cat||'', nav.family||'', STATE.menuSearch||'', STATE._posWineFind||'', STATE.menuFamily||'', STATE.orderCat||'', STATE.tilePage||0, STATE._catalogFp||''].join('|');
+  return [nav.level||'', nav.cat||'', nav.family||'', STATE.menuSearch||'', STATE._posWineFind||'', STATE.menuFamily||'', STATE.orderCat||'', STATE.tilePage||0, STATE.drinkGroup||'', STATE._catalogFp||''].join('|');
 }
 function menuPaneShouldRebuild(prev, next){
   if (prev==null) prev=STATE._menuPaneFp;
@@ -7975,7 +7979,7 @@ function renderOrder() {
       return;
     }
   }
-  var navKey=fp.split('|').slice(0,8).join('|');
+  var navKey=fp.split('|').slice(0,9).join('|');
   var keepPaneScroll=(pane && STATE._menuNavKey===navKey && STATE.selectedTable===STATE._menuNavTable) ? pane.scrollTop : null;
   var keepContentScroll=c.scrollTop;
   var html='<div class="'+cls+'">';
@@ -8278,8 +8282,60 @@ function ensureBeverageIndex(){
   };
   return STATE._bevIndex;
 }
+var DRINK_GROUPS=[
+  ['cocktails','Cocktails'],['wine','Wine List'],['glass','By the Glass'],['sparkling','Champagne'],
+  ['mocktails','Mocktails'],['beer','Beer'],['spirits','Spirits'],['after-dinner','After Dinner'],
+  ['coffees','Coffee & Tea'],['soft-drinks','Soft Drinks']
+];
+function drinkGroupMatch(item, key){
+  if (!item) return false;
+  var wine=isPosWineItem(item);
+  var glass=!!(item.byTheGlass||item.scaliniOnly);
+  if (key==='wine') return wine && !glass;
+  if (key==='glass') return wine && glass;
+  if (key==='sparkling') return wine && /champagne|sparkling|prosecco|cava|cremant|franciacorta/i.test(String(item.type||item.wineType||'')+' '+String(item.region||'')+' '+String(item.name||''));
+  if (wine) return false;
+  var cat=String(item.category||'')+' '+((item.catIds||[]).join(' '));
+  return cat.toLowerCase().indexOf(key)>-1;
+}
+function drinkGroupCounts(){
+  var rows=ensureBeverageIndex().rows;
+  var out={};
+  DRINK_GROUPS.forEach(function(g){ out[g[0]]=0; });
+  rows.forEach(function(r){
+    DRINK_GROUPS.forEach(function(g){ if (drinkGroupMatch(r.item,g[0])) out[g[0]]++; });
+  });
+  return out;
+}
+function activeDrinkGroup(counts){
+  var cur=STATE.drinkGroup;
+  if (cur && counts[cur]>0) return cur;
+  for (var i=0;i<DRINK_GROUPS.length;i++) if (counts[DRINK_GROUPS[i][0]]>0) return DRINK_GROUPS[i][0];
+  return '';
+}
+function setDrinkGroup(key){
+  STATE.drinkGroup=key;
+  STATE.menuSearch=''; STATE._drinkSearch='';
+  STATE._wineWinStart=0; STATE._bevWinStart=0;
+  STATE._menuPaneFp=null;
+  renderOrder();
+}
+function drinkGroupBarHtml(){
+  var counts=drinkGroupCounts();
+  var cur=activeDrinkGroup(counts);
+  var html='<div class="drink-groups" role="tablist">';
+  DRINK_GROUPS.forEach(function(g){
+    if (!counts[g[0]]) return;
+    html+='<button type="button" role="tab" class="drink-group'+(g[0]===cur?' on':'')+'" aria-selected="'+(g[0]===cur)+'" onclick="setDrinkGroup(\''+g[0]+'\')">'+esc(g[1])+'<span class="n">'+counts[g[0]]+'</span></button>';
+  });
+  return html+'</div>';
+}
 function filterBeverageHits(q){
   var idx=ensureBeverageIndex();
+  if (!String(q||'').trim() && !posOpsLookup(q)) {
+    var grp=activeDrinkGroup(drinkGroupCounts());
+    if (grp) return idx.rows.filter(function(r){ return drinkGroupMatch(r.item,grp); }).map(function(r){ return r.item; });
+  }
   var lookup=posOpsLookup(q);
   if (lookup) return filterByOpsLookup(idx.rows.map(function(r){ return r.item; }), lookup)||[];
   var words=posQueryWords(q);
@@ -8307,7 +8363,7 @@ function renderBeverageSearchPanel(){
   var q=String(STATE.menuSearch||STATE._drinkSearch||'');
   var hits=filterBeverageHits(q);
   STATE._wineWinStart=STATE._bevWinStart||0;
-  return renderWineWindow(hits, '');
+  return drinkGroupBarHtml()+renderWineWindow(hits, '');
 }
 
 function menuNavBack(){
