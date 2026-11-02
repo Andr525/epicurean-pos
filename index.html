@@ -2405,7 +2405,7 @@ function renderHandheldTop(){
     '<button class="hh-back" onclick="handheldBack()" aria-label="Back">←</button>'+
     '<div class="hh-title">#'+esc(String(STATE.selectedTable))+' · Table '+esc(String(STATE.selectedTable))+
       '<span><button type="button" class="hh-guests" onclick="openPartySheet()">'+sess.guestCount+' guests</button> · '+(STATE.currentServer?esc(STATE.currentServer.name):'')+
-      ' · <span id="hh-seated">'+seatedLabelFor(STATE.selectedTable)+'</span> · <span style="opacity:.6">build Nov2-d</span></span></div>'+
+      ' · <span id="hh-seated">'+seatedLabelFor(STATE.selectedTable)+'</span> · <span style="opacity:.6">build Nov2-e</span></span></div>'+
     '<button class="hh-more" onclick="printCheck()" aria-label="Print">⎙</button>'+
     '<button class="hh-more" onclick="openSwitchUser()" aria-label="Switch user">⇄</button>'+
     '<button class="hh-more" onclick="logout()" aria-label="Sign out">Out</button>'+
@@ -10582,7 +10582,7 @@ var kitchenSendBatch = null;
 function loadKitchenOutbox(){
   try {
     var list = JSON.parse(localStorage.getItem(KITCHEN_OUTBOX_KEY) || '[]');
-    return Array.isArray(list) ? list.filter(function(e){ return e && e.id && e.order; }) : [];
+    return Array.isArray(list) ? list.filter(function(e){ return e && e.id && e.order && e.collection!=='tasting_orders'; }) : [];
   } catch (e) { return []; }
 }
 function saveKitchenOutbox(){
@@ -10819,7 +10819,8 @@ function startDiningFromCheckLine(ti){
   STATE.activeTastingOrders.push(dining);
   applyDiningAllergyNotes();
   ti.diningOrderId=dining.id;
-  postKitchenTicket(dining, 'tasting_orders');
+  // Prix fixe / tasting courses reach the kitchen through the normal 'orders' path when each course is fired.
+  // (The old 'tasting_orders' collection is refused by the database rules and nothing reads it.)
   return dining;
 }
 
