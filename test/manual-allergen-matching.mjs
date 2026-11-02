@@ -27,7 +27,7 @@ try{
   assert.equal(w.guestAllergyHits([item]).length,1);
   assert.equal(w.manualMenuAllergyWarning([{name:candidate.name,allergens:[item]}],'2A','14'),true);
   w.STATE.pendingItem=candidate;const before=snapshot();w.commitPendingItem();assert.equal(snapshot(),before,guest+' vs '+item+' mutated order');
-  assert.match(w.document.querySelector('#sheet-overlay').textContent,/Position 2A/);
+  assert.match(w.document.querySelector('#sheet-overlay').textContent,/Seat 2A/);
   w.STATE._editingLineId='LAB-existing';w.commitPendingItem();assert.equal(snapshot(),before);w.STATE._editingLineId=null;
   w.STATE._replaceLineId='LAB-existing';w.commitPendingItem();assert.equal(snapshot(),before);w.STATE._replaceLineId=null;
   assert.equal(w.sessionOf('14').allergies['2'].length,0);assert.deepEqual(Array.from(w.sessionOf('14').allergies['2A']),[guest]);

@@ -2405,7 +2405,7 @@ function renderHandheldTop(){
     '<button class="hh-back" onclick="handheldBack()" aria-label="Back">←</button>'+
     '<div class="hh-title">#'+esc(String(STATE.selectedTable))+' · Table '+esc(String(STATE.selectedTable))+
       '<span><button type="button" class="hh-guests" onclick="openPartySheet()">'+sess.guestCount+' guests</button> · '+(STATE.currentServer?esc(STATE.currentServer.name):'')+
-      ' · <span id="hh-seated">'+seatedLabelFor(STATE.selectedTable)+'</span> · <span style="opacity:.6">build Nov2-e</span></span></div>'+
+      ' · <span id="hh-seated">'+seatedLabelFor(STATE.selectedTable)+'</span> · <span style="opacity:.6">build Nov2-f</span></span></div>'+
     '<button class="hh-more" onclick="printCheck()" aria-label="Print">⎙</button>'+
     '<button class="hh-more" onclick="openSwitchUser()" aria-label="Switch user">⇄</button>'+
     '<button class="hh-more" onclick="logout()" aria-label="Sign out">Out</button>'+
@@ -9314,10 +9314,46 @@ function manualMenuAllergyWarning(courses, identity, table){
   var context=exactPositionAllergyContext(identity,table);
   var conflicts=(courses||[]).filter(function(c){return !c.noneChoice&&!c.headingOnly;}).map(function(c){var hits=asList(c.allergens).filter(function(a){return context.effectiveAllergens.some(function(b){return allergensConflict(a,b);});});return hits.length?{name:c.choice||c.name||c.course,hits:hits}:null;}).filter(Boolean);
   if(!conflicts.length) return false;
-  var html='<div class="manual-preadd-warning" role="alert">Position '+esc(identity)+' — allergy conflict: '+conflicts.map(function(c){return esc(c.name)+': '+esc(c.hits.join(', '));}).join(' · ')+'</div><p>Nothing added. A substitution note does not remove BOH allergens. Choose a compatible published option. No override is authorized; notes never resolve an allergen conflict.</p>';
+  var ackKey=String(identity)+'|'+conflicts.map(function(c){return c.name+':'+c.hits.join(',');}).join(';');
+  if (STATE._allergyAck && STATE._allergyAck.key===ackKey && Date.now()-STATE._allergyAck.at<60000) {
+    STATE._allergyAck=null;
+    try { sendAllergyOverrideAlert(identity, conflicts); } catch (e) { console.warn('Allergy alert:', e); }
+    return false;
+  }
+  STATE._allergyLast={key:ackKey, identity:identity, conflicts:conflicts};
+  var html='<div class="manual-preadd-warning" role="alert">\u26A0 ALLERGY WARNING — Seat '+esc(identity)+' is flagged. '+conflicts.map(function(c){return esc(c.name)+' contains '+esc(c.hits.join(', '));}).join(' · ')+'</div><p>Not added yet. If the guest knows and still wants it, tap <b>Add anyway</b> — the kitchen gets an allergy alert. Otherwise tap Cancel and choose another dish.</p>'+
+    '<div class="allergy-choice"><button type="button" class="primary-btn" onclick="allergyAddAnyway()">Add anyway — guest accepts</button><button type="button" class="ghost-btn" onclick="allergyCancel()">Cancel</button></div>';
   var target=document.querySelector('#pf-overlay.show .pf-selector')||document.querySelector('#sheet-overlay.show .sheet');
   if(target){var old=target.querySelector('[data-manual-allergy-block]');if(old)old.remove();var box=document.createElement('section');box.setAttribute('data-manual-allergy-block','1');box.innerHTML=html;target.prepend(box);if(box.scrollIntoView)box.scrollIntoView({block:'start'});}else {openSheet('<h2>Allergy warning</h2>'+html+'<button class="ghost-btn" onclick="closeSheet()">Back</button>');STATE.manualOrderingPosition=identity;}
   return true;
+}
+function allergyCancel(){
+  STATE._allergyAck=null;
+  var box=document.querySelector('[data-manual-allergy-block]');
+  if (box) box.remove();
+  if (!document.querySelector('#pf-overlay.show')) { try { closeSheet(); } catch (e) {} }
+}
+function allergyAddAnyway(){
+  var last=STATE._allergyLast;
+  if (!last) return;
+  STATE._allergyAck={key:last.key, at:Date.now()};
+  if (document.querySelector('#pf-overlay.show') && STATE.manualSelectingPfId) confirmPrixFixe(STATE.manualSelectingPfId);
+  else if (STATE.pendingItem) commitPendingItem();
+  STATE._allergyAck=null;
+}
+function sendAllergyOverrideAlert(identity, conflicts){
+  var check=STATE.checks[activeCheckId()];
+  if (!check || check.status!=='open') return;
+  var text='ALLERGY OVERRIDE — Seat '+identity+': '+conflicts.map(function(c){return c.name+' ('+c.hits.join(', ')+')';}).join('; ')+' — guest accepts the risk. Waiter: '+(STATE.currentServer?STATE.currentServer.name:'?');
+  var order={table:STATE.selectedTable,checkId:check.id,server:STATE.currentServer?STATE.currentServer.name:'Unknown',
+    items:[{id:'allergyov_'+Date.now(),name:text,station:'Expo',cookTime:0,modifiers:[],selectedMod:text,notes:text,seat:identity,qty:1}],
+    status:'new',sentAt:Date.now(),clearedAt:null,isKitchenNote:true,allergyOverride:true};
+  var local=Object.assign({id:genId()},order);
+  STATE.orders.push(local);
+  if (!STATE._localOrders) STATE._localOrders=[];
+  STATE._localOrders.push(local);
+  postKitchenTicket(order,'orders',local).catch(function(){});
+  toast('Allergy alert sent to kitchen');
 }
 function confirmPrixFixe(pfId) {
   if (seatHasPrixFixe(STATE.activeSeat)) {
