@@ -1312,6 +1312,9 @@ body.hh-on .floor-retry { background:#fff; color:#000; border-color:#c5ced8; }
 }
 body.tableside .app-content, body.hh-table .app-content { padding-bottom:calc(92px + env(safe-area-inset-bottom)); scroll-padding-bottom:100px; }
 #order-top { padding-bottom:calc(100px + env(safe-area-inset-bottom)); flex:0 0 auto; }
+.pay-simple { display:flex; flex-direction:column; gap:10px; margin:0.6rem 0; }
+.pay-simple .pay-cash { background:linear-gradient(135deg,#15803d,#22c55e); }
+.pay-simple .pay-card { background:linear-gradient(135deg,#1d4ed8,#3b82f6); }
 .send-bar { position:fixed; left:0; right:0; bottom:0; z-index:60; display:flex; gap:10px; align-items:center;
   padding:10px 12px calc(10px + env(safe-area-inset-bottom)); background:#0f172a; border-top:2px solid #22c55e; }
 .send-bar .sb-total { display:flex; flex-direction:column; color:#fff; min-width:34%; line-height:1.1; }
@@ -2405,7 +2408,7 @@ function renderHandheldTop(){
     '<button class="hh-back" onclick="handheldBack()" aria-label="Back">←</button>'+
     '<div class="hh-title">#'+esc(String(STATE.selectedTable))+' · Table '+esc(String(STATE.selectedTable))+
       '<span><button type="button" class="hh-guests" onclick="openPartySheet()">'+sess.guestCount+' guests</button> · '+(STATE.currentServer?esc(STATE.currentServer.name):'')+
-      ' · <span id="hh-seated">'+seatedLabelFor(STATE.selectedTable)+'</span> · <span style="opacity:.6">build Nov2-f</span></span></div>'+
+      ' · <span id="hh-seated">'+seatedLabelFor(STATE.selectedTable)+'</span> · <span style="opacity:.6">build Nov2-g</span></span></div>'+
     '<button class="hh-more" onclick="printCheck()" aria-label="Print">⎙</button>'+
     '<button class="hh-more" onclick="openSwitchUser()" aria-label="Switch user">⇄</button>'+
     '<button class="hh-more" onclick="logout()" aria-label="Sign out">Out</button>'+
@@ -11588,19 +11591,72 @@ function openPayment(subtotal) {
   // Total
   html += '<div class="pay-total" id="pay-total-display">$'+total.toFixed(2)+'</div>';
 
-  // Card input
-  html += '<label class="sq-input-label">Card Details</label>';
-  html += '<div id="sq-card-container"></div>';
-
-  // Charge button
-  html += '<button class="charge-btn" id="charge-btn" onclick="processPayment('+subtotal+')">Charge $'+total.toFixed(2)+'</button>';
+  // Simple payment: the guest pays cash or on the card terminal; the POS records it and closes the check.
+  html += '<div class="pay-simple">';
+  html += '<button type="button" class="charge-btn pay-cash" onclick="markPaid(\'cash\','+subtotal+')">PAID · CASH</button>';
+  html += '<button type="button" class="charge-btn pay-card" onclick="markPaid(\'card\','+subtotal+')">PAID · CARD (terminal)</button>';
+  html += '</div>';
   html += '<button class="cancel-pay-btn" onclick="backToOrderScreen()">Back to order</button>';
 
   document.getElementById('payment-card').innerHTML = html;
   document.getElementById('payment-overlay').classList.add('show');
-
-  // Attach Square card form
-  attachCardForm();
+}
+function currentPayAmounts(subtotal){
+  var share = subtotal / (STATE.payEven||1);
+  var tip = STATE.customTip || (Math.round(share * STATE.tipPercent) / 100);
+  return { share:share, tip:tip, total:share+tip };
+}
+var PAYMENT_OUTBOX_KEY='eh_payments_pending_v1';
+function savePendingPayment(rec){
+  try {
+    var list=JSON.parse(localStorage.getItem(PAYMENT_OUTBOX_KEY)||'[]');
+    list.push(rec);
+    localStorage.setItem(PAYMENT_OUTBOX_KEY, JSON.stringify(list));
+  } catch (e) {}
+}
+function flushPendingPayments(){
+  if (!fbReady) return;
+  var list=[];
+  try { list=JSON.parse(localStorage.getItem(PAYMENT_OUTBOX_KEY)||'[]'); } catch (e) {}
+  if (!list.length) return;
+  var left=[];
+  var chain=Promise.resolve();
+  list.forEach(function(rec){
+    chain=chain.then(function(){ return fbDb.collection('payments').doc(rec.id).set(rec); }).catch(function(){ left.push(rec); });
+  });
+  chain.then(function(){ try { localStorage.setItem(PAYMENT_OUTBOX_KEY, JSON.stringify(left)); } catch (e) {} });
+}
+setInterval(function(){ try { flushPendingPayments(); } catch (e) {} }, 120000);
+function markPaid(method, subtotal){
+  var table=String(STATE.selectedTable||'');
+  if (!table) return;
+  if (unsentFor().filter(function(i){ return lineBelongsToCheck(i); }).length) { toast('Send the order first, then pay'); return; }
+  var a=currentPayAmounts(subtotal);
+  var rec={
+    id:'pay_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8),
+    method:method, amount:Math.round(a.total*100), currency:'USD', table:table,
+    checkId:activeCheckId(), server:STATE.currentServer?STATE.currentServer.name:'Unknown',
+    tip:Math.round(a.tip*100), subtotal:Math.round(a.share*100), split:STATE.payEven||1, timestamp:Date.now()
+  };
+  if (!STATE._paidShares) STATE._paidShares={};
+  STATE._paidShares[table]=(STATE._paidShares[table]||0)+1;
+  var allPaid=(STATE.payEven||1)<=1 || STATE._paidShares[table]>=(STATE.payEven||1);
+  // Never block the guest: a failed cloud save is kept on this phone and retried.
+  if (fbReady) {
+    fbDb.collection('payments').doc(rec.id).set(rec).catch(function(){ savePendingPayment(rec); });
+  } else savePendingPayment(rec);
+  if (allPaid) {
+    (STATE.orders||[]).filter(function(o){ return String(o.table)===table && o.status==='new' && o.id; }).forEach(function(o){
+      if (fbReady) fbDb.collection('orders').doc(o.id).update({status:'paid', paidAt:Date.now()}).catch(function(){});
+    });
+    closeOpenCheck(table, 'paid');
+    STATE._paidShares[table]=0;
+  }
+  var html='<div class="payment-success"><div class="check-icon">✅</div><h3>Paid</h3>'+
+    '<p>$'+a.total.toFixed(2)+' · '+(method==='cash'?'cash':'card terminal')+(allPaid?'':' · share '+STATE._paidShares[table]+' of '+(STATE.payEven||1))+'</p>'+
+    '<p style="margin-top:0.5rem;">Table '+esc(table)+'</p>'+
+    '<button class="charge-btn" style="margin-top:1.5rem;" onclick="closePayment()">Done</button></div>';
+  document.getElementById('payment-card').innerHTML=html;
 }
 
 async function attachCardForm() {
@@ -11634,9 +11690,6 @@ function setTip(pct, subtotal) {
   var tip = Math.round(share * pct) / 100;
   var total = share + tip;
   document.getElementById('pay-total-display').textContent = '$'+total.toFixed(2);
-  var chargeBtn = document.getElementById('charge-btn');
-  chargeBtn.textContent = 'Charge $'+total.toFixed(2);
-  chargeBtn.setAttribute('onclick','processPayment('+subtotal+')');
   document.querySelectorAll('.tip-btn').forEach(function(b){ b.classList.remove('active'); });
   if (event && event.target) event.target.classList.add('active');
 }
@@ -11647,9 +11700,6 @@ function setCustomTip(val, subtotal) {
   STATE.tipPercent = 0;
   var total = payShare(subtotal) + tipAmt;
   document.getElementById('pay-total-display').textContent = '$'+total.toFixed(2);
-  var chargeBtn = document.getElementById('charge-btn');
-  chargeBtn.textContent = 'Charge $'+total.toFixed(2);
-  chargeBtn.setAttribute('onclick','processPayment('+subtotal+')');
   document.querySelectorAll('.tip-btn').forEach(function(b){ b.classList.remove('active'); });
 }
 
