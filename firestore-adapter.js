@@ -162,6 +162,7 @@ function createNamedFirestoreAdapter() {
         if (retryable && n < REQUEST_RETRY_LIMIT) {
           return delay(backoffFor(error, n)).then(function() { return attempt(n + 1); });
         }
+        try { error.where = method + ' ' + String(url).replace(/^.*\/documents\//, '').split('?')[0]; } catch (e) {}
         recordFailure(error);
         throw error;
       });

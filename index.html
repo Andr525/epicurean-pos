@@ -394,6 +394,12 @@ body { font-family:var(--font); color:var(--text); background:var(--bg); -webkit
 .table-quick button.call { border-color:var(--danger); color:var(--danger); }
 .floor-hint { font-size:0.72rem; color:var(--text-muted); margin-top:0.45rem; }
 .floor-obj.seatable:active { filter:brightness(1.18); }
+.allergy-strip .as-label { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.allergy-strip .as-note-btn { min-height:34px; padding:0 12px; border-radius:10px; border:1px solid #c5ced8; background:#eef1f5; color:#000; font-weight:700; font-size:0.8rem; }
+.pending-banner { margin:0.35rem 0; padding:0.5rem 0.7rem; border-radius:10px; background:#fef3c7; border:2px solid #f59e0b; color:#78350f; font-weight:800; font-size:0.9rem; }
+.tbl-pending { position:absolute; bottom:-10px; right:-10px; width:26px; height:26px; border-radius:50%; background:#f59e0b; color:#fff; border:2px solid #fff; font-weight:900; font-size:0.95rem; line-height:22px; text-align:center; pointer-events:none; z-index:9; }
+.course-fire-row button.drink-send { background:linear-gradient(135deg,#0e7490,#06b6d4); }
+.course-fire-row button.drink-hold { background:#64748b; flex:1 1 30%; min-width:30%; }
 .tbl-clear { position:absolute; top:-12px; right:-12px; width:30px; height:30px; border-radius:50%; border:2px solid #fff; background:#dc2626; color:#fff; font-size:1.1rem; font-weight:900; line-height:1; z-index:9; padding:0; }
 .floor-assign { background:rgba(201,168,76,0.12); border:1px solid var(--primary); border-radius:12px; padding:0.65rem 0.8rem; margin-bottom:0.6rem; font-size:0.82rem; }
 .floor-assign.mgr-override { background:rgba(96,165,250,0.12); border-color:var(--info); }
@@ -1639,7 +1645,7 @@ var STATE = {
   stationDraw: null,
   floorOrigin: {x:0,y:0},
   menuFamily: 'food',
-  menuNav: { level:'root' },
+  menuNav: { level:'cats', family:'food' },
   checks: {},
   selectedLineIds: {},
   viewCheckId: null,
@@ -2399,7 +2405,7 @@ function renderHandheldTop(){
     '<button class="hh-back" onclick="handheldBack()" aria-label="Back">←</button>'+
     '<div class="hh-title">#'+esc(String(STATE.selectedTable))+' · Table '+esc(String(STATE.selectedTable))+
       '<span><button type="button" class="hh-guests" onclick="openPartySheet()">'+sess.guestCount+' guests</button> · '+(STATE.currentServer?esc(STATE.currentServer.name):'')+
-      ' · <span id="hh-seated">'+seatedLabelFor(STATE.selectedTable)+'</span> · <span style="opacity:.6">build Nov1-c</span></span></div>'+
+      ' · <span id="hh-seated">'+seatedLabelFor(STATE.selectedTable)+'</span> · <span style="opacity:.6">build Nov2-d</span></span></div>'+
     '<button class="hh-more" onclick="printCheck()" aria-label="Print">⎙</button>'+
     '<button class="hh-more" onclick="openSwitchUser()" aria-label="Switch user">⇄</button>'+
     '<button class="hh-more" onclick="logout()" aria-label="Sign out">Out</button>'+
@@ -2447,7 +2453,7 @@ function backToOrderScreen(){
   if (typeof squareCard!=='undefined' && squareCard) { squareCard.destroy().catch(function(){}); squareCard=null; }
   STATE.menuSearch='';
   STATE._posWineFind='';
-  STATE.menuNav={ level:'root' };
+  STATE.menuNav={ level:'cats', family:'food' };
   STATE.orderCat=null;
   STATE.menuFamily='food';
   STATE.hhMode='service';
@@ -2780,7 +2786,7 @@ function mapBarToPos(it, catId){
     price: Number(it.price||0),
     category: catId,
     catIds: [catId],
-    station: 'Bar',
+    station: (barKindCat(it).id==='coffees') ? 'Coffee' : 'Bar',
     cookTime: 0,
     cookMin: 0,
     modifiers: [],
@@ -5178,7 +5184,7 @@ function renderTables() {
         html+='<div class="floor-obj seatable" data-table="'+esc(String(tNum))+'" data-combined="'+(isCombinedTable(tNum)?'1':'0')+'" style="'+style+extra+'">'+
           '<div class="'+innerCls+'" style="'+(hasCall?'box-shadow:0 0 0 3px #E65050;':'')+'">'+
             '<span class="f-tnum">'+esc(String(tNum))+'</span>'+
-          '</div>'+kitchenSendBadgeHtml(tNum)+tableClearBtnHtml(tNum)+'</div>';
+          '</div>'+kitchenSendBadgeHtml(tNum)+tableClearBtnHtml(tNum)+tablePendingBadgeHtml(tNum)+'</div>';
         }
       } else {
         html+=layoutObjectHtml(o, style);
@@ -5781,8 +5787,9 @@ function collectALaCarteFireGroups(){
   unsentFor().filter(function(i){ return lineBelongsToCheck(i); }).forEach(function(i){
     if (i.isPrixFixe || i.isTasting || i.isPairing) return;
     var n=Number(i.serviceCourse||i.course)||defaultCourse(i);
-    if (!map[n]) map[n]={ course:n, name:courseName(n), count:0 };
+    if (!map[n]) map[n]={ course:n, name:courseName(n), count:0, held:0 };
     map[n].count += parseInt(i.qty,10)||1;
+    if (i.held) map[n].held += parseInt(i.qty,10)||1;
   });
   return Object.keys(map).sort().map(function(k){ return map[k]; });
 }
@@ -7974,10 +7981,11 @@ function orderTopHtml(){
   var warn=reservationWarning(STATE.selectedTable);
   var html='<div id="order-top">';
   html+=kitchenSendBannerHtml(STATE.selectedTable);
+  html+=pendingBannerHtml();
   if (warn.text) html+='<div class="res-warn lvl'+warn.level+'">'+esc(warn.text)+'</div>';
   html+=liveCheckHtml();
-  html+=renderGuestAllergyStrip();
   html+=renderSeatBar();
+  html+=renderGuestAllergyStrip();
   html+=sendBarHtml();
   if (devControlsOn()) {
     html+=voiceTestHtml();
@@ -8115,15 +8123,13 @@ function addItemsHeaderHtml(){
 }
 function periodTabsHtml(){
   var nav=STATE.menuNav||{};
-  var food=STATE.menuFamily!=='drinks' && nav.cat!=='__prixfixe__' && nav.cat!=='__tasting__' && STATE.orderCat!=='__prixfixe__' && STATE.orderCat!=='__tasting__';
+  var food=STATE.menuFamily!=='drinks';
   var drinks=STATE.menuFamily==='drinks';
   var pf=STATE.orderCat==='__prixfixe__';
   var tm=STATE.orderCat==='__tasting__';
   return '<div class="period-tabs">'+
     '<button type="button" class="period-tab'+(food?' active':'')+'" onclick="STATE.menuOpen=true;setMenuFamily(\'food\')">Food</button>'+
     '<button type="button" class="period-tab'+(drinks?' active':'')+'" onclick="STATE.menuOpen=true;setMenuFamily(\'drinks\')">Drinks</button>'+
-    '<button type="button" class="period-tab'+(pf?' active':'')+'" onclick="STATE.menuOpen=true;filterCat(\'__prixfixe__\')">Prix Fixe</button>'+
-    '<button type="button" class="period-tab'+(tm?' active':'')+'" onclick="STATE.menuOpen=true;filterCat(\'__tasting__\')">Tasting</button>'+
     '</div>';
 }
 function renderGuestAllergyStrip(){
@@ -8136,14 +8142,9 @@ function renderGuestAllergyStrip(){
   }
   collect('table');
   checkPositionIdentities().forEach(collect);
-  if (dining) {
-    return '<div class="allergy-strip compact-line"><span>'+(bits.length?esc(bits.join(' · ')):'Allergies — tap a guest to flag')+'</span>'+
-      '<button type="button" onclick="openAllergyEditor()">Edit</button>'+
-      '<button type="button" onclick="sendKitchenAllergyNote()">Send note</button></div>';
-  }
   var open=STATE.allergySeat!=null?String(STATE.allergySeat):selectedPositionIdentity();
   if(open!=='table'&&!checkPositionIdentities().includes(open)) open=selectedPositionIdentity();
-  var html='<div class="allergy-strip"><div class="as-label">Allergies — tap a guest, then flag</div><div class="as-guests">';
+  var html='<div class="allergy-strip"><div class="as-label">Allergies for <b>'+esc(seatName(open))+'</b> — tap to flag<button type="button" class="as-note-btn" onclick="openNoteComposer()">Send note</button></div><div class="as-guests" style="display:none">';
   function pill(seat){
     var cur=seatAllergies(seat);
     var on=String(open)===String(seat);
@@ -8225,15 +8226,13 @@ function renderMenuGrid(){
     });
     return tiles.length?paginateTiles(tiles,'list'):'<p>No published BOH items in this category.</p>';
   }
-  if (nav.level==='root') {
-    tiles.push('<button type="button" class="ts-tile food" onclick="setMenuFamily(\'food\')">FOOD</button>');
-    tiles.push('<button type="button" class="ts-tile drinks" onclick="setMenuFamily(\'drinks\')">DRINKS</button>');
-    if ((STATE.prixFixeMenus||[]).length) tiles.push('<button type="button" class="ts-tile prix" onclick="filterCat(\'__prixfixe__\')">Prix Fixe</button>');
-    if ((STATE.tastingMenus||[]).length) tiles.push('<button type="button" class="ts-tile prix" onclick="filterCat(\'__tasting__\')">Tasting</button>');
-    return paginateTiles(tiles);
+  if (nav.level==='root' || !nav.level) {
+    nav={ level:'cats', family:'food' };
+    STATE.menuNav=nav;
+    STATE.orderCat=null;
   }
   var extra='';
-  tiles.unshift('<button type="button" class="ts-tile back" onclick="menuNavBack();STATE.tilePage=0">← '+(nav.level==='items'?(STATE.menuFamily==='drinks'?'Drinks':'Food'):'Menu')+'</button>');
+  if (nav.level==='items') tiles.unshift('<button type="button" class="ts-tile back" onclick="menuNavBack();STATE.tilePage=0">← '+(STATE.menuFamily==='drinks'?'Drinks':'Food')+'</button>');
   if (nav.level==='cats') {
     if (STATE.menuFamily==='food' && (STATE.prixFixeMenus||[]).length) {
       tiles.push('<button type="button" class="ts-tile prix" onclick="filterCat(\'__prixfixe__\')">Prix Fixe<span class="price">set menus</span></button>');
@@ -8468,6 +8467,12 @@ function renderCourseFireRow(){
     html+='<button type="button" class="fire-btn fire-now" onclick=\'fireDiningGroup('+JSON.stringify(String(g.key))+')\'>'+esc(label)+(g.count>1?' ('+g.count+')':'')+'</button>';
   });
   ala.forEach(function(g){
+    if (Number(g.course)===1) {
+      var allHeld=g.held>=g.count;
+      html+='<button type="button" class="fire-btn drink-send" onclick="sendOrder({fireCourse:1,stay:true})">'+(allHeld?'SEND HELD DRINKS TO BAR':'SEND DRINKS TO BAR')+' ('+g.count+')</button>';
+      if (!allHeld) html+='<button type="button" class="fire-btn drink-hold" onclick="holdCourse(1)">HOLD DRINKS</button>';
+      return;
+    }
     html+='<button type="button" class="fire-btn fire-now" onclick="sendOrder({fireCourse:'+g.course+',stay:true})">FIRE '+esc(String(g.name)).toUpperCase()+' ('+g.count+')</button>';
   });
   html+='</div>';
@@ -9122,6 +9127,58 @@ function buildKitchenAllergyNote(){
   if(!body.length) body.push('No allergies flagged');
   return {table:STATE.selectedTable,checkId:check.id,server:STATE.currentServer?STATE.currentServer.name:'Unknown',allergyContext:{version:1,table:table,checkId:check.id,tableAllergies:tableAllergies,positions:positions,kitchenNote:String(sess.kitchenNote||'')},items:[{id:'note_'+Date.now(),name:'KITCHEN NOTE',station:'Expo',cookTime:0,modifiers:[],selectedMod:body.join(' · '),notes:body.join(' · ')}],status:'new',sentAt:Date.now(),clearedAt:null,isKitchenNote:true};
 }
+function openNoteComposer(){
+  var seatNow=selectedPositionIdentity();
+  STATE._noteTarget=STATE._noteTarget||'Kitchen';
+  STATE._noteSeat=seatNow||'table';
+  var html='<h2>Send a note</h2><p class="sheet-sub">Write anything for the kitchen, the bar or the coffee station.</p>';
+  html+='<div class="tasting-section-label">To</div><div class="chip-row" id="note-target-row">';
+  ['Kitchen','Bar','Coffee'].forEach(function(t){
+    html+='<button type="button" class="chip'+(STATE._noteTarget===t?' active':'')+'" data-note-target="'+t+'" onclick="pickNoteTarget(\''+t+'\')">'+t+'</button>';
+  });
+  html+='</div><div class="tasting-section-label">For</div><div class="chip-row" id="note-seat-row">';
+  html+='<button type="button" class="chip'+(STATE._noteSeat==='table'?' active':'')+'" data-note-seat="table" onclick="pickNoteSeat(\'table\')">Whole table</button>';
+  checkPositionIdentities().forEach(function(id){
+    html+='<button type="button" class="chip'+(String(STATE._noteSeat)===String(id)?' active':'')+'" data-note-seat="'+esc(String(id))+'" onclick="pickNoteSeat(\''+esc(String(id))+'\')">Seat '+esc(String(id))+'</button>';
+  });
+  html+='</div><textarea class="search-box" id="free-note-text" rows="4" autocomplete="off" placeholder="e.g. no salmon, birthday dessert, bring bread now, coffee with the dessert"></textarea>';
+  html+='<button class="primary-btn" onclick="sendFreeNote()">Send note</button><button class="ghost-btn" onclick="closeSheet()">Cancel</button>';
+  openSheet(html);
+}
+function pickNoteTarget(t){
+  STATE._noteTarget=t;
+  document.querySelectorAll('#note-target-row .chip').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-note-target')===t); });
+}
+function pickNoteSeat(id){
+  STATE._noteSeat=id;
+  document.querySelectorAll('#note-seat-row .chip').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-note-seat')===String(id)); });
+}
+function sendFreeNote(){
+  var el=document.getElementById('free-note-text');
+  var text=el?String(el.value||'').trim():'';
+  if (!text) { toast('Type the note first'); return; }
+  var check=STATE.checks[activeCheckId()];
+  if (!check || check.status!=='open') { toast('Open the check first'); return; }
+  var target=STATE._noteTarget||'Kitchen';
+  var seat=STATE._noteSeat||'table';
+  var station={Kitchen:'Expo',Bar:'Bar',Coffee:'Coffee'}[target]||'Expo';
+  var label=(seat==='table'?'TABLE':'SEAT '+seat)+' NOTE';
+  var order={
+    table:STATE.selectedTable, checkId:check.id,
+    server:STATE.currentServer?STATE.currentServer.name:'Unknown',
+    items:[{id:'note_'+Date.now(), name:label+' — '+text, station:station, cookTime:0, modifiers:[], selectedMod:text, notes:text, seat:seat, qty:1}],
+    status:'new', sentAt:Date.now(), clearedAt:null, isKitchenNote:true, noteTarget:target
+  };
+  var local=Object.assign({id:genId()}, order);
+  STATE.orders.push(local);
+  if (!STATE._localOrders) STATE._localOrders=[];
+  STATE._localOrders.push(local);
+  var run=postKitchenTicket(order, 'orders', local);
+  toast('Sending…');
+  run.then(function(){ toast('Note sent to '+target.toLowerCase()); }, function(){ toast('Not sent — tap to retry'); });
+  closeSheet();
+  renderOrder();
+}
 function sendKitchenAllergyNote(){
   saveAllergyKitchenNote();
   var sess=sessionOf(STATE.selectedTable),order=buildKitchenAllergyNote();
@@ -9750,6 +9807,45 @@ function removeItem(idx) {
   renderOrder();
 }
 
+function holdCourse(n){
+  var c=0;
+  unsentFor().filter(function(i){ return lineBelongsToCheck(i) && !i.isPrixFixe && !i.isTasting && !i.isPairing; }).forEach(function(i){
+    var k=Number(i.serviceCourse||i.course)||defaultCourse(i);
+    if (k===Number(n) && !i.held) { i.held=true; c++; }
+  });
+  toast(c ? (c+' drink(s) held for later — not sent') : 'Nothing to hold');
+  persistCheck(ensureOpenCheck(STATE.selectedTable));
+  renderOrder();
+}
+function pendingKind(i){
+  var hay=String(i.name||'')+' '+String(i.station||'')+' '+String(i.category||'');
+  if (/^coffee$/i.test(String(i.station||'')) || /coffee|espresso|cappuccino|latte|macchiato|americano|cortado|\btea\b/i.test(hay)) return 'coffee';
+  if ((Number(i.serviceCourse||i.course)||defaultCourse(i))===1) return 'drink';
+  return 'food';
+}
+function pendingSummary(tNum){
+  var out={food:0,drink:0,coffee:0,held:0};
+  unsentFor(tNum).forEach(function(i){
+    if (i.isPrixFixe||i.isTasting||i.isPairing||i.noneChoice) return;
+    var q=parseInt(i.qty,10)||1;
+    out[pendingKind(i)]+=q;
+    if (i.held) out.held+=q;
+  });
+  out.total=out.food+out.drink+out.coffee;
+  return out;
+}
+function pendingBannerHtml(){
+  var p=pendingSummary(STATE.selectedTable);
+  if (!p.total) return '';
+  var bits=[];
+  if (p.food) bits.push(p.food+' food');
+  if (p.drink) bits.push(p.drink+(p.drink>1?' drinks':' drink'));
+  if (p.coffee) bits.push(p.coffee+' coffee');
+  return '<div class="pending-banner">\u26A0 Not sent yet: '+esc(bits.join(' \u00b7 '))+(p.held?' \u00b7 '+p.held+' held':'')+'</div>';
+}
+function tablePendingBadgeHtml(tNum){
+  try { return pendingSummary(tNum).total ? '<span class="tbl-pending" title="Items not sent yet">!</span>' : ''; } catch (e) { return ''; }
+}
 function holdUnsent(){
   var selectedIds=selectedOrderLineIds();
   var hasSelected=Object.keys(selectedIds).length>0;
@@ -10563,7 +10659,7 @@ function deliverKitchenTicket(entry){
   }, function(error){
     entry.running = null;
     entry.state = 'failed';
-    entry.lastError = String((error && (error.message || error.code)) || error || 'unknown').slice(0, 140);
+    entry.lastError = ((error && error.where) ? error.where + ' — ' : '') + String((error && (error.message || error.code)) || error || 'unknown').slice(0, 140);
     entry.nextAt = Date.now() + kitchenRetryDelay(entry.attempts);
     if (entry.local) entry.local.sendState = 'failed';
     saveKitchenOutbox();
