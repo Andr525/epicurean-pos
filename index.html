@@ -2212,11 +2212,33 @@ function matchPrixFixeExtraDishes(q){
     return parsed.words.every(function(w){ return hay.indexOf(w)>-1; });
   });
 }
-function beginAddPrixFixeExtra(key){
+function seatHasAppetizer(){
+  var me=selectedPositionIdentity(),found=false;
+  (STATE.currentOrder||[]).forEach(function(l){
+    if(!lineBelongsToCheck(l)||orderPositionIdentity(l)!==me) return;
+    if(l.pfExtra&&l.pfCourseKind==='app') found=true;
+    if(l.isPrixFixe&&(l.selections||[]).some(function(x){return Number(x.serviceCourse||pfServiceCourseOf(x))===2&&!x.auto&&!x.noneChoice;})) found=true;
+  });
+  return found;
+}
+function askMainCourse(key){
+  var dish=listPrixFixeExtraDishes().filter(function(d){ return d.key===key; })[0];
+  if(!dish) return;
+  var k=JSON.stringify(String(key));
+  openSheet('<h2>'+esc(dish.name)+'</h2><p class="sheet-sub">Seat '+esc(selectedPositionIdentity())+' already has an appetizer. Is this their MAIN course?</p>'+
+    '<button class="primary-btn" onclick=\'closeSheet();beginAddPrixFixeExtra('+k+',"main-full")\'>Yes \u2014 MAIN, full portion ($'+extraPlateFeeByKind('main')+')</button>'+
+    '<button class="primary-btn" style="margin-top:.4rem" onclick=\'closeSheet();beginAddPrixFixeExtra('+k+',"main-small")\'>Yes \u2014 MAIN, appetizer-size portion ($'+extraPlateFeeByKind('app')+')</button>'+
+    '<button class="ghost-btn" style="margin-top:.4rem" onclick=\'closeSheet();beginAddPrixFixeExtra('+k+',"app-ok")\'>No \u2014 another appetizer ($'+extraPlateFeeByKind('app')+')</button>'+
+    '<button class="ghost-btn" onclick="closeSheet()">Cancel</button>');
+}
+function beginAddPrixFixeExtra(key, portion){
   var dish=listPrixFixeExtraDishes().filter(function(d){ return d.key===key; })[0];
   if (!dish) { toast('Dish not on the prix fixe'); return; }
   var kind=dish.kind||'main';
-  var extraFee=extraPlateFeeByKind(kind);
+  if (kind==='app' && !portion && seatHasAppetizer()) { askMainCourse(key); return; }
+  var small=false;
+  if (portion==='main-full' || portion==='main-small') { kind='main'; small=(portion==='main-small'); }
+  var extraFee=small?extraPlateFeeByKind('app'):extraPlateFeeByKind(kind);
   var surcharge=extraPlateSurchargeForDish(dish, kind);
   var temps=prixFixeTempOptions(dish.askTemp, dish);
   var modifiers=temps.length ? [{group:'Temperature',options:temps}] : [];
@@ -2243,7 +2265,7 @@ function beginAddPrixFixeExtra(key){
     pfId:dish.pfId||'',
     pfOptionId:dish.id||'',
     id:'pfx_'+String(dish.id||'dish')+'_'+Date.now(),
-    name:dish.name,
+    name:dish.name+(small?' (appetizer-size portion)':''),
     price:extraFee+surcharge,
     upcharge:surcharge,
     category:kind==='des'?'desserts':(kind==='app'?'small-plates':'entrees'),
@@ -2408,7 +2430,7 @@ function renderHandheldTop(){
     '<button class="hh-back" onclick="handheldBack()" aria-label="Back">←</button>'+
     '<div class="hh-title">#'+esc(String(STATE.selectedTable))+' · Table '+esc(String(STATE.selectedTable))+
       '<span><button type="button" class="hh-guests" onclick="openPartySheet()">'+sess.guestCount+' guests</button> · '+(STATE.currentServer?esc(STATE.currentServer.name):'')+
-      ' · <span id="hh-seated">'+seatedLabelFor(STATE.selectedTable)+'</span> · <span style="opacity:.6">build Nov2-g</span></span></div>'+
+      ' · <span id="hh-seated">'+seatedLabelFor(STATE.selectedTable)+'</span> · <span style="opacity:.6">build Nov2-h</span></span></div>'+
     '<button class="hh-more" onclick="printCheck()" aria-label="Print">⎙</button>'+
     '<button class="hh-more" onclick="openSwitchUser()" aria-label="Switch user">⇄</button>'+
     '<button class="hh-more" onclick="logout()" aria-label="Sign out">Out</button>'+
@@ -9032,6 +9054,7 @@ function openPositionSubSheet(kind){
     html+='<label class="sheet-sub" style="display:block;margin:0.45rem 0 0.15rem">'+esc(identity)+'</label>';
     html+='<input class="search-box pos-sub-input" data-seat="'+esc(identity)+'" value="'+esc(map[identity]||'')+'" placeholder="Position-specific substitution note">';
   });
+  html+='<p class="sheet-sub">Tap <b>KC</b> to let the kitchen choose, or type a specific item.</p><div style="display:flex;gap:.4rem;flex-wrap:wrap;margin:.3rem 0">'+checkPositionIdentities().map(function(id){return '<button type="button" class="ghost-btn" onclick="var i=document.querySelector(\'.pos-sub-input[data-seat=&quot;'+esc(id)+'&quot;]\');if(i)i.value=\'KC \u2014 Kitchen Choice\'">KC for '+esc(id)+'</button>';}).join('')+'</div>';
   html+='<button class="primary-btn" onclick=\'savePositionSubs('+JSON.stringify(String(kind))+')\'>Save</button>';
   html+='<button class="ghost-btn" onclick="closeSheet()">Cancel</button>';
   openSheet(html);
@@ -9169,7 +9192,7 @@ function sendFreeNote(){
   var order={
     table:STATE.selectedTable, checkId:check.id,
     server:STATE.currentServer?STATE.currentServer.name:'Unknown',
-    items:[{id:'note_'+Date.now(), name:label+' — '+text, station:station, cookTime:0, modifiers:[], selectedMod:text, notes:text, seat:seat, qty:1}],
+    items:[{id:'note_'+Date.now(), name:label, station:station, cookTime:0, modifiers:[], selectedMod:null, notes:text, seat:seat, qty:1}],
     status:'new', sentAt:Date.now(), clearedAt:null, isKitchenNote:true, noteTarget:target
   };
   var local=Object.assign({id:genId()}, order);
@@ -9313,9 +9336,21 @@ function attachOrderGuestSafety(line){
 function orderLineAllergyWarning(line){
   return manualMenuAllergyWarning([{name:line.name,allergens:line.allergens}].concat(line.selections||line.courses||[]),orderPositionIdentity(line),line.table);
 }
+function isFreeComplimentary(c){
+  try { return !!(c && (c.auto || c.entremets || isWelcomeTrioCourse(c) || isEntremetCourse(c))); } catch(e){ return !!(c&&c.auto); }
+}
+function freeItemAllergyFlags(courses, identity, table){
+  var context=exactPositionAllergyContext(identity,table),out=[];
+  (courses||[]).forEach(function(c){
+    if(!isFreeComplimentary(c)||c.noneChoice||c.headingOnly) return;
+    var hits=asList(c.allergens).filter(function(a){return context.effectiveAllergens.some(function(b){return allergensConflict(a,b);});});
+    if(hits.length) out.push({name:c.choice||c.name||c.course,hits:hits,kind:isEntremetCourse(c)?'entremet':'welcome'});
+  });
+  return out;
+}
 function manualMenuAllergyWarning(courses, identity, table){
   var context=exactPositionAllergyContext(identity,table);
-  var conflicts=(courses||[]).filter(function(c){return !c.noneChoice&&!c.headingOnly;}).map(function(c){var hits=asList(c.allergens).filter(function(a){return context.effectiveAllergens.some(function(b){return allergensConflict(a,b);});});return hits.length?{name:c.choice||c.name||c.course,hits:hits}:null;}).filter(Boolean);
+  var conflicts=(courses||[]).filter(function(c){return !c.noneChoice&&!c.headingOnly&&!isFreeComplimentary(c);}).map(function(c){var hits=asList(c.allergens).filter(function(a){return context.effectiveAllergens.some(function(b){return allergensConflict(a,b);});});return hits.length?{name:c.choice||c.name||c.course,hits:hits}:null;}).filter(Boolean);
   if(!conflicts.length) return false;
   var ackKey=String(identity)+'|'+conflicts.map(function(c){return c.name+':'+c.hits.join(',');}).join(';');
   if (STATE._allergyAck && STATE._allergyAck.key===ackKey && Date.now()-STATE._allergyAck.at<60000) {
@@ -9324,8 +9359,7 @@ function manualMenuAllergyWarning(courses, identity, table){
     return false;
   }
   STATE._allergyLast={key:ackKey, identity:identity, conflicts:conflicts};
-  var html='<div class="manual-preadd-warning" role="alert">\u26A0 ALLERGY WARNING — Seat '+esc(identity)+' is flagged. '+conflicts.map(function(c){return esc(c.name)+' contains '+esc(c.hits.join(', '));}).join(' · ')+'</div><p>Not added yet. If the guest knows and still wants it, tap <b>Add anyway</b> — the kitchen gets an allergy alert. Otherwise tap Cancel and choose another dish.</p>'+
-    '<div class="allergy-choice"><button type="button" class="primary-btn" onclick="allergyAddAnyway()">Add anyway — guest accepts</button><button type="button" class="ghost-btn" onclick="allergyCancel()">Cancel</button></div>';
+  var html='<div class="manual-preadd-warning allergy-strip" role="alert"><b>\u26A0 Seat '+esc(identity)+': '+conflicts.map(function(c){return esc(c.name)+' has '+esc(c.hits.join(', '));}).join(' \u00B7 ')+'</b><div class="allergy-choice"><button type="button" class="primary-btn" onclick="allergyAddAnyway()">Add anyway</button><button type="button" class="ghost-btn" onclick="allergyCancel()">Cancel</button></div></div>';
   var target=document.querySelector('#pf-overlay.show .pf-selector')||document.querySelector('#sheet-overlay.show .sheet');
   if(target){var old=target.querySelector('[data-manual-allergy-block]');if(old)old.remove();var box=document.createElement('section');box.setAttribute('data-manual-allergy-block','1');box.innerHTML=html;target.prepend(box);if(box.scrollIntoView)box.scrollIntoView({block:'start'});}else {openSheet('<h2>Allergy warning</h2>'+html+'<button class="ghost-btn" onclick="closeSheet()">Back</button>');STATE.manualOrderingPosition=identity;}
   return true;
@@ -9349,7 +9383,7 @@ function sendAllergyOverrideAlert(identity, conflicts){
   if (!check || check.status!=='open') return;
   var text='ALLERGY OVERRIDE — Seat '+identity+': '+conflicts.map(function(c){return c.name+' ('+c.hits.join(', ')+')';}).join('; ')+' — guest accepts the risk. Waiter: '+(STATE.currentServer?STATE.currentServer.name:'?');
   var order={table:STATE.selectedTable,checkId:check.id,server:STATE.currentServer?STATE.currentServer.name:'Unknown',
-    items:[{id:'allergyov_'+Date.now(),name:text,station:'Expo',cookTime:0,modifiers:[],selectedMod:text,notes:text,seat:identity,qty:1}],
+    items:[{id:'allergyov_'+Date.now(),name:'ALLERGY OVERRIDE \u2014 Seat '+identity,station:'Expo',cookTime:0,modifiers:[],selectedMod:null,notes:conflicts.map(function(c){return c.name+' ('+c.hits.join(', ')+')';}).join('; ')+' \u2014 guest accepts the risk',seat:identity,qty:1}],
     status:'new',sentAt:Date.now(),clearedAt:null,isKitchenNote:true,allergyOverride:true};
   var local=Object.assign({id:genId()},order);
   STATE.orders.push(local);
@@ -9401,6 +9435,7 @@ function confirmPrixFixe(pfId) {
   if (missingScoops) { toast('Choose scoops for '+missingScoops); return; }
   var selections=buildPrixFixeSelections(pf, picked);
   if(manualMenuAllergyWarning(selections,selectedPositionIdentity())) return;
+  try { var fl=freeItemAllergyFlags(selections,selectedPositionIdentity()); if(fl.length){ STATE._freeFlags=fl; setTimeout(function(){toast('\u26A0 Seat '+selectedPositionIdentity()+': free '+fl.map(function(f){return f.name+' ('+f.hits.join(', ')+')';}).join(', ')+' \u2014 tap Modify to swap or KC');},400); } } catch(e){}
   selections.forEach(function(s,si){
     var ci=-1;
     (pf.courses||[]).forEach(function(c,i){
@@ -10863,6 +10898,22 @@ function startDiningFromCheckLine(ti){
   return dining;
 }
 
+function postDiningOverviewTicket(dn, check){
+  var rows=diningCourses(dn).filter(function(c){return c&&!c.noneChoice&&!c.headingOnly;}).map(function(c){
+    var t=String(c.choice||c.name||c.course||'').trim();
+    return t?((c.course&&c.choice?c.course+': ':'')+t+(c.modNote?' ['+c.modNote+']':'')):'';
+  }).filter(Boolean);
+  if(!rows.length) return;
+  var ident=orderPositionIdentity(dn);
+  var order={table:STATE.selectedTable,checkId:check.id,server:STATE.currentServer?STATE.currentServer.name:'Unknown',
+    items:[{id:'ovw_'+dn.id,name:'ORDER TAKEN \u2014 Seat '+ident+' (on hold, not fired)',station:'Expo',cookTime:0,modifiers:[],selectedMod:null,notes:rows.join(' | '),seat:ident,qty:1}],
+    status:'new',sentAt:Date.now(),clearedAt:null,isKitchenNote:true,overview:true};
+  var local=Object.assign({id:genId()},order);
+  STATE.orders.push(local);
+  if(!STATE._localOrders) STATE._localOrders=[];
+  STATE._localOrders.push(local);
+  postKitchenTicket(order,'orders',local);
+}
 function sendOrder(opts) {
   opts = opts || {};
   var pool = unsentFor().filter(function(i){ return lineBelongsToCheck(i); });
@@ -10913,8 +10964,10 @@ function sendOrder(opts) {
 
   tastingItems.forEach(function(ti){
     if (ti.isTasting || ti.isPrixFixe) {
-      startDiningFromCheckLine(ti);
+      var wasStarted=!!ti.diningOrderId;
+      var dn=startDiningFromCheckLine(ti);
       opts.stay=true;
+      if (dn && !wasStarted) { try { postDiningOverviewTicket(dn, check); } catch (e) { console.warn('Overview ticket:', e); } }
     }
     if (ti.isPairing) {
       var pairingOrder={

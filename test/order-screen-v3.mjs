@@ -104,7 +104,26 @@ try {
   assert.ok(r2.afterHold.some((t) => /SEND HELD DRINKS TO BAR/.test(t)), 'after hold: ' + r2.afterHold);
   assert.match(r2.heldBanner, /2 held/, 'held banner: ' + r2.heldBanner);
   assert.ok(r2.composer, 'note composer has no text box');
-  assert.ok(r2.note.some((n) => /SEAT .* NOTE — no salmon, birthday\|Bar/.test(n)), 'note: ' + r2.note);
+  assert.ok(r2.note.some((n) => /SEAT .* NOTE\|Bar/.test(n)), 'note: ' + r2.note);
+  const r3 = await page.evaluate(() => {
+    const out = {};
+    const apps = listPrixFixeExtraDishes().filter((x) => x.kind === 'app');
+    STATE.currentOrder = [];
+    setActivePositionIdentity(checkPositionIdentities()[1] || checkPositionIdentities()[0]);
+    beginAddPrixFixeExtra(apps[0].key); commitPendingItem();
+    out.first = STATE.currentOrder.map((l) => l.name + ':' + l.price);
+    beginAddPrixFixeExtra(apps[1].key);
+    out.askSheet = (document.querySelector('#sheet-overlay.show .sheet') || {}).textContent || '';
+    beginAddPrixFixeExtra(apps[1].key, 'main-small'); commitPendingItem();
+    beginAddPrixFixeExtra(apps[1].key, 'main-full'); commitPendingItem();
+    const L = STATE.currentOrder;
+    out.small = L[1].name + ':' + L[1].price + ':' + L[1].serviceCourse;
+    out.full = L[2].price + ':' + L[2].serviceCourse;
+    return out;
+  });
+  assert.match(r3.askSheet, /MAIN/, 'no main prompt: ' + r3.askSheet);
+  assert.match(r3.small, /appetizer-size portion/, r3.small);
+  assert.ok(/:3$/.test(r3.small) && /:3$/.test(r3.full), 'main course numbers ' + r3.small + ' ' + r3.full);
   console.log('PASS tabs, allergy block, drink hold/send, pending warning, coffee station, note composer');
 } catch (error) {
   console.log('FAIL ' + (error && error.message));
