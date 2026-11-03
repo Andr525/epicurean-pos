@@ -153,6 +153,28 @@ try {
   assert.ok(!/NOTHING|KITCHEN/i.test(r2.barAfter.join(' ')), 'bar after: ' + r2.barAfter);
   assert.ok(!/ORDER TAKEN|NOTE|ALLERGY/i.test(r2.billAfter), 'tickets leaked onto bill: ' + r2.billAfter);
   await page.evaluate(() => { const x=checkPositionIdentities(); toggleHoldLine((STATE.currentOrder.find(l=>l.pfExtra)||{}).lineId); renderOrder(); });
+  const r5 = await page.evaluate(() => {
+    const out = {};
+    const rows0 = document.querySelectorAll('.free-row').length;
+    const to = STATE.activeTastingOrders[0];
+    const idx = diningCourses(to).findIndex((c) => /zucchini/i.test(c.choice || c.name || ''));
+    openFreeCourseSheet(to.id, idx);
+    document.getElementById('free-sub-input').value = 'grilled asparagus';
+    saveFreeCourseSub(to.id, idx);
+    out.sub = diningCourses(to)[idx].modNote;
+    out.rowText = [...document.querySelectorAll('.free-row')].map((e) => e.textContent.replace(/\s+/g, ' ')).find((t) => /asparagus/.test(t)) || '';
+    const before = STATE.orders.length;
+    fireFreeOne(to.id, idx);
+    out.fired = diningCourses(to)[idx].fired === true;
+    const others = diningCourses(to).filter((c, i) => i !== idx && /salmon|shrimp/i.test(c.choice || c.name || '')).every((c) => !c.fired);
+    out.othersHeld = others;
+    out.rows0 = rows0;
+    return out;
+  });
+  assert.ok(r5.rows0 >= 5, 'one free row per course per seat: ' + r5.rows0);
+  assert.match(r5.sub, /SUB: grilled asparagus/);
+  assert.match(r5.rowText, /asparagus/);
+  assert.ok(r5.fired && r5.othersHeld, 'fire one free course only: ' + JSON.stringify(r5));
   const r4 = await page.evaluate(() => { const a = extraPlateFeeByKind('main'); STATE.serviceSettings = { extraAppetizer: 35, extraMain: 50, extraDessert: 30 }; return [a, extraPlateFeeByKind('app'), extraPlateFeeByKind('main'), extraPlateFeeByKind('des')]; });
   assert.deepEqual(r4, [46, 35, 50, 30], 'prices must follow BOH service_settings: ' + r4);
   const writes = fake.requests ? fake.requests.filter((q) => /boh_shared\/(bar|wines)/.test(q.path || q.url || '') && /PATCH|PUT|POST/.test(q.method || '')) : [];
