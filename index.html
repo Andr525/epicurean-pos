@@ -2089,20 +2089,25 @@ function extraOnItem(item){
   if (item.pfExtra && item.itemSurcharge!=null) return Number(item.itemSurcharge)||0;
   return Number(item.upcharge)||Number(item.supplement)||Number(item.extraCharge)||Number(item.surcharge)||0;
 }
+// Prices for extra dishes come from BOH (boh_shared/service_settings). Fallbacks only if BOH has not set them yet.
+function bohServicePrice(kind){
+  var ss=STATE.serviceSettings||{};
+  var v=Number(kind==='des'?ss.extraDessert:(kind==='app'?ss.extraAppetizer:ss.extraMain));
+  if (isFinite(v) && v>0) return v;
+  return kind==='des'?27:(kind==='app'?32:46);
+}
 function extraPlateFee(item){
-  if (item && item.pfCourseKind==='des') return 27;
-  if (item && item.pfCourseKind==='app') return 32;
-  if (item && item.pfCourseKind==='main') return 46;
+  if (item && item.pfCourseKind==='des') return bohServicePrice('des');
+  if (item && item.pfCourseKind==='app') return bohServicePrice('app');
+  if (item && item.pfCourseKind==='main') return bohServicePrice('main');
   var n=defaultCourse(item);
   var cat=[item&&item.category, item&&item.name, ((item&&item.catIds)||[]).join(' ')].join(' ').toLowerCase();
-  if (n===4 || /dessert|dolce|pastry|sweet/.test(cat)) return 27;
-  if (n===2 || /small|app|primi|primo|pasta|ravioli|salad|soup|ceviche|side/.test(cat)) return 32;
-  return 46;
+  if (n===4 || /dessert|dolce|pastry|sweet/.test(cat)) return bohServicePrice('des');
+  if (n===2 || /small|app|primi|primo|pasta|ravioli|salad|soup|ceviche|side/.test(cat)) return bohServicePrice('app');
+  return bohServicePrice('main');
 }
 function extraPlateFeeByKind(kind){
-  if (kind==='des') return 27;
-  if (kind==='app') return 32;
-  return 46;
+  return bohServicePrice(kind);
 }
 function extraKindOf(line){
   if (!line) return 'main';
@@ -2467,7 +2472,7 @@ function renderHandheldTop(){
     '<button class="hh-back" onclick="handheldBack()" aria-label="Back">←</button>'+
     '<div class="hh-title">#'+esc(String(STATE.selectedTable))+' · Table '+esc(String(STATE.selectedTable))+
       '<span><button type="button" class="hh-guests" onclick="openPartySheet()">'+sess.guestCount+' guests</button> · '+(STATE.currentServer?esc(STATE.currentServer.name):'')+
-      ' · <span id="hh-seated">'+seatedLabelFor(STATE.selectedTable)+'</span> · <span style="opacity:.6">build Nov2-i</span></span></div>'+
+      ' · <span id="hh-seated">'+seatedLabelFor(STATE.selectedTable)+'</span> · <span style="opacity:.6">build Nov3-a</span></span></div>'+
     '<button class="hh-more" onclick="printCheck()" aria-label="Print">⎙</button>'+
     '<button class="hh-more" onclick="openSwitchUser()" aria-label="Switch user">⇄</button>'+
     '<button class="hh-more" onclick="logout()" aria-label="Sign out">Out</button>'+
@@ -3040,8 +3045,10 @@ function rebuildPosCatalog(){
     items.push(mapWineToPos(it, bottleCat));
   });
   var btg=(typeof EPICUREAN_SCALINI!=='undefined' && EPICUREAN_SCALINI.winesByGlass) || [];
-  if (btg.length) {
-    var glassCat=resolveWineGlassCatId(cats);
+  var glassCatProbe=resolveWineGlassCatId(cats);
+  var bohHasGlass=items.some(function(it){ return it && !it.scaliniOnly && String(it.id||'').indexOf('btg_')!==0 && (it.byTheGlass || it.category===glassCatProbe || it.category==='wine-glass'); });
+  if (btg.length && !bohHasGlass) {
+    var glassCat=glassCatProbe;
     items = items.filter(function(it){
       if (!it) return false;
       var id=String(it.id||'');
@@ -3326,19 +3333,9 @@ function posPourOz(line, w){
   if (/glass|6 oz/i.test(mod)) return 6;
   return Number(w && w.bottleOz)||25;
 }
-function savePosWineItem(w){
-  if (!fbReady || !w) return;
-  var list=STATE.wines||[];
-  var idx=-1;
-  for (var i=0;i<list.length;i++){ if (list[i].id===w.id){ idx=i; break; } }
-  if (idx<0) return;
-  var CHUNK=250, c=Math.floor(idx/CHUNK);
-  var slice=list.slice(c*CHUNK,(c+1)*CHUNK);
-  var id=c===0?'wines':'wines_'+c;
-  var payload={list:slice, updatedAt:Date.now()};
-  if (c===0) payload.chunkCount=Math.max(1, Math.ceil(list.length/CHUNK));
-  fbDb.collection('boh_shared').doc(id).set(payload,{merge:true});
-}
+// BOH is the only place that edits boh_shared/bar and boh_shared/wines*. The POS never writes to them;
+// sales reach BOH through the order tickets, so BOH can deduct stock from those.
+function savePosWineItem(w){ /* intentionally empty: BOH owns wine data */ }
 function consumePosInventory(lines){
   (lines||[]).forEach(function(i){
     var item=(STATE.menuItems||[]).filter(function(x){ return x.id===i.id; })[0];
@@ -3351,7 +3348,6 @@ function consumePosInventory(lines){
       var b=(STATE.bar||[]).filter(function(x){ return x.id===i.id; })[0];
       if (b){
         consumeBarSale(b, qty);
-        if (fbReady) fbDb.collection('boh_shared').doc('bar').set({list:STATE.bar, updatedAt:Date.now()},{merge:true});
       }
     }
   });
@@ -3543,6 +3539,11 @@ function loadData() {
     applyBohMenuPhotos();
     refreshOrderView();
   }, function(){ STATE.prixFixeMenus = (SEED_PRIX_FIXE_MENUS||[]).map(hydratePrixFixeMenu); });
+
+  fbDb.collection('boh_shared').doc('service_settings').onSnapshot(function(doc){
+    STATE.serviceSettings = (doc.exists && doc.data()) ? doc.data() : {};
+    refreshOrderView();
+  }, function(){});
 
   fbDb.collection('calls').onSnapshot(snap=>{
     STATE.calls=[]; snap.forEach(d=>STATE.calls.push({id:d.id,...d.data()}));

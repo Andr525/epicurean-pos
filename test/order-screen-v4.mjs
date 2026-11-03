@@ -153,6 +153,10 @@ try {
   assert.ok(!/NOTHING|KITCHEN/i.test(r2.barAfter.join(' ')), 'bar after: ' + r2.barAfter);
   assert.ok(!/ORDER TAKEN|NOTE|ALLERGY/i.test(r2.billAfter), 'tickets leaked onto bill: ' + r2.billAfter);
   await page.evaluate(() => { const x=checkPositionIdentities(); toggleHoldLine((STATE.currentOrder.find(l=>l.pfExtra)||{}).lineId); renderOrder(); });
+  const r4 = await page.evaluate(() => { const a = extraPlateFeeByKind('main'); STATE.serviceSettings = { extraAppetizer: 35, extraMain: 50, extraDessert: 30 }; return [a, extraPlateFeeByKind('app'), extraPlateFeeByKind('main'), extraPlateFeeByKind('des')]; });
+  assert.deepEqual(r4, [46, 35, 50, 30], 'prices must follow BOH service_settings: ' + r4);
+  const writes = fake.requests ? fake.requests.filter((q) => /boh_shared\/(bar|wines)/.test(q.path || q.url || '') && /PATCH|PUT|POST/.test(q.method || '')) : [];
+  assert.equal(writes.length, 0, 'POS wrote to BOH bar/wines');
   if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });
   console.log('PASS free courses per seat, KC per seat, clean bill, SEND label');
 } catch (error) {
