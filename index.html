@@ -2498,7 +2498,7 @@ function renderHandheldTop(){
     '<button class="hh-back" onclick="handheldBack()" aria-label="Back">←</button>'+
     '<div class="hh-title">#'+esc(String(STATE.selectedTable))+' · Table '+esc(String(STATE.selectedTable))+
       '<span><button type="button" class="hh-guests" onclick="openPartySheet()">'+sess.guestCount+' guests</button> · '+(STATE.currentServer?esc(STATE.currentServer.name):'')+
-      ' · <span id="hh-seated">'+seatedLabelFor(STATE.selectedTable)+'</span> · <span style="opacity:.6">build Nov3-b</span></span></div>'+
+      ' · <span id="hh-seated">'+seatedLabelFor(STATE.selectedTable)+'</span> · <span style="opacity:.6">build Nov4-a</span></span></div>'+
     '<button class="hh-more" onclick="printCheck()" aria-label="Print">⎙</button>'+
     '<button class="hh-more" onclick="openSwitchUser()" aria-label="Switch user">⇄</button>'+
     '<button class="hh-more" onclick="logout()" aria-label="Sign out">Out</button>'+
@@ -11162,6 +11162,17 @@ function startDiningFromCheckLine(ti){
   return dining;
 }
 
+function diningCourseLabel(c){
+  try {
+    if (isEntremetCourse(c)) return 'Pre-dessert';
+    if (isFreeComplimentary(c)) return String(c.course||'Primi Piccolo');
+    var b=workingDisplayBucket(c);
+    if (b==='app') return 'Appetizer';
+    if (b==='des') return 'Dessert';
+    if (b==='main') return 'Main';
+  } catch (e) {}
+  return String(c&&c.course||'Course');
+}
 function postDiningOverviewTicket(dn, check){
   var ident=orderPositionIdentity(dn);
   var items=[];
@@ -11174,7 +11185,7 @@ function postDiningOverviewTicket(dn, check){
     var sub=diningPositionSubNote(dn,c); if (sub&&notes.join(' ').indexOf(sub)<0) notes.push(sub);
     items.push({id:'ovw_'+dn.id+'_'+i,name:t,station:c.station||'Expo',cookTime:0,modifiers:[],selectedMod:null,
       notes:notes.join(' \u00B7 '),seat:ident,course:c.serviceCourse!=null?Number(c.serviceCourse):null,
-      allergens:c.allergens||[],qty:1,preview:true});
+      allergens:c.allergens||[],qty:1,preview:true,courseLabel:diningCourseLabel(c),mods:notes.slice()});
   });
   if(!items.length) return;
   var order={table:STATE.selectedTable,checkId:check.id,server:STATE.currentServer?STATE.currentServer.name:'Unknown',
@@ -11342,6 +11353,8 @@ function fireDiningCourse(to, quiet, idx){
     checkId:to.checkId||activeCheckId(),
     lineId:to._boundLine||null,
     tastingCourse:{
+      courseLabel:diningCourseLabel(nextCourse),
+      mods:String(nextCourse.modNote||'').split(' \u00B7 ').filter(Boolean).concat(allergyNote?[allergyNote]:[]),
       type:isPf?'prix_fixe':'tasting',
       position:orderPositionIdentity(to),
       allergyContext:exactPositionAllergyContext(orderPositionIdentity(to),to.table),
