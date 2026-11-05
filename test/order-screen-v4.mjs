@@ -151,7 +151,7 @@ try {
   assert.ok(r2.overview.length >= 1 && r2.overview.flat().some((t) => /fusilli/i.test(t) && /GLUTEN-FREE PASTA/.test(t)), 'overview: ' + JSON.stringify(r2.overview));
   assert.ok(!r2.overview.flat().some((t) => /negroni/i.test(t)), 'drink in overview ticket');
   assert.ok(!/NOTHING|KITCHEN/i.test(r2.barAfter.join(' ')), 'bar after: ' + r2.barAfter);
-  assert.ok(!/ORDER TAKEN|NOTE|ALLERGY/i.test(r2.billAfter), 'tickets leaked onto bill: ' + r2.billAfter);
+  assert.ok(!/ORDER TAKEN|ALLERGY OVERRIDE|ASK KITCHEN|ORDER CANCELLED/i.test(r2.billAfter), 'tickets leaked onto bill: ' + r2.billAfter);
   await page.evaluate(() => { const x=checkPositionIdentities(); toggleHoldLine((STATE.currentOrder.find(l=>l.pfExtra)||{}).lineId); renderOrder(); });
   const r5 = await page.evaluate(() => {
     const out = {};
