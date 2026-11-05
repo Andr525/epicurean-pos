@@ -111,6 +111,23 @@ try {
     return out;
   });
 
+  const r3 = await page.evaluate(async () => {
+    const out = {};
+    const ids = checkPositionIdentities();
+    toggleAllergy(ids[1], 'Gluten'); // seat 2 already had the earlier test; ensure a fresh seat check
+    out.filled = ['Porcini ravioli','Butternut squash agnolotti','Soft egg yolk raviolo','Spaghettini "Arrabbiata"'].map(n => n+':'+isFilledPastaName(n)+':'+canMakeGfPasta(n));
+    // simulate a gluten conflict on a filled pasta
+    const conflicts=[{name:'Porcini ravioli',hits:['Gluten']}];
+    out.cannot = cannotBeGlutenFree(conflicts[0]);
+    // BOH flag lets it through
+    STATE.prixFixeMenus=(STATE.prixFixeMenus||[]).concat([{id:'zz',name:'zz',courses:[{label:'Primi',options:[{name:'Porcini ravioli',gfOk:true}]}]}]);
+    out.cannotWithFlag = cannotBeGlutenFree(conflicts[0]);
+    out.canWithFlag = canMakeGfPasta('Porcini ravioli');
+    return out;
+  });
+  console.log(JSON.stringify(r3));
+  assert.deepEqual(r3.filled, ['Porcini ravioli:true:false','Butternut squash agnolotti:true:false','Soft egg yolk raviolo:true:false','Spaghettini "Arrabbiata":false:true']);
+  assert.ok(r3.cannot && !r3.cannotWithFlag && r3.canWithFlag, 'BOH gfOk flag must unlock filled pasta');
   console.log(JSON.stringify(r1)); console.log(JSON.stringify(r2));
   assert.ok(r1.aamBlock && r1.askShown==='block', 'second-appetizer-as-main block missing');
   assert.ok(r1.refused, 'must refuse until when/size answered');

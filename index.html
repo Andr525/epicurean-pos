@@ -2504,7 +2504,7 @@ function renderHandheldTop(){
     '<button class="hh-back" onclick="handheldBack()" aria-label="Back">←</button>'+
     '<div class="hh-title">#'+esc(String(STATE.selectedTable))+' · Table '+esc(String(STATE.selectedTable))+
       '<span><button type="button" class="hh-guests" onclick="openPartySheet()">'+sess.guestCount+' guests</button> · '+(STATE.currentServer?esc(STATE.currentServer.name):'')+
-      ' · <span id="hh-seated">'+seatedLabelFor(STATE.selectedTable)+'</span> · <span style="opacity:.6">build Nov5-a</span></span></div>'+
+      ' · <span id="hh-seated">'+seatedLabelFor(STATE.selectedTable)+'</span> · <span style="opacity:.6">build Nov5-b</span></span></div>'+
     '<button class="hh-more" onclick="printCheck()" aria-label="Print">⎙</button>'+
     '<button class="hh-more" onclick="openSwitchUser()" aria-label="Switch user">⇄</button>'+
     '<button class="hh-more" onclick="logout()" aria-label="Sign out">Out</button>'+
@@ -9074,7 +9074,8 @@ function pfOptionRadiosHtml(c, ci, selectedName){
       });
       html+='</div>';
     }
-    if (isPastaName(o.name)) html+='<div class="pf-temp-row"><label class="chip"><input type="checkbox" id="pf-gf-'+ci+'-'+oi+'"> Gluten-free pasta</label></div>';
+    if (canMakeGfPasta(o.name)) html+='<div class="pf-temp-row"><label class="chip"><input type="checkbox" id="pf-gf-'+ci+'-'+oi+'"> Gluten-free pasta</label></div>';
+    else if (isFilledPastaName(o.name)) html+='<div class="pf-opt-desc" style="margin-left:1.4rem;color:#b45309">Filled pasta \u2014 made with gluten, cannot be gluten-free</div>';
   });
   return html;
 }
@@ -9554,7 +9555,8 @@ function pfAamHtml(src, si, ci){
     if (!o || o.headingOnly || !String(o.name||'').trim()) return;
     var hits=guestAllergyHits(o.allergens);
     h+='<label class="pf-opt-label"><input type="radio" name="pf-course-'+ci+'" value="a'+si+'-'+oi+'"> '+esc(o.name)+(hits.length?' <span class="allergy-flag">⚠ '+esc(hits.join(', '))+'</span>':'')+'</label>';
-    if (isPastaName(o.name)) h+='<div class="pf-temp-row"><label class="chip"><input type="checkbox" id="pf-gf-aam'+ci+'-'+oi+'"> Gluten-free pasta</label></div>';
+    if (canMakeGfPasta(o.name)) h+='<div class="pf-temp-row"><label class="chip"><input type="checkbox" id="pf-gf-aam'+ci+'-'+oi+'"> Gluten-free pasta</label></div>';
+    else if (isFilledPastaName(o.name)) h+='<div class="pf-opt-desc" style="margin-left:1.4rem;color:#b45309">Filled pasta \u2014 made with gluten, cannot be gluten-free</div>';
   });
   h+='<div class="pf-aam-ask" id="pf-aam-ask-'+ci+'" style="display:none"><b>Serve it:</b><div class="pf-temp-row">'+
      '<label class="chip"><input type="radio" name="pf-aam-when-'+ci+'" value="main"> With the MAIN course</label>'+
@@ -9644,6 +9646,19 @@ function orderLineAllergyWarning(line){
 function isPastaName(n){
   return /fusilli|pasta|tagliatelle|spaghetti|rigatoni|linguine|pappardelle|penne|capelli|tagliolini|ravioli|tortellini|agnolotti|cavatelli|orecchiette|bucatini|lasagn|paccheri|maltagliati|strozzapreti|tonnarelli|fettuccine|cappellacci|ziti|mafalde|candele|trofie|tajarin/i.test(String(n||''));
 }
+// Filled pasta (ravioli, agnolotti, tortellini...) is pre-made with gluten: it can never be gluten-free unless BOH marks that dish "gfOk".
+function isFilledPastaName(n){ return /raviol|agnolott|tortell|tortelloni|cappellacc|cappelletti|anolini|casoncell|mezzelun|pansotti|culurgi|caramelle|fagottini|sacchett|girasol|plin\b/i.test(String(n||'')); }
+function bohGfOk(name){
+  var nm=String(name||'').split(' \u00B7 ')[0].replace(/\s*\((main|appetizer) size\)\s*$/i,'').trim().toLowerCase(), hit=false;
+  function scan(list){ (list||[]).forEach(function(o){ if (o && o.gfOk && String(o.name||'').trim().toLowerCase()===nm) hit=true; }); }
+  try {
+    (STATE.prixFixeMenus||[]).concat(typeof SEED_PRIX_FIXE_MENUS!=='undefined'?SEED_PRIX_FIXE_MENUS:[]).forEach(function(pf){ if(!pf) return; scan(pf.dishes); (pf.courses||[]).forEach(function(c){ scan(c.options); }); });
+    scan(STATE.menuItems); scan(STATE.menu && STATE.menu.items);
+  } catch(e) {}
+  return hit;
+}
+function canMakeGfPasta(name){ return isPastaName(name) && (!isFilledPastaName(name) || bohGfOk(name)); }
+function cannotBeGlutenFree(c){ return isFilledPastaName(c.name) && !bohGfOk(c.name) && (c.hits||[]).some(isGlutenHit); }
 function isGlutenHit(h){ return /gluten|wheat/i.test(String(h||'')); }
 function gfListHas(name){ return (STATE._gfPasta||[]).indexOf(String(name))>=0; }
 function applyGfPastaTo(obj){
@@ -9680,14 +9695,14 @@ function manualMenuAllergyWarning(courses, identity, table){
     return false;
   }
   STATE._allergyLast={key:ackKey, identity:identity, conflicts:conflicts};
-  var html='<div class="manual-preadd-warning allergy-warn" role="alert"><b>\u26A0 Seat '+esc(identity)+': '+conflicts.map(function(c){return esc(c.name)+' has '+esc(c.hits.join(', '));}).join(' \u00B7 ')+'</b><div class="allergy-choice"><button type="button" class="primary-btn" onclick="allergyAddAnyway()">Add anyway</button>'+(conflicts.every(function(c){return isPastaName(c.name)&&c.hits.every(isGlutenHit);})?'<button type="button" class="gf-btn" onclick="allergyGlutenFree()">Gluten-free pasta</button>':'')+'<button type="button" class="ask-btn" onclick="allergyAskKitchen()">Ask kitchen: make without '+esc(conflictAllergenText(conflicts))+'</button><button type="button" class="ghost-btn" onclick="allergyCancel()">Cancel</button></div></div>';
+  var html='<div class="manual-preadd-warning allergy-warn" role="alert"><b>\u26A0 Seat '+esc(identity)+': '+conflicts.map(function(c){return esc(c.name)+' has '+esc(c.hits.join(', '));}).join(' \u00B7 ')+'</b>'+(conflicts.some(cannotBeGlutenFree)?'<div style="margin-top:.3rem;font-weight:600">'+esc(conflicts.filter(cannotBeGlutenFree).map(function(c){return c.name;}).join(', '))+' is filled pasta \u2014 it is made with gluten and cannot be made without it. Suggest another dish.</div>':'')+'<div class="allergy-choice"><button type="button" class="primary-btn" onclick="allergyAddAnyway()">Add anyway</button>'+(conflicts.every(function(c){return canMakeGfPasta(c.name)&&c.hits.every(isGlutenHit);})?'<button type="button" class="gf-btn" onclick="allergyGlutenFree()">Gluten-free pasta</button>':'')+(conflicts.some(cannotBeGlutenFree)?'':'<button type="button" class="ask-btn" onclick="allergyAskKitchen()">Ask kitchen: make without '+esc(conflictAllergenText(conflicts))+'</button>')+'<button type="button" class="ghost-btn" onclick="allergyCancel()">Cancel</button></div></div>';
   var target=document.querySelector('#pf-overlay.show .pf-selector')||document.querySelector('#sheet-overlay.show .sheet');
   if(target){var old=target.querySelector('[data-manual-allergy-block]');if(old)old.remove();var box=document.createElement('section');box.setAttribute('data-manual-allergy-block','1');box.innerHTML=html;target.prepend(box);if(box.scrollIntoView)box.scrollIntoView({block:'start'});}else {openSheet('<h2>Allergy warning</h2>'+html+'<button class="ghost-btn" onclick="closeSheet()">Back</button>');STATE.manualOrderingPosition=identity;}
   return true;
 }
 function allergyGlutenFree(){
   var last=STATE._allergyLast;
-  if (!last) return;
+  if (!last || last.conflicts.some(cannotBeGlutenFree)) return;
   STATE._gfPasta=(STATE._gfPasta||[]).concat(last.conflicts.map(function(c){return String(c.name).split(' \u00B7 ')[0];}));
   if (document.querySelector('#pf-overlay.show') && STATE.manualSelectingPfId) confirmPrixFixe(STATE.manualSelectingPfId);
   else if (STATE.pendingItem) commitPendingItem();
@@ -9714,7 +9729,7 @@ function conflictAllergenText(conflicts){
 }
 function allergyAskKitchen(){
   var last=STATE._allergyLast;
-  if (!last) return;
+  if (!last || last.conflicts.some(cannotBeGlutenFree)) return;
   STATE._allergyAck={key:last.key, at:Date.now(), ask:true};
   STATE._askNames=last.conflicts.map(function(c){ return String(c.name).split(' \u00B7 ')[0]; });
   STATE._askTag='WITHOUT '+conflictAllergenText(last.conflicts).toUpperCase()+' \u2014 CHEF TO CONFIRM';
