@@ -115,6 +115,13 @@ try {
     out.mods=diningCourses(to).map(c=>c.modNote||'').filter(Boolean);
     out.noteSheet=!!document.getElementById('course-mod-note') && document.getElementById('course-mod-note').value;
     out.ticket=STATE.orders.filter(o=>o.allergyOverride).map(o=>o.items[0].name+' :: '+o.items[0].notes);
+    // save the note window that opened after Ask kitchen: must save, no second warning, dish stays on the bill
+    const ci=diningCourses(to).findIndex(c=>c.askKitchen);
+    document.getElementById('course-mod-note').value='WITHOUT GLUTEN \u2014 CHEF TO CONFIRM \u00B7 sauce on the side';
+    saveCourseNote(to.id, ci);
+    out.saved=diningCourses(to)[ci].modNote;
+    out.warnAfterSave=!!document.querySelector('.allergy-warn');
+    out.onBill=[...document.querySelectorAll('.ts-check-lines .working-line')].some(e=>/Ecuadorian shrimp/.test(e.textContent));
     return out;
   });
 
@@ -151,5 +158,6 @@ try {
   assert.match(r2.askBtn, /Ask kitchen: make without Gluten/);
   assert.ok(r2.mods.some(m=>/WITHOUT GLUTEN/.test(m)) && /WITHOUT GLUTEN/.test(r2.noteSheet), 'ask-kitchen tag / note window');
   assert.ok(r2.ticket.some(t=>/ASK KITCHEN/.test(t)));
+  assert.ok(/sauce on the side/.test(r2.saved) && !r2.warnAfterSave && r2.onBill, 'saving the ask-kitchen note must work and keep the dish on the bill: '+JSON.stringify([r2.saved,r2.warnAfterSave,r2.onBill]));
   console.log('PASS v5: second appetizer as main, per-dish note, ask kitchen, move dish');
 } finally { await browser.close(); server.close(); fake.close && fake.close(); }

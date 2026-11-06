@@ -2577,7 +2577,7 @@ function renderHandheldTop(){
     '<button class="hh-back" onclick="handheldBack()" aria-label="Back">←</button>'+
     '<div class="hh-title">#'+esc(String(STATE.selectedTable))+' · Table '+esc(String(STATE.selectedTable))+
       '<span><button type="button" class="hh-guests" onclick="openPartySheet()">'+sess.guestCount+' guests</button> · '+(STATE.currentServer?esc(STATE.currentServer.name):'')+
-      ' · <span id="hh-seated">'+seatedLabelFor(STATE.selectedTable)+'</span> · <span style="opacity:.6">build Nov6-b</span></span></div>'+
+      ' · <span id="hh-seated">'+seatedLabelFor(STATE.selectedTable)+'</span> · <span style="opacity:.6">build Nov6-c</span></span></div>'+
     '<button class="hh-more" onclick="printCheck()" aria-label="Print">⎙</button>'+
     '<button class="hh-more" onclick="openSwitchUser()" aria-label="Switch user">⇄</button>'+
     '<button class="hh-more" onclick="logout()" aria-label="Sign out">Out</button>'+
@@ -9798,6 +9798,7 @@ function manualMenuAllergyWarning(courses, identity, table){
     var askFlag=!!STATE._allergyAck.ask;
     STATE._allergyAck=null;
     try { sendAllergyOverrideAlert(identity, conflicts, askFlag); } catch (e) { console.warn('Allergy alert:', e); }
+    (courses||[]).forEach(function(c){ if (c && conflicts.some(function(x){ return x.name===String(c.choice||c.name||c.course); })) c._allergyAcked=true; });
     return false;
   }
   STATE._allergyLast={key:ackKey, identity:identity, conflicts:conflicts};
@@ -11681,7 +11682,7 @@ function saveCourseNote(orderId, idx){
   var to=STATE.activeTastingOrders.find(function(o){ return o.id===orderId; });
   if (!to) return;
   var c=diningCourses(to)[idx];
-  if(!c||manualMenuAllergyWarning([c],orderPositionIdentity(to),to.table)) return;
+  if(!c||(!c._allergyAcked&&!c.askKitchen&&manualMenuAllergyWarning([c],orderPositionIdentity(to),to.table))) return;
   var el=document.getElementById('course-mod-note');
   if (c && el) c.modNote=noteComposed('course-mod-note');
   closeSheet();
