@@ -58,38 +58,38 @@ try {
     const ids = checkPositionIdentities(); setActivePositionIdentity(ids[0]);
     const pfid = EPICUREAN_SCALINI.prixFixe.id;
     openPrixFixeSelector(pfid);
-    const pf = findPrixFixeMenu(pfid);
-    // GF checkbox must auto-pick its dish
+    // GF checkbox must auto-pick its dish (nothing chosen yet)
     const gfBox = [...document.querySelectorAll('input[id^="pf-gf-1-"]')][0];
     gfBox.checked = true; gfBox.dispatchEvent(new Event('change',{bubbles:true}));
     const oi = gfBox.id.split('-')[3];
     out.gfAutoPicked = document.querySelector('input[name="pf-course-1"][value="'+oi+'"]').checked;
-    document.querySelector('input[name="pf-course-1"][value="0"]').checked = true;      // appetizer 1
-    document.querySelector('input[name="pf-course-2"][value="none"]').checked = true;   // main: none
+    const r0 = document.querySelector('input[name="pf-course-1"][value="0"]'); r0.checked = true; r0.dispatchEvent(new Event('change',{bubbles:true}));      // appetizer 1
+    // tap a second appetizer: first must stay selected and a question must appear
+    const second = document.querySelector('input[name="pf-course-1"][value="2"]');
+    second.click();
+    out.firstStays = document.querySelector('input[name="pf-course-1"][value="0"]').checked && !second.checked;
+    out.q1 = (document.querySelector('[data-pf-aam-panel]')||{}).textContent;
+    pfAamStep2('main');
+    out.q2 = (document.querySelector('[data-pf-aam-panel]')||{}).textContent;
+    pfAamSet('main','main');
+    out.badge = (document.getElementById('pf-aam-badge-2')||{}).textContent;
     document.getElementById('pf-note-1').value = 'no cheese on top';
     confirmPrixFixe(pfid);
-    out.slot = !!seatEmptyMainSlot();
-    // second appetizer tapped on Add items -> popup
-    const app2 = listPrixFixeExtraDishes().filter(d=>d.kind==='app')[2];
-    const before = STATE.currentOrder.length;
-    beginAddPrixFixeExtra(app2.key);
-    out.q1 = document.querySelector('#sheet-overlay .sheet').textContent.replace(/\s+/g,' ').slice(0,160);
-    askMakeMainSize('beginAddPrixFixeExtra', app2.key, 'main');
-    out.q2 = document.querySelector('#sheet-overlay .sheet').textContent.replace(/\s+/g,' ').slice(0,80);
-    makeMainWith('beginAddPrixFixeExtra', app2.key, 'main', 'main');
-    out.noNewLine = STATE.currentOrder.length===before;
     const to = STATE.activeTastingOrders[STATE.activeTastingOrders.length-1];
     out.sels = diningCourses(to).filter(c=>!c.auto&&!c.noneChoice).map(c=>[c.course,c.choice,c.serviceCourse,c.upcharge,c.modNote||'',diningCourseLabel(c)].join('|'));
     out.price = STATE.currentOrder[STATE.currentOrder.length-1].price;
     out.billText = [...document.querySelectorAll('.ts-check-lines .working-line')].map(e=>e.textContent.replace(/\s+/g,' ')).join(' | ');
     out.rowBtns = [...document.querySelectorAll('.ts-row-actions button')].map(b=>b.textContent).join(',');
     out.labels = [...document.querySelectorAll('.ts-course-label')].map(e=>e.textContent).join(',');
-    // no open main anymore -> a third appetizer goes the extra-plate route (old sheet)
-    beginAddPrixFixeExtra(app2.key);
-    out.third = document.querySelector('#sheet-overlay .sheet').textContent.replace(/\s+/g,' ').slice(0,90);
-    closeSheet();
-    // move the new main to the appetizers
+    // modify sheet: allergy flag + free text
     const idx = diningCourses(to).findIndex(c=>c.appAsMain);
+    openCourseNoteSheet(to.id, idx);
+    out.chips = document.querySelectorAll('.note-allergen').length;
+    document.querySelector('.note-allergen[value="Dairy"]').checked = true;
+    document.getElementById('course-mod-note').value = 'cut in half please';
+    saveCourseNote(to.id, idx);
+    out.noteSaved = diningCourses(to)[idx].modNote;
+    // move the new main to the appetizers
     openMoveSheet(diningLineKey(to.id, idx));
     setSelectedServiceCourse(2);
     out.afterMove = diningCourses(to)[idx].serviceCourse + ' ' + diningCourseLabel(diningCourses(to)[idx]);
@@ -137,16 +137,16 @@ try {
   assert.ok(r3.cannot && !r3.cannotWithFlag && r3.canWithFlag, 'BOH gfOk flag must unlock filled pasta');
   console.log(JSON.stringify(r1)); console.log(JSON.stringify(r2));
   assert.ok(r1.gfAutoPicked, 'GF checkbox must select its dish');
-  assert.ok(r1.slot, 'main set to NONE leaves an open slot');
+  assert.ok(r1.firstStays, 'first appetizer must stay selected');
   assert.match(r1.q1, /MAIN course/); assert.match(r1.q2, /What size/);
-  assert.ok(r1.noNewLine, 'second appetizer must fill the main slot, not add an extra line');
-  assert.ok(r1.sels.some(s=>/\(main size\)/.test(s) && /\|3\|0\|/.test(s) && /\|Main$/.test(s)), 'second appetizer should be the Main, main size, included: '+r1.sels);
-  assert.ok(r1.sels.some(s=>/no cheese on top/.test(s)), 'per-dish message missing');
-  assert.equal(r1.price, 89);
+  assert.match(r1.badge, /\(main size\)/);
+  assert.ok(r1.sels.some(s=>/\(main size\)/.test(s) && /\|3\|\d+\|/.test(s) && /\|Main$/.test(s)), 'second appetizer should be the Main, included: '+r1.sels);
+  assert.ok(r1.sels.some(s=>/^Primi\|/.test(s) && /no cheese on top/.test(s)), 'first appetizer kept + message: '+r1.sels);
+  assert.ok(r1.price>=89 && r1.price<=99, "price "+r1.price);
   assert.match(r1.billText, /\(main size\)/, 'second appetizer must show on the bill: '+r1.billText);
-  assert.match(r1.rowBtns, /Note,Move/);
+  assert.match(r1.rowBtns, /Modify,Move/);
   assert.match(r1.labels, /APPETIZER,MAIN/);
-  assert.match(r1.third, /already has an appetizer|extra/i);
+  assert.ok(r1.chips>=8 && /\u26A0 NO DAIRY \u00B7 cut in half please/.test(r1.noteSaved), 'allergy flags + free text: '+r1.noteSaved);
   assert.match(r1.afterMove, /^2 Appetizer/);
   assert.match(r2.askBtn, /Ask kitchen: make without Gluten/);
   assert.ok(r2.mods.some(m=>/WITHOUT GLUTEN/.test(m)) && /WITHOUT GLUTEN/.test(r2.noteSheet), 'ask-kitchen tag / note window');

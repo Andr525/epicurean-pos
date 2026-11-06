@@ -1320,6 +1320,9 @@ body.tableside .app-content, body.hh-table .app-content { padding-bottom:calc(92
 .allergy-warn .allergy-choice button{flex:1;min-width:30%;padding:.55rem;font-size:.95rem}
 .allergy-warn .ask-btn{background:#7c3aed;color:#fff;border:0;border-radius:10px;font-weight:700;flex-basis:100%}
 .pf-note{margin-top:.5rem;font-size:.9rem}
+.pf-aam-panel{margin:.4rem 0;padding:.6rem;border:2px solid #7c3aed;border-radius:12px;background:rgba(124,58,237,.08)}
+.pf-aam-panel button{margin-top:.4rem;width:100%}
+.pf-aam-badge{margin:.4rem 0;padding:.4rem .6rem;border-radius:8px;background:rgba(124,58,237,.12);font-size:.9rem}
 .ts-course-label{font-size:.68rem;font-weight:800;letter-spacing:.08em;color:var(--text-muted,#888);padding:.35rem .2rem .1rem}
 .gf-btn{background:#16a34a;color:#fff;border:0;border-radius:10px;font-weight:700}
 .send-bar .sb-send.drinks{background:linear-gradient(135deg,#6d28d9,#a855f7);box-shadow:0 2px 10px rgba(168,85,247,.45)}
@@ -2574,7 +2577,7 @@ function renderHandheldTop(){
     '<button class="hh-back" onclick="handheldBack()" aria-label="Back">←</button>'+
     '<div class="hh-title">#'+esc(String(STATE.selectedTable))+' · Table '+esc(String(STATE.selectedTable))+
       '<span><button type="button" class="hh-guests" onclick="openPartySheet()">'+sess.guestCount+' guests</button> · '+(STATE.currentServer?esc(STATE.currentServer.name):'')+
-      ' · <span id="hh-seated">'+seatedLabelFor(STATE.selectedTable)+'</span> · <span style="opacity:.6">build Nov6-a</span></span></div>'+
+      ' · <span id="hh-seated">'+seatedLabelFor(STATE.selectedTable)+'</span> · <span style="opacity:.6">build Nov6-b</span></span></div>'+
     '<button class="hh-more" onclick="printCheck()" aria-label="Print">⎙</button>'+
     '<button class="hh-more" onclick="openSwitchUser()" aria-label="Switch user">⇄</button>'+
     '<button class="hh-more" onclick="logout()" aria-label="Sign out">Out</button>'+
@@ -5894,8 +5897,9 @@ function openLineNoteSheet(lineId){
   var line=STATE.currentOrder.filter(function(i){ return i.lineId===lineId; })[0];
   if (!line) { toast('Sent items keep their original note'); return; }
   openSheet(
-    '<h2>Note</h2><p class="sheet-sub">'+esc(line.name)+'</p>'+
-    '<input class="search-box" id="line-mod-note" value="'+esc(line.notes||'')+'" placeholder="Kitchen note">'+
+    '<h2>Modify</h2><p class="sheet-sub">'+esc(line.name)+' \u2014 tap allergy flags and/or write anything.</p>'+
+    noteChipsHtml(line.notes)+
+    '<textarea class="search-box" id="line-mod-note" rows="3" style="height:auto" placeholder="Write anything for the kitchen\u2026">'+esc(noteFreeText(line.notes))+'</textarea>'+
     '<button class="primary-btn" onclick=\'saveLineNote('+JSON.stringify(String(lineId))+')\'>Save note</button>'+
     '<button class="ghost-btn" onclick="closeSheet()">Cancel</button>'
   );
@@ -5903,7 +5907,7 @@ function openLineNoteSheet(lineId){
 function saveLineNote(lineId){
   var line=STATE.currentOrder.filter(function(i){ return i.lineId===lineId; })[0];
   var el=document.getElementById('line-mod-note');
-  if (line && el) line.notes=String(el.value||'').trim();
+  if (line && el) line.notes=noteComposed('line-mod-note');
   closeSheet();
   STATE.selectedLineIds={};
   renderOrder();
@@ -6313,14 +6317,14 @@ function workingRowActionsHtml(g){
     var lab=positionTempToken(p.seat,'',p.priority);
     var btns='';
     if (p.toId && p.courseIdx>=0) {
-      btns+='<button type="button" onclick=\'event.stopPropagation();openCourseNoteSheet('+JSON.stringify(String(p.toId))+','+p.courseIdx+')\'>Note</button>';
+      btns+='<button type="button" onclick=\'event.stopPropagation();openCourseNoteSheet('+JSON.stringify(String(p.toId))+','+p.courseIdx+')\'>Modify</button>';
       btns+='<button type="button" onclick=\'event.stopPropagation();openMoveSheet('+JSON.stringify(String(p.selectKey))+')\'>Move</button>';
       btns+='<button type="button" onclick=\'event.stopPropagation();openDiningCourseEditor('+JSON.stringify(String(p.toId))+','+p.courseIdx+')\'>Change</button>';
       btns+='<button type="button" onclick=\'event.stopPropagation();eraseDiningCourse('+JSON.stringify(String(p.toId))+','+p.courseIdx+',true);renderOrder();\'>\u2715</button>';
     } else if (p.lineId) {
       var ln=(STATE.currentOrder||[]).filter(function(x){return x&&x.lineId===p.lineId;})[0];
       var held=!!(ln&&ln.held);
-      btns+='<button type="button" onclick=\'event.stopPropagation();openLineNoteSheet('+JSON.stringify(String(p.lineId))+')\'>Note</button>';
+      btns+='<button type="button" onclick=\'event.stopPropagation();openLineNoteSheet('+JSON.stringify(String(p.lineId))+')\'>Modify</button>';
       btns+='<button type="button" onclick=\'event.stopPropagation();openMoveSheet('+JSON.stringify(String(p.selectKey))+')\'>Move</button>';
       btns+='<button type="button" class="hold-btn'+(held?' on':'')+'" onclick=\'event.stopPropagation();toggleHoldLine('+JSON.stringify(String(p.lineId))+')\'>'+(held?'HELD \u00B7 release':'HOLD')+'</button>';
       btns+='<button type="button" onclick=\'event.stopPropagation();removeWorkingLine('+JSON.stringify(String(p.lineId))+')\'>\u2715</button>';
@@ -9069,6 +9073,7 @@ function pfGuestChoiceMode(c){
 }
 function pfGfPick(ci, oi, el){
   if (!el || !el.checked) return;
+  if (pfSecondApp({preventDefault:function(){},stopPropagation:function(){}},ci,oi)===false) { el.checked=false; return; }
   var r=document.querySelector('input[name="pf-course-'+ci+'"][value="'+oi+'"]');
   if (r && !r.checked) { r.checked=true; try{ r.dispatchEvent(new Event('change',{bubbles:true})); }catch(e){} }
 }
@@ -9115,6 +9120,8 @@ function applyNoneToDiningCourse(c, flags){
   if (c.serviceCourse==null) c.serviceCourse=pfServiceCourseOf(c);
 }
 function togglePfScoops(ci, active){
+  (STATE._pfLast=STATE._pfLast||{})[ci]=String(active);
+  if (STATE._pfAam && STATE._pfAam.ci===ci && active!=='none') pfAamClear(ci);
   document.querySelectorAll('[id^="pf-scoops-'+ci+'-"]').forEach(function(el){
     el.style.display = el.id==='pf-scoops-'+ci+'-'+active ? 'block' : 'none';
   });
@@ -9126,7 +9133,7 @@ function pfOptionRadiosHtml(c, ci, selectedName){
     var hits=guestAllergyHits(o.allergens);
     var temps=prixFixeTempOptions(o.askTemp, o);
     var checked=selectedName ? String(o.name)===String(selectedName) : false;
-    html+='<label class="pf-opt-label"><input type="radio" name="pf-course-'+ci+'" value="'+oi+'"'+(checked?' checked':'')+' onchange="togglePfScoops('+ci+','+oi+')">'+
+    html+='<label class="pf-opt-label"><input type="radio" name="pf-course-'+ci+'" value="'+oi+'"'+(checked?' checked':'')+' onclick="return pfSecondApp(event,'+ci+','+oi+')" onchange="togglePfScoops('+ci+','+oi+')">'+
       esc(o.name)+(o.upcharge>0?' <span class="pf-upcharge">+$'+Number(o.upcharge).toFixed(0)+'</span>':'')+
       (o.cookNote?' <span class="pf-upcharge">'+esc(o.cookNote)+'</span>':'')+
       (hits.length?' <span class="allergy-flag">⚠ '+esc(hits.join(', '))+'</span>':'')+
@@ -9215,6 +9222,21 @@ function buildPrixFixeSelections(pf, pickedByIndex){
         });
       }
       return;
+    }
+    var am=STATE._pfAam;
+    if (am && am.ci===ci) {
+      var so=((pf.courses[am.si]||{}).options||[])[am.oi];
+      if (so) {
+        var asel=selFromOption(c,so,{});
+        asel.appAsMain=true; asel.aamWhen=am.when; asel.aamSize=am.size;
+        asel.choice=so.name+(am.size==='main'?' (main size)':' (appetizer size)');
+        asel.name=asel.choice;
+        asel.serviceCourse=am.when==='app'?2:3;
+        if (am.when==='app') asel.ticketPos=defaultTicketPosForKind('app')+0.5;
+        asel.upcharge=(Number(so.upcharge)||0)+pfAppAsMainExtra();
+        selections.push(asel);
+        return;
+      }
     }
     if (pickedByIndex[ci]==null || isPfNonePick(pickedByIndex[ci])) {
       selections.push(nonePrixFixeSelection(c,{}));
@@ -9594,7 +9616,73 @@ function prixFixeTempOptions(kind, opt){
   return [];
 }
 
+function pfAppAsMainOn(){ return (STATE.serviceSettings||{}).allowAppAsMain!==false; }
+function pfAppAsMainExtra(){ return Number((STATE.serviceSettings||{}).appAsMainExtra)||0; }
+function pfMainIndexFor(pf, appCi){
+  var a=(pf.courses||[])[appCi];
+  if (!a || pfCourseMode(a)!=='choose' || a.fireEach || pfCourseKind(a.label||a.name||'')!=='app') return -1;
+  for (var i=0;i<(pf.courses||[]).length;i++){
+    var m=pf.courses[i];
+    if (i!==appCi && pfCourseMode(m)==='choose' && !m.fireEach && pfCourseKind(m.label||m.name||'')==='main') return i;
+  }
+  return -1;
+}
+function pfAamPanel(html){
+  var host=document.querySelector('#pf-overlay .pf-selector'); if(!host) return;
+  var old=host.querySelector('[data-pf-aam-panel]'); if (old) old.remove();
+  if (!html) return;
+  var box=document.createElement('section'); box.setAttribute('data-pf-aam-panel','1'); box.className='pf-aam-panel'; box.innerHTML=html;
+  host.prepend(box); if (box.scrollIntoView) box.scrollIntoView({block:'start'});
+}
+// Tapping a second appetizer keeps the first one and asks what to do with the new one.
+function pfSecondApp(ev, ci, oi){
+  if (!pfAppAsMainOn()) return true;
+  var pf=findPrixFixeMenu(STATE.manualSelectingPfId); if (!pf) return true;
+  var mainCi=pfMainIndexFor(pf,ci); if (mainCi<0) return true;
+  var prev=(STATE._pfLast||{})[ci];
+  if (prev==null || prev==='none' || prev===String(oi)) return true;
+  if (STATE._pfAam && STATE._pfAam.ci===mainCi) return true;
+  var cur={value:prev};
+  ev.preventDefault(); ev.stopPropagation();
+  var first=((pf.courses[ci]||{}).options||[])[parseInt(cur.value,10)]||{}, second=((pf.courses[ci]||{}).options||[])[oi]||{};
+  STATE._pfAamAsk={ci:ci,oi:oi,mainCi:mainCi,first:first.name||'',second:second.name||''};
+  pfAamPanel('<b>'+esc(second.name)+'</b><div style="margin:.3rem 0">'+esc(first.name)+' stays selected. Make <b>'+esc(second.name)+'</b> the <b>MAIN course</b> too?</div>'+
+    '<button type="button" class="primary-btn" onclick="pfAamStep2(\'main\')">YES \u2014 make it the main course</button>'+
+    '<button type="button" class="primary-btn" onclick="pfAamStep2(\'app\')">YES \u2014 but serve it with the appetizers</button>'+
+    '<button type="button" class="ghost-btn" onclick="pfAamReplace()">NO \u2014 replace '+esc(first.name)+' with it</button>'+
+    '<button type="button" class="ghost-btn" onclick="pfAamPanel(\'\')">Cancel</button>');
+  return false;
+}
+function pfAamStep2(when){
+  var q=STATE._pfAamAsk; if(!q) return;
+  var gf=canMakeGfPasta(q.second)?'<label class="chip" style="margin:.3rem 0"><input type="checkbox" id="pf-aam-gf"> Gluten-free pasta</label>':'';
+  pfAamPanel('<b>'+esc(q.second)+'</b> \u2014 '+(when==='main'?'main course':'served with the appetizers')+'<div style="margin:.3rem 0">What size?</div>'+gf+
+    '<button type="button" class="primary-btn" onclick="pfAamSet(\''+when+'\',\'main\')">MAIN size</button>'+
+    '<button type="button" class="primary-btn" onclick="pfAamSet(\''+when+'\',\'app\')">APPETIZER size</button>'+
+    '<button type="button" class="ghost-btn" onclick="pfAamPanel(\'\')">Cancel</button>');
+}
+function pfAamSet(when, size){
+  var q=STATE._pfAamAsk; if(!q) return;
+  var gfEl=document.getElementById('pf-aam-gf');
+  STATE._pfAam={ci:q.mainCi, si:q.ci, oi:q.oi, when:when, size:size, gf:!!(gfEl&&gfEl.checked), name:q.second};
+  var none=document.querySelector('input[name="pf-course-'+q.mainCi+'"][value="none"]'); if (none) { none.checked=true; }
+  pfAamBadge(q.mainCi);
+  pfAamPanel('');
+  toast(q.second+' will be the main course');
+}
+function pfAamReplace(){
+  var q=STATE._pfAamAsk; if(!q) return;
+  var r=document.querySelector('input[name="pf-course-'+q.ci+'"][value="'+q.oi+'"]'); if (r) { r.checked=true; try{ r.dispatchEvent(new Event('change',{bubbles:true})); }catch(e){} }
+  pfAamPanel('');
+}
+function pfAamBadge(mainCi){
+  var el=document.getElementById('pf-aam-badge-'+mainCi); if(!el) return;
+  var a=STATE._pfAam;
+  el.innerHTML=(a&&a.ci===mainCi)?'<div class="pf-aam-badge">Main: <b>'+esc(a.name)+' ('+(a.size==='main'?'main':'appetizer')+' size'+(a.when==='app'?', with the appetizers':'')+(a.gf?', gluten-free':'')+')</b> <button type="button" class="ghost-btn" style="width:auto;padding:.2rem .6rem" onclick="pfAamClear('+mainCi+')">Remove</button></div>':'';
+}
+function pfAamClear(mainCi){ STATE._pfAam=null; STATE._pfAamAsk=null; pfAamBadge(mainCi); }
 function openPrixFixeSelector(pfId) {
+  STATE._pfAam=null;STATE._pfAamAsk=null;STATE._pfLast={};
   STATE.manualOrderingPosition=selectedPositionIdentity();STATE.manualSelectingPfId=pfId;
   if (seatHasPrixFixe(STATE.activeSeat)) {
     warnPrixFixeAlreadyOnSeat();
@@ -9634,7 +9722,7 @@ function openPrixFixeSelector(pfId) {
     }
     html+='<div class="pf-course-select"><label>'+esc(c.label)+' — choose one</label><div class="pf-options">';
     html+=pfOptionRadiosHtml(c, ci, '');
-    html+='</div><input class="search-box pf-note" id="pf-note-'+ci+'" placeholder="Message for this dish (optional)"></div>';
+    html+='</div><div id="pf-aam-badge-'+ci+'"></div><input class="search-box pf-note" id="pf-note-'+ci+'" placeholder="Message for this dish (optional)"></div>';
   });
   html+='<div class="pf-course-select"><label>Modifier / kitchen note</label>';
   html+='<input class="search-box" id="pf-mod-note" placeholder="Kitchen instructions — notes do not clear allergens"></div>';
@@ -9645,7 +9733,7 @@ function openPrixFixeSelector(pfId) {
 }
 
 function closePfSelector() {
-  STATE.manualOrderingPosition=null;STATE.manualSelectingPfId=null;
+  STATE.manualOrderingPosition=null;STATE.manualSelectingPfId=null;STATE._pfAam=null;STATE._pfAamAsk=null;
   var ov=document.getElementById('pf-overlay');
   if (ov) { ov.classList.remove('show'); ov.innerHTML=''; }
 }
@@ -9823,6 +9911,7 @@ function confirmPrixFixe(pfId) {
   });
   if (missingTemp) { toast('Choose temperature for '+missingTemp); return; }
   if (missingScoops) { toast('Choose scoops for '+missingScoops); return; }
+  if (STATE._pfAam && STATE._pfAam.gf) { var gfn=String(STATE._pfAam.name||''); (STATE._gfPasta=STATE._gfPasta||[]).push(gfn, gfn+' (main size)', gfn+' (appetizer size)'); }
   var selections=buildPrixFixeSelections(pf, picked);
   if(manualMenuAllergyWarning(selections,selectedPositionIdentity())) return;
   selections.forEach(function(sel){ applyGfPastaTo(sel); });
@@ -11561,6 +11650,19 @@ function skipDiningCourse(orderId, idx){
   toast('Course skipped for allergy');
   renderOrder();
 }
+var NOTE_ALLERGENS=['Gluten','Dairy','Shellfish','Fish','Tree Nut','Peanut','Egg','Sesame','Soy','Sulfites'];
+function noteChipsHtml(text){
+  var on={}; String(text||'').replace(/\u26A0 NO ([A-Z ]+?)(?= \u00B7 |$)/g,function(m,a){ on[a.trim()]=1; return m; });
+  return '<div class="tasting-section-label">Allergy flag for the kitchen</div><div class="chip-row">'+NOTE_ALLERGENS.map(function(a){
+    return '<label class="chip"><input type="checkbox" class="note-allergen" value="'+esc(a)+'"'+(on[a.toUpperCase()]?' checked':'')+'> \u26A0 '+esc(a)+'</label>';
+  }).join('')+'</div>';
+}
+function noteFreeText(text){ return String(text||'').replace(/\u26A0 NO [A-Z ]+?(?= \u00B7 |$)/g,'').split(' \u00B7 ').map(function(x){return x.trim();}).filter(Boolean).join(' \u00B7 '); }
+function noteComposed(inputId){
+  var el=document.getElementById(inputId), chips=[].slice.call(document.querySelectorAll('.note-allergen:checked')).map(function(c){ return '\u26A0 NO '+String(c.value).toUpperCase(); });
+  var free=el?String(el.value||'').trim():'';
+  return chips.concat(free?[free]:[]).join(' \u00B7 ');
+}
 function openCourseNoteSheet(orderId, idx){
   var to=STATE.activeTastingOrders.find(function(o){ return o.id===orderId; });
   if (!to) return;
@@ -11568,8 +11670,9 @@ function openCourseNoteSheet(orderId, idx){
   if (!c) return;
   openSheet(
     '<h2>'+esc(diningCourseTitle(to,c))+'</h2>'+
-    '<p class="sheet-sub">Simple kitchen modifier. Stays on this course.</p>'+
-    '<input class="search-box" id="course-mod-note" value="'+esc(c.modNote||'')+'" placeholder="No onion, extra sauce…">'+
+    '<p class="sheet-sub">Modify this dish for the kitchen: tap allergy flags and/or write anything.</p>'+
+    noteChipsHtml(c.modNote)+
+    '<textarea class="search-box" id="course-mod-note" rows="3" style="height:auto" placeholder="Write anything: no onion, extra sauce, cut in half\u2026">'+esc(noteFreeText(c.modNote))+'</textarea>'+
     '<button class="primary-btn" onclick=\'saveCourseNote('+JSON.stringify(String(orderId))+','+idx+')\'>Save note</button>'+
     '<button class="ghost-btn" onclick="closeSheet()">Cancel</button>'
   );
@@ -11580,7 +11683,7 @@ function saveCourseNote(orderId, idx){
   var c=diningCourses(to)[idx];
   if(!c||manualMenuAllergyWarning([c],orderPositionIdentity(to),to.table)) return;
   var el=document.getElementById('course-mod-note');
-  if (c && el) c.modNote=String(el.value||'').trim();
+  if (c && el) c.modNote=noteComposed('course-mod-note');
   closeSheet();
   STATE.selectedLineIds={};
   renderOrder();
