@@ -143,7 +143,7 @@ try {
   assert.ok(r2.hasGf, 'no Gluten-free pasta button: ' + r2.strip);
   assert.ok(r2.gfNotes.length >= 1, 'GF modifier missing: ' + JSON.stringify(r2.gfNotes));
   assert.equal(r2.alertTickets, 0, 'GF pasta should not raise allergy override');
-  assert.match(r2.sheet, /MAIN course[\s\S]*APPETIZER/, 'no main/appetizer prompt: ' + r2.sheet);
+  assert.match(r2.sheet, /MAIN course/, 'no main prompt: ' + r2.sheet);
   assert.match(r2.line, /appetizer size.*:\d+:3$/, r2.line);
   assert.ok(r2.bar1.some((t) => /SEND DRINKS \(1\)/.test(t)), 'purple drinks button: ' + r2.bar1);
   assert.ok(!r2.bar2.some((t) => /DRINKS/.test(t)) && r2.holdBtn, 'hold: ' + r2.bar2);

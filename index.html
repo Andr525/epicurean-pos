@@ -1319,9 +1319,6 @@ body.tableside .app-content, body.hh-table .app-content { padding-bottom:calc(92
 .allergy-warn .allergy-choice{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.4rem}
 .allergy-warn .allergy-choice button{flex:1;min-width:30%;padding:.55rem;font-size:.95rem}
 .allergy-warn .ask-btn{background:#7c3aed;color:#fff;border:0;border-radius:10px;font-weight:700;flex-basis:100%}
-.pf-aam{margin-top:.6rem;padding:.5rem;border:1px dashed #b45309;border-radius:10px;background:rgba(180,83,9,.06)}
-.pf-aam-h{font-weight:800;font-size:.85rem;margin-bottom:.3rem}
-.pf-aam-ask{margin-top:.5rem;padding:.4rem;background:rgba(124,58,237,.1);border-radius:8px}
 .pf-note{margin-top:.5rem;font-size:.9rem}
 .ts-course-label{font-size:.68rem;font-weight:800;letter-spacing:.08em;color:var(--text-muted,#888);padding:.35rem .2rem .1rem}
 .gf-btn{background:#16a34a;color:#fff;border:0;border-radius:10px;font-weight:700}
@@ -2290,7 +2287,80 @@ function seatHasAppetizer(){
   } catch (e) { console.warn('seatHasAppetizer', e); }
   return found;
 }
+function pfAppAsMainOn(){ return (STATE.serviceSettings||{}).allowAppAsMain!==false; }
+function pfAppAsMainExtra(){ return Number((STATE.serviceSettings||{}).appAsMainExtra)||0; }
+// An open MAIN slot in this seat's prix fixe (main chosen as "None"), so a second appetizer can take it.
+function seatEmptyMainSlot(){
+  var me=selectedPositionIdentity(), found=null;
+  try {
+    tableDiningOrders().forEach(function(to){
+      if (found || orderPositionIdentity(to)!==me) return;
+      diningCourses(to).forEach(function(c,i){
+        if (found || !c || !c.noneChoice || c.fired || c.headingOnly) return;
+        if (isFreeComplimentary(c) || c.later || c.mode==='later') return;
+        if (workingDisplayBucket(c)==='main') found={to:to,c:c,i:i};
+      });
+    });
+  } catch(e) { console.warn('seatEmptyMainSlot', e); }
+  return found;
+}
+function askMakeMain(title, fnName, arg){
+  var a=JSON.stringify(String(arg)), f=JSON.stringify(String(fnName)), x=pfAppAsMainExtra();
+  function b(label,call,cls){ return '<button class="'+cls+'" style="margin-top:.45rem" onclick=\''+call+'\'>'+label+'</button>'; }
+  openSheet('<h2>'+esc(title)+'</h2><p class="sheet-sub">Seat '+esc(selectedPositionIdentity())+' has an appetizer and no main yet. Make this dish the <b>MAIN course</b> of the prix fixe '+(x>0?'(+$'+x.toFixed(0)+')':'(included)')+'?</p>'+
+    b('YES \u2014 make it the main course','askMakeMainSize('+f+','+a+',"main")','primary-btn')+
+    b('YES \u2014 but serve it with the appetizers','askMakeMainSize('+f+','+a+',"app")','primary-btn')+
+    b('NO \u2014 add it as an extra plate','askExtraPlatePortion('+JSON.stringify(String(title))+','+f+','+a+')','ghost-btn')+
+    '<button class="ghost-btn" style="margin-top:.45rem" onclick="closeSheet()">Cancel</button>');
+}
+function askMakeMainSize(fnName, arg, when){
+  var a=JSON.stringify(String(arg)), f=JSON.stringify(String(fnName));
+  function b(label,size,cls){ return '<button class="'+cls+'" style="margin-top:.45rem" onclick=\'makeMainWith('+f+','+a+',"'+when+'","'+size+'")\'>'+label+'</button>'; }
+  openSheet('<h2>What size?</h2><p class="sheet-sub">'+(when==='main'?'Served as the main course.':'Served with the appetizers.')+'</p>'+b('MAIN size','main','primary-btn')+b('APPETIZER size','app','primary-btn')+
+    '<button class="ghost-btn" style="margin-top:.45rem" onclick="closeSheet()">Cancel</button>');
+}
+function makeMainWith(fnName, arg, when, size){
+  closeSheet();
+  if (!seatEmptyMainSlot()) { toast('No open main for this seat'); return; }
+  var fn=window[fnName]; if (typeof fn!=='function') return;
+  fn(arg,'F');
+  var p=STATE.pendingItem; if (!p) return;
+  p.fillMainSlot=true; p.pfWhen=when; p.pfSize=size;
+  p.extraPlate=false; p.selectedMod=null; p.extraFee=0; p.itemSurcharge=0; p.price=0;
+  if (!/\((main|appetizer) size\)\s*$/i.test(p.name)) p.name=p.name+(size==='main'?' (main size)':' (appetizer size)');
+  if (modifiersReady(p)) commitPendingItem(); else renderModifierSheet();
+}
+function fillEmptyMainSlot(p){
+  var slot=seatEmptyMainSlot();
+  if (!slot) { p.fillMainSlot=false; return false; }
+  var c=slot.c, to=slot.to;
+  c.pending=false; c.skipped=false; c.noneChoice=false;
+  c.choice=p.name; c.name=p.name; c.desc=p.description||'';
+  c.upcharge=pfAppAsMainExtra();
+  c.station=p.station||c.station||'Expo';
+  c.allergens=(p.allergens||[]).slice(); c.cookNote=p.cookNote||''; c.cookTime=p.cookTime||0;
+  c.optionId=p.pfOptionId||p.id||''; c.selectedTemp=''; c.scoopChoice='';
+  c.appAsMain=true; c.aamWhen=p.pfWhen; c.aamSize=p.pfSize;
+  c.serviceCourse=p.pfWhen==='app'?2:3;
+  if (p.pfWhen==='app') c.ticketPos=defaultTicketPosForKind('app')+0.5;
+  if (p.notes) c.modNote=c.modNote?(c.modNote+' \u00B7 '+p.notes):p.notes;
+  if (p.askKitchen) c.askKitchen=true;
+  applyDiningAllergyNotes();
+  var line=(STATE.currentOrder||[]).filter(function(i){ return i.diningOrderId===to.id || i.lineId===to._boundLine; })[0];
+  if (line && line.selections && line.selections[slot.i]) line.selections[slot.i]=Object.assign({}, c);
+  STATE.pendingItem=null; STATE._slotFilled=true;
+  STATE.selectedLineIds={};
+  persistCheck(ensureOpenCheck(STATE.selectedTable));
+  closeSheet();
+  renderOrder();
+  toast('Main course: '+p.name);
+  return true;
+}
 function askCoursePortion(title, fnName, arg){
+  if (pfAppAsMainOn() && seatEmptyMainSlot()) { askMakeMain(title, fnName, arg); return; }
+  askExtraPlatePortion(title, fnName, arg);
+}
+function askExtraPlatePortion(title, fnName, arg){
   var a=JSON.stringify(String(arg));
   function b(code,label,cls){ return '<button class="'+cls+'" style="margin-top:.45rem" onclick=\'closeSheet();'+fnName+'('+a+',"'+code+'")\'>'+label+'</button>'; }
   openSheet('<h2>'+esc(title)+'</h2><p class="sheet-sub">Seat '+esc(selectedPositionIdentity())+' already has an appetizer. Serve this one as:</p>'+
@@ -2504,7 +2574,7 @@ function renderHandheldTop(){
     '<button class="hh-back" onclick="handheldBack()" aria-label="Back">←</button>'+
     '<div class="hh-title">#'+esc(String(STATE.selectedTable))+' · Table '+esc(String(STATE.selectedTable))+
       '<span><button type="button" class="hh-guests" onclick="openPartySheet()">'+sess.guestCount+' guests</button> · '+(STATE.currentServer?esc(STATE.currentServer.name):'')+
-      ' · <span id="hh-seated">'+seatedLabelFor(STATE.selectedTable)+'</span> · <span style="opacity:.6">build Nov5-b</span></span></div>'+
+      ' · <span id="hh-seated">'+seatedLabelFor(STATE.selectedTable)+'</span> · <span style="opacity:.6">build Nov6-a</span></span></div>'+
     '<button class="hh-more" onclick="printCheck()" aria-label="Print">⎙</button>'+
     '<button class="hh-more" onclick="openSwitchUser()" aria-label="Switch user">⇄</button>'+
     '<button class="hh-more" onclick="logout()" aria-label="Sign out">Out</button>'+
@@ -8997,6 +9067,11 @@ function pfGuestChoiceMode(c){
   var m=pfCourseMode(c);
   return m==='choose' || m==='later';
 }
+function pfGfPick(ci, oi, el){
+  if (!el || !el.checked) return;
+  var r=document.querySelector('input[name="pf-course-'+ci+'"][value="'+oi+'"]');
+  if (r && !r.checked) { r.checked=true; try{ r.dispatchEvent(new Event('change',{bubbles:true})); }catch(e){} }
+}
 function pfNoneRadioHtml(name, checked, onchange){
   return '<div class="pf-none-row"><label class="pf-none-tab'+(checked?' active':'')+'"><input type="radio" name="'+name+'" value="none"'+(checked?' checked':'')+(onchange?' onchange="'+onchange+'"':'')+'> NONE</label>'+
     '<span class="pf-none-hint">Skip this prix-fixe course. Add a dish through Add items if needed.</span></div>';
@@ -9074,7 +9149,7 @@ function pfOptionRadiosHtml(c, ci, selectedName){
       });
       html+='</div>';
     }
-    if (canMakeGfPasta(o.name)) html+='<div class="pf-temp-row"><label class="chip"><input type="checkbox" id="pf-gf-'+ci+'-'+oi+'"> Gluten-free pasta</label></div>';
+    if (canMakeGfPasta(o.name)) html+='<div class="pf-temp-row"><label class="chip"><input type="checkbox" id="pf-gf-'+ci+'-'+oi+'" onchange="pfGfPick('+ci+','+oi+',this)"> Gluten-free pasta</label></div>';
     else if (isFilledPastaName(o.name)) html+='<div class="pf-opt-desc" style="margin-left:1.4rem;color:#b45309">Filled pasta \u2014 made with gluten, cannot be gluten-free</div>';
   });
   return html;
@@ -9145,22 +9220,7 @@ function buildPrixFixeSelections(pf, pickedByIndex){
       selections.push(nonePrixFixeSelection(c,{}));
       return;
     }
-    var pk=pickedByIndex[ci];
-    if (pk && pk.aam) {
-      var so=((pf.courses[pk.si]||{}).options||[])[pk.oi];
-      if (so) {
-        var asel=selFromOption(c,so,{});
-        asel.appAsMain=true; asel.aamWhen=pk.when; asel.aamSize=pk.size;
-        asel.choice=so.name+(pk.size==='main'?' (main size)':' (appetizer size)');
-        asel.name=asel.choice;
-        asel.serviceCourse=pk.when==='app'?2:3;
-        if (pk.when==='app') asel.ticketPos=defaultTicketPosForKind('app')+0.5;
-        asel.upcharge=(Number(so.upcharge)||0)+pfAppAsMainExtra();
-        selections.push(asel);
-      }
-      return;
-    }
-    var opt=opts[pk];
+    var opt=opts[pickedByIndex[ci]];
     if (opt) selections.push(selFromOption(c,opt,{}));
   });
   return selections;
@@ -9534,45 +9594,6 @@ function prixFixeTempOptions(kind, opt){
   return [];
 }
 
-function pfAppAsMainOn(){ return (STATE.serviceSettings||{}).allowAppAsMain!==false; }
-function pfAppAsMainExtra(){ return Number((STATE.serviceSettings||{}).appAsMainExtra)||0; }
-function pfAamSource(pf, ci){
-  var c=(pf.courses||[])[ci];
-  if (!pfAppAsMainOn() || !c) return -1;
-  if (pfCourseMode(c)!=='choose' || c.fireEach) return -1;
-  if (pfCourseKind(c.label||c.name||'')!=='main') return -1;
-  for (var i=0;i<(pf.courses||[]).length;i++){
-    var a=pf.courses[i];
-    if (i===ci || pfCourseMode(a)!=='choose' || a.fireEach) continue;
-    if (pfCourseKind(a.label||a.name||'')==='app' && (a.options||[]).length) return i;
-  }
-  return -1;
-}
-function pfAamHtml(src, si, ci){
-  var x=pfAppAsMainExtra();
-  var h='<div class="pf-aam"><div class="pf-aam-h">Or a second appetizer as the main '+(x>0?'(+$'+x.toFixed(0)+')':'(included)')+'</div>';
-  (src.options||[]).forEach(function(o,oi){
-    if (!o || o.headingOnly || !String(o.name||'').trim()) return;
-    var hits=guestAllergyHits(o.allergens);
-    h+='<label class="pf-opt-label"><input type="radio" name="pf-course-'+ci+'" value="a'+si+'-'+oi+'"> '+esc(o.name)+(hits.length?' <span class="allergy-flag">⚠ '+esc(hits.join(', '))+'</span>':'')+'</label>';
-    if (canMakeGfPasta(o.name)) h+='<div class="pf-temp-row"><label class="chip"><input type="checkbox" id="pf-gf-aam'+ci+'-'+oi+'"> Gluten-free pasta</label></div>';
-    else if (isFilledPastaName(o.name)) h+='<div class="pf-opt-desc" style="margin-left:1.4rem;color:#b45309">Filled pasta \u2014 made with gluten, cannot be gluten-free</div>';
-  });
-  h+='<div class="pf-aam-ask" id="pf-aam-ask-'+ci+'" style="display:none"><b>Serve it:</b><div class="pf-temp-row">'+
-     '<label class="chip"><input type="radio" name="pf-aam-when-'+ci+'" value="main"> With the MAIN course</label>'+
-     '<label class="chip"><input type="radio" name="pf-aam-when-'+ci+'" value="app"> With the appetizers</label></div>'+
-     '<b>Size:</b><div class="pf-temp-row">'+
-     '<label class="chip"><input type="radio" name="pf-aam-size-'+ci+'" value="main"> MAIN size</label>'+
-     '<label class="chip"><input type="radio" name="pf-aam-size-'+ci+'" value="app"> Appetizer size</label></div></div></div>';
-  return h;
-}
-function pfAamSync(){
-  document.querySelectorAll('.pf-aam-ask').forEach(function(el){
-    var ci=el.id.replace('pf-aam-ask-','');
-    var r=document.querySelector('input[name="pf-course-'+ci+'"]:checked');
-    el.style.display=(r && /^a\d/.test(r.value))?'block':'none';
-  });
-}
 function openPrixFixeSelector(pfId) {
   STATE.manualOrderingPosition=selectedPositionIdentity();STATE.manualSelectingPfId=pfId;
   if (seatHasPrixFixe(STATE.activeSeat)) {
@@ -9587,7 +9608,7 @@ function openPrixFixeSelector(pfId) {
   var html='<div class="pf-selector">';
   html+='<button type="button" class="pf-back" onclick="backToOrderScreen()">← Order</button>';
   html+='<h3>'+esc(pf.name)+' — '+posLineMoney(Number(pf.price)||0)+'</h3>';
-  html+='<p class="pf-sel-sub">One appetizer and one main per seat — or None. A second appetizer may be taken as the main. Dessert is chosen later from the check, at any point. Extra dishes go through Add items. Welcome bites and entremet fire from the check.</p>';
+  html+='<p class="pf-sel-sub">One appetizer and one main per seat — or None. Dessert is chosen later from the check, at any point. Extra dishes go through Add items. Welcome bites and entremet fire from the check.</p>';
   if (!courses.length) html+='<p class="pf-sel-sub">No courses on this menu yet.</p>';
   courses.forEach(function(c,ci){
     var mode=pfCourseMode(c);
@@ -9613,8 +9634,6 @@ function openPrixFixeSelector(pfId) {
     }
     html+='<div class="pf-course-select"><label>'+esc(c.label)+' — choose one</label><div class="pf-options">';
     html+=pfOptionRadiosHtml(c, ci, '');
-    var aamSrc=pfAamSource(pf,ci);
-    if (aamSrc>=0) html+=pfAamHtml(pf.courses[aamSrc], aamSrc, ci);
     html+='</div><input class="search-box pf-note" id="pf-note-'+ci+'" placeholder="Message for this dish (optional)"></div>';
   });
   html+='<div class="pf-course-select"><label>Modifier / kitchen note</label>';
@@ -9622,7 +9641,6 @@ function openPrixFixeSelector(pfId) {
   html+='<div class="pf-sel-actions"><button class="send-btn" onclick=\'confirmPrixFixe('+JSON.stringify(String(pf.id))+')\'>Add to Order</button>'+
     '<button class="cancel-pay-btn" onclick="backToOrderScreen()">Back to order</button></div></div>';
   ov.innerHTML=html;
-  ov.onchange=pfAamSync;
   ov.classList.add('show');
 }
 
@@ -9736,7 +9754,8 @@ function allergyAskKitchen(){
   var before=(STATE.currentOrder||[]).length;
   if (document.querySelector('#pf-overlay.show') && STATE.manualSelectingPfId) confirmPrixFixe(STATE.manualSelectingPfId);
   else if (STATE.pendingItem) commitPendingItem();
-  var added=(STATE.currentOrder||[]).length>before;
+  var added=(STATE.currentOrder||[]).length>before || !!STATE._slotFilled;
+  STATE._slotFilled=false;
   STATE._allergyAck=null; STATE._askTag=null; STATE._askNames=null;
   if (!added) return;
   setTimeout(function(){
@@ -9774,7 +9793,6 @@ function confirmPrixFixe(pfId) {
   var scoops={};
   var missingTemp='';
   var missingScoops='';
-  var missingAam='';
   (pf.courses||[]).forEach(function(c,ci){
     if (!pfGuestChoiceMode(c)) return;
     var radios=document.querySelectorAll('input[name="pf-course-'+ci+'"]');
@@ -9783,18 +9801,9 @@ function confirmPrixFixe(pfId) {
       if (!r.checked) return;
       got=true;
       if (isPfNonePick(r.value)) picked[ci]='none';
-      else if (/^a\d+-\d+$/.test(r.value)) { var mm=r.value.slice(1).split('-'); picked[ci]={aam:true,si:parseInt(mm[0],10),oi:parseInt(mm[1],10)}; }
       else picked[ci]=parseInt(r.value,10);
     });
     if (!got || isPfNonePick(picked[ci])) return;
-    if (picked[ci] && picked[ci].aam) {
-      var ao=((pf.courses[picked[ci].si]||{}).options||[])[picked[ci].oi];
-      var wEl=document.querySelector('input[name="pf-aam-when-'+ci+'"]:checked'), zEl=document.querySelector('input[name="pf-aam-size-'+ci+'"]:checked');
-      if (!wEl || !zEl) { missingAam=ao?ao.name:'the dish'; return; }
-      picked[ci].when=wEl.value; picked[ci].size=zEl.value;
-      if (ao && isPastaName(ao.name)) { var gf2=document.getElementById('pf-gf-aam'+ci+'-'+picked[ci].oi); if (gf2 && gf2.checked) (STATE._gfPasta=STATE._gfPasta||[]).push(String(ao.name), String(ao.name)+' (main size)', String(ao.name)+' (appetizer size)'); }
-      return;
-    }
     var opt=(c.options||[])[picked[ci]];
     if (opt && prixFixeTempOptions(opt.askTemp, opt).length){
       var tEl=document.querySelector('input[name="pf-temp-'+ci+'-'+picked[ci]+'"]:checked');
@@ -9812,7 +9821,6 @@ function confirmPrixFixe(pfId) {
       else scoops[ci]=names.join(', ');
     }
   });
-  if (missingAam) { STATE._gfPasta=null; toast('Choose when to serve it, and the size, for '+missingAam); return; }
   if (missingTemp) { toast('Choose temperature for '+missingTemp); return; }
   if (missingScoops) { toast('Choose scoops for '+missingScoops); return; }
   var selections=buildPrixFixeSelections(pf, picked);
@@ -10230,6 +10238,7 @@ function commitPendingItem(){
   if (STATE._askTag && (STATE._askNames||[]).indexOf(String(p.name||'').split(' \u00B7 ')[0])>=0) { p.notes=p.notes?(p.notes+' \u00B7 '+STATE._askTag):STATE._askTag; p.askKitchen=true; }
   if (!modifiersReady(p)) { toast('Choose required modifiers'); return; }
   attachOrderGuestSafety(p);
+  if (p.fillMainSlot && fillEmptyMainSlot(p)) return;
   if (STATE._voiceCommit) p.voiceOrigin=true;
   settleVoiceDraftForItem(p.id);
   if (p.serviceCourse==null) p.serviceCourse=p.course||defaultCourse(p);
