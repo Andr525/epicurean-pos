@@ -2577,7 +2577,7 @@ function renderHandheldTop(){
     '<button class="hh-back" onclick="handheldBack()" aria-label="Back">←</button>'+
     '<div class="hh-title">#'+esc(String(STATE.selectedTable))+' · Table '+esc(String(STATE.selectedTable))+
       '<span><button type="button" class="hh-guests" onclick="openPartySheet()">'+sess.guestCount+' guests</button> · '+(STATE.currentServer?esc(STATE.currentServer.name):'')+
-      ' · <span id="hh-seated">'+seatedLabelFor(STATE.selectedTable)+'</span> · <span style="opacity:.6">build Nov6-c</span></span></div>'+
+      ' · <span id="hh-seated">'+seatedLabelFor(STATE.selectedTable)+'</span> · <span style="opacity:.6">build Nov6-e</span></span></div>'+
     '<button class="hh-more" onclick="printCheck()" aria-label="Print">⎙</button>'+
     '<button class="hh-more" onclick="openSwitchUser()" aria-label="Switch user">⇄</button>'+
     '<button class="hh-more" onclick="logout()" aria-label="Sign out">Out</button>'+
@@ -2885,6 +2885,34 @@ function isWineListCat(catId){
   });
   return /wine/.test(n);
 }
+STATE.btgPours = (function(){ try { return JSON.parse(localStorage.getItem('eh_btg_pours')||'{}')||{}; } catch(e){ return {}; } })();
+// BOH (boh_shared/btg_pours) sets the 6 oz and 2 oz price of each by-the-glass wine; 2 oz defaults to a third of the glass.
+function btgPoursFor(w){
+  var glass=Number(w && w.glassPrice || 0);
+  var o=(STATE.btgPours||{})[w && w.id]||{};
+  var p6=Number(o.p6)>0 ? Number(o.p6) : glass;
+  var p2=Number(o.p2)>0 ? Number(o.p2) : Math.round(p6/3);
+  return {p6:p6, p2:p2};
+}
+function pourLabel(opt){
+  return String(opt||'').replace(/^(glass|taste)\s+/i,'').replace(/\s+\$?\d+(?:\.\d+)?K?\s*$/i,'').trim();
+}
+function pourAmount(opt){
+  var m=String(opt||'').match(/\$?(\d+(?:\.\d+)?)(K?)\s*$/i);
+  if (!m) return null;
+  return Number(m[1])*(m[2]?1000:1);
+}
+function modsText(mods){
+  return Object.keys(mods||{}).map(function(g){ return g==='Pour' ? mods[g] : g+': '+mods[g]; }).join(', ');
+}
+// Turn a picked Pour option ("Taste 2 oz 8") into a clean label ("2 oz") and charge that pour's own price.
+function applyPourToLine(p){
+  if (!p || !p.mods || !p.mods.Pour) return;
+  var raw=p.mods.Pour, amt=pourAmount(raw);
+  p.mods.Pour=pourLabel(raw);
+  if (amt!=null && !p.extraPlate) p.price=amt;
+  p.selectedMod=modsText(p.mods);
+}
 function winePourMods(w){
   var btg=!!(w && (w.byTheGlass || w.scaliniOnly || Number(w && w.glassPrice || 0)>0));
   if (!btg) return [];
@@ -2892,8 +2920,9 @@ function winePourMods(w){
   var glass=Number(w && w.glassPrice || 0);
   var bottle=Number(w && w.bottlePrice || 0);
   if (btg && glass>0) {
-    opts.push('Glass 6 oz '+posLineMoney(glass));
-    opts.push('Taste 2 oz '+posLineMoney(Math.round(glass/3)));
+    var pr=btgPoursFor(w);
+    opts.push('Glass 6 oz '+posLineMoney(pr.p6));
+    opts.push('Taste 2 oz '+posLineMoney(pr.p2));
   }
   if (bottle>0) opts.push('Bottle '+posLineMoney(bottle));
   if (opts.length<=1) return [];
@@ -3603,6 +3632,12 @@ function loadData() {
   }, function(){ if (!STATE.menuLive) seedOfflineCatalog(); });
   listenBohList('bar','bar');
   listenWines();
+  fbDb.collection('boh_shared').doc('btg_pours').onSnapshot(function(doc){
+    STATE.btgPours = (doc.exists && doc.data() && doc.data().prices) ? doc.data().prices : {};
+    try { localStorage.setItem('eh_btg_pours', JSON.stringify(STATE.btgPours)); } catch(e){}
+    rebuildPosCatalog();
+    refreshOrderView();
+  }, function(){});
   listenVoiceVocabulary();
   listenBohList('retail','retail');
   listenBohList('daily_specials','dailySpecials');
@@ -5897,9 +5932,9 @@ function openLineNoteSheet(lineId){
   var line=STATE.currentOrder.filter(function(i){ return i.lineId===lineId; })[0];
   if (!line) { toast('Sent items keep their original note'); return; }
   openSheet(
-    '<h2>Modify</h2><p class="sheet-sub">'+esc(line.name)+' \u2014 tap allergy flags and/or write anything.</p>'+
-    noteChipsHtml(line.notes)+
-    '<textarea class="search-box" id="line-mod-note" rows="3" style="height:auto" placeholder="Write anything for the kitchen\u2026">'+esc(noteFreeText(line.notes))+'</textarea>'+
+    '<h2>Modify</h2><p class="sheet-sub">'+esc(line.name)+(isDrinkItem(line)?' \u2014 type what the bar should do.':' \u2014 tap allergy flags and/or write anything.')+'</p>'+
+    (isDrinkItem(line)?'':noteChipsHtml(line.notes))+
+    '<textarea class="search-box" id="line-mod-note" rows="3" style="height:auto" placeholder="'+(isDrinkItem(line)?'e.g. no garnish, extra cold, up\u2026':'Write anything for the kitchen\u2026')+'">'+esc(noteFreeText(line.notes))+'</textarea>'+
     '<button class="primary-btn" onclick=\'saveLineNote('+JSON.stringify(String(lineId))+')\'>Save note</button>'+
     '<button class="ghost-btn" onclick="closeSheet()">Cancel</button>'
   );
@@ -7165,7 +7200,8 @@ function voicePlaceHigh(item, parsed, preset){
     if (STATE.pendingItem && STATE.pendingItem.id===item.id) {
       if (preset.mods) {
         STATE.pendingItem.mods=Object.assign({}, STATE.pendingItem.mods||{}, preset.mods);
-        STATE.pendingItem.selectedMod=Object.keys(STATE.pendingItem.mods).map(function(g){ return g+': '+STATE.pendingItem.mods[g]; }).join(', ');
+        STATE.pendingItem.selectedMod=modsText(STATE.pendingItem.mods);
+        applyPourToLine(STATE.pendingItem);
       }
       if (preset.notes) STATE.pendingItem.notes=preset.notes;
       if (!modifiersReady(STATE.pendingItem) || allergenHits(STATE.pendingItem, STATE.pendingItem.seat).length) {
@@ -9792,6 +9828,15 @@ function freeItemAllergyFlags(courses, identity, table){
 function manualMenuAllergyWarning(courses, identity, table){
   var context=exactPositionAllergyContext(identity,table);
   var conflicts=(courses||[]).filter(function(c){return !c.noneChoice&&!c.headingOnly&&!isFreeComplimentary(c);}).map(function(c){var cname=c.choice||c.name||c.course;var hits=asList(c.allergens).filter(function(a){return context.effectiveAllergens.some(function(b){return allergensConflict(a,b);});}).filter(function(a){return !(isGlutenHit(a)&&gfListHas(String(cname).split(' \u00B7 ')[0]));});return hits.length?{name:cname,hits:hits}:null;}).filter(Boolean);
+  // A dish already set to gluten-free pasta needs no warning for its gluten hit.
+  conflicts=conflicts.map(function(c){
+    var base=String(c.name).split(' \u00B7 ')[0], bare=base.replace(/\s*\((main|appetizer) size\)\s*$/i,'');
+    if (canMakeGfPasta(bare) && (gfListHas(base)||gfListHas(bare))) {
+      var rest=c.hits.filter(function(h){ return !isGlutenHit(h); });
+      return rest.length ? Object.assign({}, c, {hits:rest}) : null;
+    }
+    return c;
+  }).filter(Boolean);
   if(!conflicts.length) return false;
   var ackKey=String(identity)+'|'+conflicts.map(function(c){return c.name+':'+c.hits.join(',');}).join(';');
   if (STATE._allergyAck && STATE._allergyAck.key===ackKey && Date.now()-STATE._allergyAck.at<60000) {
@@ -9802,7 +9847,9 @@ function manualMenuAllergyWarning(courses, identity, table){
     return false;
   }
   STATE._allergyLast={key:ackKey, identity:identity, conflicts:conflicts};
-  var html='<div class="manual-preadd-warning allergy-warn" role="alert"><b>\u26A0 Seat '+esc(identity)+': '+conflicts.map(function(c){return esc(c.name)+' has '+esc(c.hits.join(', '));}).join(' \u00B7 ')+'</b>'+(conflicts.some(cannotBeGlutenFree)?'<div style="margin-top:.3rem;font-weight:600">'+esc(conflicts.filter(cannotBeGlutenFree).map(function(c){return c.name;}).join(', '))+' is filled pasta \u2014 it is made with gluten and cannot be made without it. Suggest another dish.</div>':'')+'<div class="allergy-choice"><button type="button" class="primary-btn" onclick="allergyAddAnyway()">Add anyway</button>'+(conflicts.every(function(c){return canMakeGfPasta(c.name)&&c.hits.every(isGlutenHit);})?'<button type="button" class="gf-btn" onclick="allergyGlutenFree()">Gluten-free pasta</button>':'')+(conflicts.some(cannotBeGlutenFree)?'':'<button type="button" class="ask-btn" onclick="allergyAskKitchen()">Ask kitchen: make without '+esc(conflictAllergenText(conflicts))+'</button>')+'<button type="button" class="ghost-btn" onclick="allergyCancel()">Cancel</button></div></div>';
+  var gfOnly=conflicts.every(function(c){return canMakeGfPasta(c.name)&&c.hits.every(isGlutenHit);});
+  var stuck=conflicts.some(cannotBeGlutenFree);
+  var html='<div class="manual-preadd-warning allergy-warn" role="alert"><b>\u26A0 Seat '+esc(identity)+': '+conflicts.map(function(c){return esc(c.name)+' has '+esc(c.hits.join(', '));}).join(' \u00B7 ')+'</b>'+(stuck?'<div style="margin-top:.3rem;font-weight:600">'+esc(conflicts.filter(cannotBeGlutenFree).map(function(c){return c.name;}).join(', '))+' is filled pasta \u2014 it is made with gluten and cannot be made without it. Suggest another dish.</div>':'')+'<div class="allergy-choice">'+(gfOnly?'<button type="button" class="gf-btn" onclick="allergyGlutenFree()">Make gluten-free</button>':(stuck?'':'<button type="button" class="ask-btn" onclick="allergyAskKitchen()">Ask kitchen: make without '+esc(conflictAllergenText(conflicts))+'</button>'))+'<button type="button" class="ghost-btn" onclick="allergyCancel()">Cancel</button></div></div>';
   var target=document.querySelector('#pf-overlay.show .pf-selector')||document.querySelector('#sheet-overlay.show .sheet');
   if(target){var old=target.querySelector('[data-manual-allergy-block]');if(old)old.remove();var box=document.createElement('section');box.setAttribute('data-manual-allergy-block','1');box.innerHTML=html;target.prepend(box);if(box.scrollIntoView)box.scrollIntoView({block:'start'});}else {openSheet('<h2>Allergy warning</h2>'+html+'<button class="ghost-btn" onclick="closeSheet()">Back</button>');STATE.manualOrderingPosition=identity;}
   return true;
@@ -10256,15 +10303,21 @@ function renderModifierSheet(){
     var chosen=p.mods[mod.group];
     html+='<div class="tasting-section-label">'+mod.group+' <span style="color:var(--danger)">*</span></div><div class="chip-row">';
     (mod.options||[]).forEach(function(opt){
-      html+="<button type=\"button\" class=\"chip"+(chosen===opt?' active':'')+(!chosen?' required-miss':'')+"\" onclick='pickMod("+mi+","+JSON.stringify(String(opt))+")'>"+opt+"</button>";
+      var isPour=mod.group==='Pour';
+      var shown=isPour ? (pourLabel(opt)+' \u00b7 $'+pourAmount(opt)) : opt;
+      var isOn=isPour ? (chosen===pourLabel(opt)) : (chosen===opt);
+      html+="<button type=\"button\" class=\"chip"+(isOn?' active':'')+(!chosen?' required-miss':'')+"\" onclick='pickMod("+mi+","+JSON.stringify(String(opt))+")'>"+esc(shown)+"</button>";
     });
     html+='</div>';
   });
-  if (p.allergens&&p.allergens.length) html+='<div class="warn-banner">⚠ ALLERGENS: '+p.allergens.join(', ')+'</div>';
-  else html+='<p class="sheet-sub">Allergens: none listed</p>';
-  if (p.dietaryFlags&&p.dietaryFlags.length) html+='<p class="sheet-sub">Dietary: '+p.dietaryFlags.join(' · ')+'</p>';
-  html+='<div class="tasting-section-label">Notes</div>';
-  html+='<input class="search-box" id="mod-notes" value="'+(p.notes||'').replace(/"/g,'&quot;')+'" placeholder="Special instructions" oninput="STATE.pendingItem.notes=this.value">';
+  var drinkLine=isDrinkItem(p);
+  if (!drinkLine) {
+    if (p.allergens&&p.allergens.length) html+='<div class="warn-banner">⚠ ALLERGENS: '+p.allergens.join(', ')+'</div>';
+    else html+='<p class="sheet-sub">Allergens: none listed</p>';
+    if (p.dietaryFlags&&p.dietaryFlags.length) html+='<p class="sheet-sub">Dietary: '+p.dietaryFlags.join(' · ')+'</p>';
+  }
+  html+='<div class="tasting-section-label">'+(drinkLine?'Type a request':'Notes')+'</div>';
+  html+='<input class="search-box" id="mod-notes" value="'+(p.notes||'').replace(/"/g,'&quot;')+'" placeholder="'+(drinkLine?'e.g. martini, no garnish':'Special instructions')+'" oninput="STATE.pendingItem.notes=this.value">';
   var ready=modifiersReady(p);
   html+='<p class="sheet-sub">Tap a modifier to add this dish. Stay here and pick more dishes; SEND when the order is ready.</p>';
   html+=(ready?'<button class="primary-btn" onclick="maybeAllergyThenAdd()">Add & keep ordering</button>':'');
@@ -10287,6 +10340,7 @@ function pickMod(mi, opt){
   var p=STATE.pendingItem; if(!p) return;
   var group=(p.modifiers[mi]||{}).group;
   p.mods[group]=opt;
+  if (group==='Pour') { applyPourToLine(p); if (modifiersReady(p)) maybeAllergyThenAdd(); else renderModifierSheet(); return; }
   var dollar=String(opt).match(/\$(\d+(?:\.\d+)?)/);
   if (dollar) {
     var add=Number(dollar[1]);
@@ -10297,7 +10351,7 @@ function pickMod(mi, opt){
       p.price=add;
     }
   }
-  p.selectedMod=Object.keys(p.mods).map(function(g){return g+': '+p.mods[g];}).join(', ');
+  p.selectedMod=modsText(p.mods);
   if (modifiersReady(p)) maybeAllergyThenAdd();
   else renderModifierSheet();
 }

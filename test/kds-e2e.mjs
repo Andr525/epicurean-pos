@@ -163,6 +163,7 @@ try {
     await kp.goto(korigin+'/?screen='+scr);
     await kp.evaluate(()=>{ document.getElementById('kds-login').style.display='none'; document.getElementById('kds-app').style.display='flex'; startKDS(); });
     await new Promise(r=>setTimeout(r,4500));
+    await kp.evaluate(()=>{ document.querySelectorAll('.k-arrow').forEach(b=>b.click()); });
     seen[scr] = await kp.evaluate(()=>document.getElementById('kds-content').innerText.replace(/\s+/g,' '));
     console.log('KDS', scr, '=>', seen[scr].slice(0,300), '| errs', JSON.stringify(errs.slice(0,3)));
     if (scr==='kitchen') await kp.screenshot({path:(process.env.SHOT||'/tmp/kds-e2e.png')});

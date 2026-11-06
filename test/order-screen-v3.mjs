@@ -65,8 +65,8 @@ try {
     commitPendingItem();
     out.allergyAdded = STATE.currentOrder.length - before;
     out.allergyWarn = !!document.querySelector('.manual-preadd-warning');
-    out.addAnywayBtn = !!document.querySelector('.allergy-choice .primary-btn');
-    allergyAddAnyway();
+    out.addAnywayBtn = !document.querySelector('.allergy-choice .primary-btn') && !!document.querySelector('.allergy-choice .ask-btn');
+    allergyAskKitchen();
     out.afterOverride = STATE.currentOrder.length - before;
     out.alert = STATE.orders.filter((o) => o.allergyOverride).map((o) => o.items[0].name);
     closeSheet();
@@ -75,9 +75,9 @@ try {
   assert.deepEqual(r.tabs, ['Food', 'Drinks'], 'tabs: ' + r.tabs);
   assert.ok(!r.tiles.some((t) => /^FOOD$|^DRINKS$/.test(t)), 'big root boxes still shown');
   assert.equal(r.allergyAdded, 0, 'pignoli dish was added for a nut-allergy seat');
-  assert.ok(r.allergyWarn && r.addAnywayBtn, 'no allergy warning with Add anyway button');
+  assert.ok(r.allergyWarn && r.addAnywayBtn, 'allergy warning must offer only Ask kitchen (no Add anyway)');
   assert.equal(r.afterOverride, 1, 'Add anyway did not add the dish');
-  assert.ok(r.alert.length === 1 && /ALLERGY OVERRIDE/.test(r.alert[0]), 'no allergy alert ticket: ' + r.alert);
+  assert.ok(r.alert.length === 1 && /ASK KITCHEN|ALLERGY OVERRIDE/.test(r.alert[0]), 'no allergy alert ticket: ' + r.alert);
   await page.waitForTimeout(13000);
   const r2 = await page.evaluate(() => {
     const out = {};
