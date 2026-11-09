@@ -2577,7 +2577,7 @@ function renderHandheldTop(){
     '<button class="hh-back" onclick="handheldBack()" aria-label="Back">←</button>'+
     '<div class="hh-title">#'+esc(String(STATE.selectedTable))+' · Table '+esc(String(STATE.selectedTable))+
       '<span><button type="button" class="hh-guests" onclick="openPartySheet()">'+sess.guestCount+' guests</button> · '+(STATE.currentServer?esc(STATE.currentServer.name):'')+
-      ' · <span id="hh-seated">'+seatedLabelFor(STATE.selectedTable)+'</span> · <span style="opacity:.6">build Nov6-e</span></span></div>'+
+      ' · <span id="hh-seated">'+seatedLabelFor(STATE.selectedTable)+'</span> · <span style="opacity:.6">build Nov9-a</span></span></div>'+
     '<button class="hh-more" onclick="printCheck()" aria-label="Print">⎙</button>'+
     '<button class="hh-more" onclick="openSwitchUser()" aria-label="Switch user">⇄</button>'+
     '<button class="hh-more" onclick="logout()" aria-label="Sign out">Out</button>'+
@@ -6097,11 +6097,13 @@ function collectWorkingCheckGroups(){
         extraPlate:!!opts.extraPlate,
         kind:opts.kind||opts.bucket,
         ticketPos:opts.ticketPos,
-        rowFire:!!opts.rowFire
+        rowFire:!!opts.rowFire,
+        upTotal:0
       };
       order.push(groups[key]);
     }
     var g=groups[key];
+    g.upTotal+=(Number(opts.up)||0)*(opts.qty||1);
     g.plates.push({
       seat:opts.seat,
       temp:opts.temp||'',
@@ -6126,10 +6128,9 @@ function collectWorkingCheckGroups(){
     var line=diningLineOnCheck(to, activeCheckId());
     if (line && Number(line.price)) unit=Number(line.price);
     if (!tasting) {
-      try {
-        var pfBase=Number((findPrixFixeMenu(to.prixFixeId)||{}).price)||0;
-        if (pfBase && unit>pfBase) pkgName='Prix Fixe (+$'+Math.round(unit-pfBase)+' upcharge)';
-      } catch (e) {}
+      // Upcharges show on the dish they belong to, not on the Prix Fixe line.
+      var upSum=diningCourses(to).reduce(function(a,c){ return a+((c&&!c.noneChoice&&!c.skipped)?(Number(c.upcharge)||0):0); },0);
+      if (upSum>0 && unit-upSum>0) unit=unit-upSum;
     }
     if (line && line.lineId) boundPkg[line.lineId]=1;
     addPlate({
@@ -6197,6 +6198,7 @@ function collectWorkingCheckGroups(){
         toId:to.id, courseIdx:i,
         status:c.fired?'sent':(c.skipped?'held':'unsent'),
         note:c.modNote||'',
+        up:(c.noneChoice||c.skipped)?0:(Number(c.upcharge)||0),
         kind:diningCourseKind(c),
         ticketPos:diningCourseTicketPos(c,i),
         rowFire:isComplimentaryStyleCourse(c)
@@ -6318,6 +6320,8 @@ function workingCheckHtml(){
     if (!g.pfComp) {
       var total=(Number(g.unit)||0)*qty;
       if (total) price='$'+(total%1?String(Math.round(total)):String(Math.round(total)));
+    } else if (g.upTotal>0) {
+      price='+$'+String(Math.round(g.upTotal));
     }
     var nameClick='';
     if (first && first.status!=='sent') {
@@ -9825,9 +9829,26 @@ function freeItemAllergyFlags(courses, identity, table){
   });
   return out;
 }
+function allergenAlreadyHandled(c, allergen){
+  var texts=[c&&c.notes, c&&c.note, c&&c.selectedMod, c&&c.noteText, c&&c.modNote];
+  var m=c&&c.mods; if (m) { if (Array.isArray(m)) texts=texts.concat(m); else if (typeof m==='object') Object.keys(m).forEach(function(k){ texts.push(m[k]); }); }
+  var t=texts.filter(function(x){ return typeof x==='string'; }).join(' | ').toLowerCase();
+  if (!t) return false;
+  var a=String(allergen||'').toLowerCase().trim(); if (!a) return false;
+  var words=[a]; if (a.indexOf(' ')>0) words.push(a.split(' ').pop());
+  return words.some(function(w){
+    return t.indexOf('no '+w)>=0 || t.indexOf('without '+w)>=0 || t.indexOf('w/o '+w)>=0 || t.indexOf(w+'-free')>=0 || t.indexOf(w+' free')>=0 || t.indexOf('allergy '+w)>=0 || t.indexOf('allergy: '+w)>=0 ||
+      (/gluten/.test(w) && /gluten[- ]?free|\bgf\b/.test(t));
+  });
+}
 function manualMenuAllergyWarning(courses, identity, table){
   var context=exactPositionAllergyContext(identity,table);
-  var conflicts=(courses||[]).filter(function(c){return !c.noneChoice&&!c.headingOnly&&!isFreeComplimentary(c);}).map(function(c){var cname=c.choice||c.name||c.course;var hits=asList(c.allergens).filter(function(a){return context.effectiveAllergens.some(function(b){return allergensConflict(a,b);});}).filter(function(a){return !(isGlutenHit(a)&&gfListHas(String(cname).split(' \u00B7 ')[0]));});return hits.length?{name:cname,hits:hits}:null;}).filter(Boolean);
+  var conflicts=(courses||[]).filter(function(c){return !c.noneChoice&&!c.headingOnly&&!isFreeComplimentary(c);}).map(function(c){var cname=c.choice||c.name||c.course;var hits=asList(c.allergens).filter(function(a){return context.effectiveAllergens.some(function(b){return allergensConflict(a,b);});}).filter(function(a){return !(isGlutenHit(a)&&gfListHas(String(cname).split(' \u00B7 ')[0]));});return hits.length?{name:cname,hits:hits,src:c}:null;}).filter(Boolean);
+  // Once the waiter has already modified the dish for that allergy (NO SHELLFISH, gluten-free ...), do not ask again.
+  conflicts=conflicts.map(function(c){
+    var rest=c.hits.filter(function(h){ return !allergenAlreadyHandled(c.src||c, h); });
+    return rest.length ? (rest.length===c.hits.length ? c : Object.assign({}, c, {hits:rest})) : null;
+  }).filter(Boolean);
   // A dish already set to gluten-free pasta needs no warning for its gluten hit.
   conflicts=conflicts.map(function(c){
     var base=String(c.name).split(' \u00B7 ')[0], bare=base.replace(/\s*\((main|appetizer) size\)\s*$/i,'');

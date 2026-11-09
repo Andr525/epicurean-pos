@@ -99,6 +99,9 @@ try {
     STATE._gfPasta = ['Rigatoni "Amatriciana"'];
     out.warnWithGf = manualMenuAllergyWarning(sel, ids[0]);
     STATE._gfPasta = null;
+    toggleAllergy(ids[0], 'Shellfish');
+    out.shellModified = manualMenuAllergyWarning([{ name: 'Shrimp', allergens: ['Shellfish'], notes: '\u26A0 NO SHELLFISH' }], ids[0]);
+    out.shellPlain = manualMenuAllergyWarning([{ name: 'Shrimp', allergens: ['Shellfish'] }], ids[0]);
     out.warnNoGf = manualMenuAllergyWarning(sel, ids[0]);
     out.btns = [...document.querySelectorAll('.allergy-choice button')].map(b => b.textContent);
     return out;
@@ -108,6 +111,8 @@ try {
   assert.ok(e.area, 'drink Modify needs a text box');
   assert.equal(e.warnWithGf, false, 'GF pasta ticked: no warning');
   assert.equal(e.warnNoGf, true);
+  assert.equal(e.shellModified, false, 'already modified NO SHELLFISH: no second prompt');
+  assert.equal(e.shellPlain, true, 'unmodified shellfish dish must still warn');
   assert.ok(e.btns.length === 2 && /Make gluten-free|Ask kitchen/.test(e.btns[0]) && /Cancel/.test(e.btns[1]), 'buttons: ' + e.btns);
   console.log('PASS drink modify is text only; allergy prompt simplified');
 

@@ -86,7 +86,7 @@ try {
     out.tiles = [...document.querySelectorAll('.ts-tile')].map((e) => e.textContent);
     return out;
   });
-  assert.deepEqual(r.pkgRows.map((t) => t.replace(/\s+/g, ' ')), ['1Prix Fixe (+$18 upcharge)✕ 1A$107', '1Prix Fixe✕ 2$89'], 'prix fixe rows: ' + JSON.stringify(r.pkgRows));
+  assert.deepEqual(r.pkgRows.map((t) => t.replace(/\s+/g, ' ')), ['2Prix Fixe✕ 1A✕ 2$178'], 'prix fixe rows: ' + JSON.stringify(r.pkgRows));
   assert.ok(r.barVisible && /SEND \(2\)/.test(r.barText), 'send bar: ' + r.barText);
   assert.equal(r.stayHold, false, 'Stay/Send buttons should be gone from the check');
   assert.deepEqual(r.scrollAfter, r.scrollBefore, 'scroll moved ' + r.scrollBefore + ' -> ' + r.scrollAfter);
