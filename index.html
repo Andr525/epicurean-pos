@@ -864,6 +864,8 @@ body.hh-on.floor-drawing .floor-stage { outline:2px dashed var(--primary); }
   font-size:0.66rem; font-weight:800; letter-spacing:0.04em; cursor:pointer;
   border:1px solid var(--border); background:var(--surface-2); color:var(--text);
 }
+.ts-row-actions.compact{flex-wrap:wrap;margin-top:0}.ts-row-actions .ts-dots{min-width:44px;font-size:1rem;line-height:1;padding:0 .5rem;background:transparent;border-color:transparent;color:#64748b}.ts-row-actions .ts-dots.on{border-color:var(--border)}
+.free-row.grp .fr-name b{font-size:.9rem}.free-row .fr-notes{display:block;color:#b45309;font-weight:700;font-size:.78rem;line-height:1.25}.free-row.done{opacity:.55}
 .ts-row-actions button.fire-now {
   background:linear-gradient(135deg,#dc2626,#ea580c); color:#fff; border:none;
 }
@@ -2577,7 +2579,7 @@ function renderHandheldTop(){
     '<button class="hh-back" onclick="handheldBack()" aria-label="Back">←</button>'+
     '<div class="hh-title">#'+esc(String(STATE.selectedTable))+' · Table '+esc(String(STATE.selectedTable))+
       '<span><button type="button" class="hh-guests" onclick="openPartySheet()">'+sess.guestCount+' guests</button> · '+(STATE.currentServer?esc(STATE.currentServer.name):'')+
-      ' · <span id="hh-seated">'+seatedLabelFor(STATE.selectedTable)+'</span> · <span style="opacity:.6">build Nov9-a</span></span></div>'+
+      ' · <span id="hh-seated">'+seatedLabelFor(STATE.selectedTable)+'</span> · <span style="opacity:.6">build Nov10-b</span></span></div>'+
     '<button class="hh-more" onclick="printCheck()" aria-label="Print">⎙</button>'+
     '<button class="hh-more" onclick="openSwitchUser()" aria-label="Switch user">⇄</button>'+
     '<button class="hh-more" onclick="logout()" aria-label="Sign out">Out</button>'+
@@ -2639,7 +2641,7 @@ function backToOrderScreen(){
 }
 function handheldBack(){
   var nested=overlayIsOpen() ||
-    (STATE.menuNav && STATE.menuNav.level && STATE.menuNav.level!=='root') ||
+    (STATE.menuNav && STATE.menuNav.level && STATE.menuNav.level!=='root' && STATE.menuNav.level!=='cats') ||
     !!String(STATE.menuSearch||'').trim() ||
     !!STATE.checkFocus;
   if (nested) { backToOrderScreen(); return; }
@@ -6350,7 +6352,7 @@ function workingCheckHtml(){
 }
 function workingRowActionsHtml(g){
   if (!g) return '';
-  var out='';
+  var out='', heldOut='';
   (g.plates||[]).forEach(function(p){
     if (!p || p.status==='sent' || !p.selectKey) return;
     var lab=positionTempToken(p.seat,'',p.priority);
@@ -6363,6 +6365,7 @@ function workingRowActionsHtml(g){
     } else if (p.lineId) {
       var ln=(STATE.currentOrder||[]).filter(function(x){return x&&x.lineId===p.lineId;})[0];
       var held=!!(ln&&ln.held);
+      if (held) heldOut+='<button type="button" class="hold-btn on" onclick=\'event.stopPropagation();toggleHoldLine('+JSON.stringify(String(p.lineId))+')\'>HELD \u00B7 release</button> ';
       btns+='<button type="button" onclick=\'event.stopPropagation();openLineNoteSheet('+JSON.stringify(String(p.lineId))+')\'>Modify</button>';
       btns+='<button type="button" onclick=\'event.stopPropagation();openMoveSheet('+JSON.stringify(String(p.selectKey))+')\'>Move</button>';
       btns+='<button type="button" class="hold-btn'+(held?' on':'')+'" onclick=\'event.stopPropagation();toggleHoldLine('+JSON.stringify(String(p.lineId))+')\'>'+(held?'HELD \u00B7 release':'HOLD')+'</button>';
@@ -6370,8 +6373,12 @@ function workingRowActionsHtml(g){
     }
     if (btns) out+='<span class="pa"><b>'+esc(lab)+'</b> '+btns+'</span> ';
   });
-  return out?'<div class="ts-row-actions">'+out+'</div>':'';
+  if (!out) return '';
+  if ((STATE.serviceSettings||{}).compactBill===false) return '<div class="ts-row-actions">'+out+'</div>';
+  var rk=String(((g.plates||[])[0]||{}).selectKey||''), open=!!(STATE._actOpen&&STATE._actOpen[rk]);
+  return '<div class="ts-row-actions compact">'+(open?out:heldOut)+'<button type="button" class="ts-dots'+(open?' on':'')+'" aria-label="Edit this line" onclick=\'event.stopPropagation();toggleRowActs('+JSON.stringify(rk)+')\'>'+(open?'\u25B4':'\u22EF')+'</button></div>';
 }
+function toggleRowActs(k){ STATE._actOpen=STATE._actOpen||{}; STATE._actOpen[k]=!STATE._actOpen[k]; renderOrder(); }
 function openMoveSheet(key){
   STATE.selectedLineIds={}; STATE.selectedLineIds[key]=1;
   var spec=parseSelKey(key), sc=0, nm='';
@@ -6422,8 +6429,8 @@ function postSeatNoteTicket(text){
   STATE._localOrders.push(local);
   postKitchenTicket(order,'orders',local);
 }
-function freeCoursesHtml(){
-  var rows='';
+function freeEntries(){
+  var out=[];
   tableDiningOrders().forEach(function(to){
     var ident=orderPositionIdentity(to),k=0;
     diningCourses(to).forEach(function(c,i){
@@ -6436,17 +6443,77 @@ function freeCoursesHtml(){
       var base=operationalDishName(c.choice||c.name||'',c)||String(c.course||'');
       var flags=[];
       if (!sub&&!posSub) { try { flags=freeItemAllergyFlags([c],ident,to.table); } catch(e){} }
-      var done=c.fired||c.skipped;
-      rows+='<div class="free-row"><span class="fr-seat">'+esc(ident)+'</span><span class="fr-name"><b>'+(kind==='entremet'?'Pre-dessert':(esc(c.course||'Free')+' '+k))+'</b>'+
-        '<small>'+(sub?('<s>'+esc(base)+'</s> \u2192 <b>'+esc(sub)+'</b>'):esc(base))+(posSub&&!sub?' \u2192 '+esc(posSub):'')+'</small>'+
-        (flags.length?'<span class="fr-warn">\u26A0 '+esc(flags[0].hits.join(', '))+' \u2014 tap Modify</span>':'')+'</span>'+
-        (done?'<span>'+(c.skipped?'skipped':'\u2713 sent')+'</span>':
-          '<button type="button" onclick=\'openFreeCourseSheet('+JSON.stringify(String(to.id))+','+i+')\'>Modify</button>'+
-          '<button type="button" class="fire" onclick=\'fireFreeOne('+JSON.stringify(String(to.id))+','+i+')\'>FIRE</button>')+
-        '</div>';
+      out.push({to:to,i:i,c:c,ident:ident,kind:kind,k:k,sub:sub,posSub:posSub,base:base,flags:flags,done:!!(c.fired||c.skipped),
+        label:(kind==='entremet'?'Pre-dessert':(String(c.course||'Free')+' '+k))});
     });
   });
-  return rows?'<div class="free-panel"><h4>FREE COURSES \u2014 per seat, fire one by one (not on the bill)</h4>'+rows+'</div>':'';
+  return out;
+}
+function freeNoteFor(e){
+  var bits=[], handled=false;
+  String(e.c.modNote||'').split(' · ').forEach(function(p){
+    p=String(p||'').replace(/^\s*Position\s+\w+\s+[—-]\s*/i,'').trim();
+    if (!p || /^SUB:/i.test(p)) return;
+    var m=p.match(/^ALLERGY\s+([A-Za-z \-\/]+?)(?:\s+[—-]\s*(.*))?$/i);
+    if (m) { handled=true; var d=String(m[2]||'').replace(/\.\s*$/,'').trim(); bits.push('no '+m[1].toLowerCase()+(d?' ('+d+')':'')); return; }
+    bits.push(p);
+  });
+  if (e.flags.length && !handled) bits.unshift('no '+e.flags[0].hits.join(', ').toLowerCase());
+  if (e.sub) bits.push(e.sub); else if (e.posSub) bits.push(e.posSub);
+  return bits.length ? e.ident+' '+bits.join(' · ') : '';
+}
+function freeCoursesHtml(){
+  var ents=freeEntries(); if (!ents.length) return '';
+  var rows='';
+  if ((STATE.serviceSettings||{}).groupFreeCourses===false) {
+    ents.forEach(function(e){
+      rows+='<div class="free-row"><span class="fr-seat">'+esc(e.ident)+'</span><span class="fr-name"><b>'+esc(e.label)+'</b>'+
+        '<small>'+(e.sub?('<s>'+esc(e.base)+'</s> \u2192 <b>'+esc(e.sub)+'</b>'):esc(e.base))+(e.posSub&&!e.sub?' \u2192 '+esc(e.posSub):'')+'</small>'+
+        (e.flags.length?'<span class="fr-warn">\u26A0 '+esc(e.flags[0].hits.join(', '))+' \u2014 tap Modify</span>':'')+'</span>'+
+        (e.done?'<span>'+(e.c.skipped?'skipped':'\u2713 sent')+'</span>':
+          '<button type="button" onclick=\'openFreeCourseSheet('+JSON.stringify(String(e.to.id))+','+e.i+')\'>Modify</button>'+
+          '<button type="button" class="fire" onclick=\'fireFreeOne('+JSON.stringify(String(e.to.id))+','+e.i+')\'>FIRE</button>')+'</div>';
+    });
+    return '<div class="free-panel"><h4>FREE COURSES \u2014 per seat, fire one by one (not on the bill)</h4>'+rows+'</div>';
+  }
+  // one line per dish for the whole table
+  var groups=[], idx={};
+  ents.forEach(function(e){ var key=e.label+'|'+e.base.toLowerCase(); var g=idx[key]; if(!g){ g=idx[key]={label:e.label,base:e.base,list:[]}; groups.push(g); } g.list.push(e); });
+  groups.forEach(function(g){
+    var open=g.list.filter(function(e){ return !e.done; });
+    var notes=g.list.map(freeNoteFor).filter(Boolean);
+    var seats=g.list.length+' seat'+(g.list.length===1?'':'s');
+    var refs=JSON.stringify(open.map(function(e){ return [String(e.to.id),e.i]; }));
+    rows+='<div class="free-row grp'+(open.length?'':' done')+'"><span class="fr-name"><b>'+esc(g.label)+' \u2014 '+esc(g.base)+'</b>'+
+      '<small>'+(open.length?(open.length===g.list.length?'all '+seats:open.length+' of '+seats+' left'):'\u2713 sent to all')+'</small>'+
+      (notes.length?'<span class="fr-notes">\u25B2 '+notes.map(esc).join(' \u00B7 ')+'</span>':'')+'</span>'+
+      (open.length?'<button type="button" aria-label="Change seats" onclick=\'openFreeGroupSheet('+esc(JSON.stringify(g.label+'|'+g.base.toLowerCase())).replace(/'/g,"&#39;")+')\'>\u22EF</button>'+
+      '<button type="button" class="fire" onclick=\'fireFreeGroup('+refs.replace(/'/g,"&#39;")+')\'>FIRE</button>':'')+'</div>';
+  });
+  return '<div class="free-panel"><h4>FREE COURSES \u2014 one tap fires it for the whole table</h4>'+rows+'</div>';
+}
+function fireFreeGroup(refs){
+  var n=0, pick=null;
+  (refs||[]).forEach(function(r){
+    var to=(STATE.activeTastingOrders||[]).filter(function(o){return String(o.id)===String(r[0]);})[0]; if(!to) return;
+    var c=diningCourses(to)[r[1]]; if(!c||c.fired||c.skipped) return;
+    if (courseNeedsDessertPick(c)) { pick=pick||String(to.id); return; }
+    c.allergyConfirmed=true;
+    if (fireDiningCourse(to,true,r[1])) n++;
+  });
+  if (pick && !n) { openDessertSelector(pick); return; }
+  toast(n?('Fired for '+n+' seat'+(n===1?'':'s')):'Already fired');
+  renderOrder();
+}
+function openFreeGroupSheet(key){
+  var list=freeEntries().filter(function(e){ return (e.label+'|'+e.base.toLowerCase())===key; });
+  if (!list.length) return;
+  var rows=list.map(function(e){
+    var tid=JSON.stringify(String(e.to.id));
+    return '<div class="free-row"><span class="fr-seat">'+esc(e.ident)+'</span><span class="fr-name"><small>'+(freeNoteFor(e)?esc(freeNoteFor(e).replace(e.ident+' ','')):'standard')+'</small></span>'+
+      (e.done?'<span>\u2713 sent</span>':'<button type="button" onclick=\'closeSheet();openFreeCourseSheet('+tid+','+e.i+')\'>Modify</button><button type="button" class="fire" onclick=\'closeSheet();fireFreeOne('+tid+','+e.i+')\'>FIRE</button>')+'</div>';
+  }).join('');
+  openSheet('<h2>'+esc(list[0].label+' \u2014 '+list[0].base)+'</h2><p class="sheet-sub">Change or fire a single seat.</p>'+rows+'<button class="ghost-btn" style="margin-top:.5rem" onclick="closeSheet()">Close</button>');
 }
 function openFreeCourseSheet(toId, idx){
   var to=(STATE.activeTastingOrders||[]).filter(function(o){return o.id===toId;})[0];

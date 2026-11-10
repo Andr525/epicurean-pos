@@ -171,7 +171,7 @@ try {
     out.rows0 = rows0;
     return out;
   });
-  assert.ok(r5.rows0 >= 5, 'one free row per course per seat: ' + r5.rows0);
+  assert.ok(r5.rows0 >= 3, 'one free row per dish for the whole table: ' + r5.rows0);
   assert.match(r5.sub, /SUB: grilled asparagus/);
   assert.match(r5.rowText, /asparagus/);
   assert.ok(r5.fired && r5.othersHeld, 'fire one free course only: ' + JSON.stringify(r5));

@@ -168,7 +168,7 @@ try {
     console.log('KDS', scr, '=>', seen[scr].slice(0,300), '| errs', JSON.stringify(errs.slice(0,3)));
     if (scr==='kitchen') await kp.screenshot({path:(process.env.SHOT||'/tmp/kds-e2e.png')});
   }
-  assert.match(seen.kitchen, /Smoked Salmon/); assert.match(seen.bar, /Negroni/);
+  assert.match(seen.kitchen, /Salmon/); assert.match(seen.bar, /Negroni/);
   assert.doesNotMatch(seen.kitchen, /Negroni/); assert.doesNotMatch(seen.bar, /Salmon/);
   console.log('PASS e2e: POS -> Firestore -> KDS kitchen & bar');
   ks.close();

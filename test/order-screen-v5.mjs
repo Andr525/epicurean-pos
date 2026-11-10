@@ -79,6 +79,7 @@ try {
     out.sels = diningCourses(to).filter(c=>!c.auto&&!c.noneChoice).map(c=>[c.course,c.choice,c.serviceCourse,c.upcharge,c.modNote||'',diningCourseLabel(c)].join('|'));
     out.price = STATE.currentOrder[STATE.currentOrder.length-1].price;
     out.billText = [...document.querySelectorAll('.ts-check-lines .working-line')].map(e=>e.textContent.replace(/\s+/g,' ')).join(' | ');
+    { const d=document.querySelector('.ts-dots'); if(d) d.click(); }
     out.rowBtns = [...document.querySelectorAll('.ts-row-actions button')].map(b=>b.textContent).join(',');
     out.labels = [...document.querySelectorAll('.ts-course-label')].map(e=>e.textContent).join(',');
     // modify sheet: allergy flag + free text
