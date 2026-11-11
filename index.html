@@ -1406,6 +1406,8 @@ body.hh-on .voice-draft .voice-draft-acts button { background:#fff; color:#000; 
   body.hh-on.hh-table .toast-totals{font-size:.85rem;padding:.2rem .1rem}
   body.hh-on.hh-table .pending-banner{padding:.3rem .55rem;font-size:.85rem;margin:.25rem 0}
 }
+.void-chips{display:flex;flex-wrap:wrap;gap:6px;margin:.4rem 0}.void-chip{border:1px solid var(--border);background:transparent;color:inherit;border-radius:16px;padding:.5rem .8rem;font-size:.85rem}.void-chip.on{background:var(--danger);border-color:var(--danger);color:#fff;font-weight:700}
+.xp-tabs{display:flex;gap:6px;margin:.4rem 0 .6rem}.xp-tab{flex:1;border:1px solid var(--border);background:transparent;color:inherit;border-radius:10px;padding:.6rem;font-weight:600}.xp-tab.on{background:var(--accent,#d97706);border-color:var(--accent,#d97706);color:#fff}.xp-dish{display:flex;justify-content:space-between;align-items:center;gap:.6rem;width:100%;text-align:left;border:1px solid var(--border);background:transparent;color:inherit;border-radius:10px;padding:.7rem .8rem;margin:.3rem 0;font-size:.95rem}.xp-dish b{white-space:nowrap}.xp-warn{display:block;color:#f59e0b;font-style:normal;font-size:.75rem}.xp-incl{width:100%;border:2px solid #16a34a;background:rgba(22,163,74,.12);color:inherit;border-radius:10px;padding:.8rem;margin:.3rem 0 .6rem;font-weight:700}
 </style>
 </head>
 <body>
@@ -1455,6 +1457,8 @@ body.hh-on .voice-draft .voice-draft-acts button { background:#fff; color:#000; 
     <button class="ghost-btn" onclick="closeOverflow();switchTab('history')">History</button>
     <button class="ghost-btn" onclick="closeOverflow();openAllergyEditor()">Guest allergies</button>
     <button class="ghost-btn" onclick="closeOverflow();openGuestNotesSheet()">Guest notes</button>
+    <button class="ghost-btn" id="ovf-comp" style="display:none" onclick="closeOverflow();openVoidSheet('comp')">Comp table (manager)</button>
+    <button class="ghost-btn" id="ovf-void" style="display:none;color:var(--danger)" onclick="closeOverflow();openVoidSheet('void')">Erase table (manager)</button>
     <button class="ghost-btn" onclick="closeOverflow();logout()">Sign out</button>
     <button class="primary-btn" style="margin-top:0.8rem;" onclick="closeOverflow();backToOrderScreen()">Back to order</button>
   </div>
@@ -2465,8 +2469,42 @@ function seatHasPrixFixe(seat, priority){
     return i && i.isPrixFixe && String(i.table)===String(STATE.selectedTable) && orderPositionIdentity(i)===s;
   });
 }
-function warnPrixFixeAlreadyOnSeat(){
-  toast('This position already has a prix-fixe menu. Extra dishes go through Add items.');
+function warnPrixFixeAlreadyOnSeat(){ openExtraDishesPanel(); }
+function seatDiningOrder(){
+  var me=selectedPositionIdentity();
+  return tableDiningOrders().filter(function(to){ return to && to.status!=='void' && orderPositionIdentity(to)===me; })[0]||null;
+}
+function openExtraDishesPanel(kind){
+  var ov=document.getElementById('pf-overlay'); if (!ov) return;
+  var me=selectedPositionIdentity();
+  kind=kind||STATE._xpKind||'app'; STATE._xpKind=kind;
+  var dishes=listPrixFixeExtraDishes().filter(function(d){ return d.kind===kind; });
+  var tabs=[['app','Appetizer'],['main','Main'],['des','Dessert']].map(function(k){
+    return '<button type="button" class="xp-tab'+(k[0]===kind?' on':'')+'" onclick="openExtraDishesPanel(\''+k[0]+'\')">'+k[1]+'</button>';
+  }).join('');
+  var html='<div class="pf-selector"><button type="button" class="pf-back" onclick="backToOrderScreen()">← Order</button>'+
+    '<h3>Seat '+esc(me)+' — more dishes</h3>'+
+    '<p class="pf-sel-sub">Added on top of the prix fixe at the à la carte price: appetizer $'+extraPlateFeeByKind('app').toFixed(0)+' · main $'+extraPlateFeeByKind('main').toFixed(0)+' · dessert $'+extraPlateFeeByKind('des').toFixed(0)+' (set in BOH).</p>'+
+    '<div class="xp-tabs">'+tabs+'</div>';
+  if (kind==='des') {
+    var to=seatDiningOrder();
+    if (to && diningCourses(to).some(courseNeedsDessertPick)) {
+      html+='<button type="button" class="xp-incl" onclick=\'closePfSelector();openDessertSelector('+JSON.stringify(String(to.id))+')\'>The dessert included in the prix fixe — choose it (no charge)</button>';
+    } else if (to) {
+      html+='<p class="pf-sel-sub">This seat’s included dessert is already chosen. More desserts are charged à la carte.</p>';
+    } else {
+      html+='<p class="pf-sel-sub">This seat has no prix fixe yet. Anything chosen here is charged à la carte.</p>';
+    }
+  }
+  if (!dishes.length) html+='<p class="pf-sel-sub">No dishes listed for this course.</p>';
+  dishes.forEach(function(d){
+    var price=extraPlateFeeByKind(d.kind)+extraPlateSurchargeForDish(d, d.kind);
+    var hits=guestAllergyHits(d.allergens);
+    html+='<button type="button" class="xp-dish" onclick=\'closePfSelector();beginAddPrixFixeExtra('+JSON.stringify(String(d.key))+')\'><span>'+esc(d.name)+
+      (hits.length?'<em class="xp-warn">⚠ '+esc(hits.join(', '))+'</em>':'')+'</span><b>$'+price.toFixed(0)+'</b></button>';
+  });
+  html+='<div class="pf-sel-actions"><button class="cancel-pay-btn" onclick="backToOrderScreen()">Back to order</button></div></div>';
+  ov.innerHTML=html; ov.classList.add('show');
 }
 function extraDishSearchOnly(){
   if (!tableHasDining()) return false;
@@ -2517,7 +2555,11 @@ document.addEventListener('pointermove', function(e){ extraDragMove(e); }, {pass
 document.addEventListener('pointerup', function(e){ extraDragEnd(e); });
 document.addEventListener('pointercancel', function(e){ extraDragEnd(e); });
 function closeOverflow(){ document.getElementById('hh-overflow').classList.remove('show'); }
-function openOverflow(){ document.getElementById('hh-overflow').classList.add('show'); }
+function openOverflow(){
+  var t=String(STATE.selectedTable||''), show=!!t && voidEnabled() && tableServiceState(t)!=='empty';
+  ['ovf-comp','ovf-void'].forEach(function(id){ var b=document.getElementById(id); if (b) b.style.display=show?'':'none'; });
+  document.getElementById('hh-overflow').classList.add('show');
+}
 function paintChrome(){
   var hh=isHandheld() && !!STATE.currentServer;
   var tableside=!!STATE.currentServer && STATE.activeTab==='order';
@@ -2579,7 +2621,7 @@ function renderHandheldTop(){
     '<button class="hh-back" onclick="handheldBack()" aria-label="Back">←</button>'+
     '<div class="hh-title">#'+esc(String(STATE.selectedTable))+' · Table '+esc(String(STATE.selectedTable))+
       '<span><button type="button" class="hh-guests" onclick="openPartySheet()">'+sess.guestCount+' guests</button> · '+(STATE.currentServer?esc(STATE.currentServer.name):'')+
-      ' · <span id="hh-seated">'+seatedLabelFor(STATE.selectedTable)+'</span> · <span style="opacity:.6">build Nov10-b</span></span></div>'+
+      ' · <span id="hh-seated">'+seatedLabelFor(STATE.selectedTable)+'</span> · <span style="opacity:.6">build Nov11-a</span></span></div>'+
     '<button class="hh-more" onclick="printCheck()" aria-label="Print">⎙</button>'+
     '<button class="hh-more" onclick="openSwitchUser()" aria-label="Switch user">⇄</button>'+
     '<button class="hh-more" onclick="logout()" aria-label="Sign out">Out</button>'+
@@ -5599,6 +5641,7 @@ function selectTable(t) {
     if (window.EPICUREAN_ORDER_SESSION) window.EPICUREAN_ORDER_SESSION.reset();
     STATE.voiceTurn=null; STATE.voiceBatch=null;
   }
+  if (tableServiceState(t)==='paid') releasePaidTable(t);
   var obj=findFloorTable(t);
   STATE.selectedTable = t;
   if (fbReady) {
@@ -6435,7 +6478,7 @@ function freeEntries(){
     var ident=orderPositionIdentity(to),k=0;
     diningCourses(to).forEach(function(c,i){
       if (!isFreeComplimentary(c)||c.noneChoice||c.headingOnly) return;
-      if (isEntremetCourse(c)&&hideEntremetUntilDessert(c,to)) return;
+      if (isEntremetCourse(c)&&(hideEntremetUntilDessert(c,to)||dessertIsDish(to))) return;
       k++;
       var kind=isEntremetCourse(c)?'entremet':'welcome';
       var posSub=positionSubForSeat(kind,to.seat,to.seatPriority);
@@ -9357,10 +9400,20 @@ function buildPrixFixeSelections(pf, pickedByIndex){
 function diningCourses(to){
   return to.type==='tasting' ? (to.courses||[]) : (to.selections||[]);
 }
+function dessertIsDish(to){
+  return diningCourses(to).some(function(c){
+    if (!c || isEntremetCourse(c) || isFreeComplimentary(c) || c.headingOnly) return false;
+    if (pfCourseKind(String(c.course||c.label||c.group||''))!=='des') return false;
+    if (c.noneChoice || (c.skipped&&!c.fired) || c.pending || courseNeedsDessertPick(c)) return false;
+    var nm=String(c.choice||c.name||'').trim();
+    return !!nm && !/take after|^dolce$|^none$/i.test(nm);
+  });
+}
 function nextDiningFire(to){
   var courses=diningCourses(to);
   for (var i=0;i<courses.length;i++){
     if (courses[i].fired || courses[i].skipped || courses[i].noneChoice) continue;
+    if (isEntremetCourse(courses[i]) && dessertIsDish(to)) continue;   // sorbet goes out by itself with the dessert
     var needDessert=courseNeedsDessertPick(courses[i]);
     return { idx:i, needDessert:needDessert, course:courses[i] };
   }
@@ -9792,7 +9845,7 @@ function openPrixFixeSelector(pfId) {
   STATE._pfAam=null;STATE._pfAamAsk=null;STATE._pfLast={};
   STATE.manualOrderingPosition=selectedPositionIdentity();STATE.manualSelectingPfId=pfId;
   if (seatHasPrixFixe(STATE.activeSeat)) {
-    warnPrixFixeAlreadyOnSeat();
+    openExtraDishesPanel();
     return;
   }
   var pf=findPrixFixeMenu(pfId);
@@ -9803,7 +9856,7 @@ function openPrixFixeSelector(pfId) {
   var html='<div class="pf-selector">';
   html+='<button type="button" class="pf-back" onclick="backToOrderScreen()">← Order</button>';
   html+='<h3>'+esc(pf.name)+' — '+posLineMoney(Number(pf.price)||0)+'</h3>';
-  html+='<p class="pf-sel-sub">One appetizer and one main per seat — or None. Dessert is chosen later from the check, at any point. Extra dishes go through Add items. Welcome bites and entremet fire from the check.</p>';
+  html+='<p class="pf-sel-sub">One appetizer and one main per seat — or None. Dessert can be picked here or later from the check. More dishes are charged \u00E0 la carte. Welcome bites and entremet fire from the check.</p>';
   if (!courses.length) html+='<p class="pf-sel-sub">No courses on this menu yet.</p>';
   courses.forEach(function(c,ci){
     var mode=pfCourseMode(c);
@@ -9822,8 +9875,8 @@ function openPrixFixeSelector(pfId) {
     }
     if (mode==='later'){
       html+='<div class="pf-course-select"><label>'+esc(c.label)+' — later</label>';
-      html+='<p class="pf-sel-sub">Dessert is chosen later from the check. Tap None only if this guest skips dessert. Extra desserts go through Add items.</p>';
-      html+=pfNoneRadioHtml('pf-course-'+ci, false);
+      html+='<p class="pf-sel-sub">Pick the dessert now, or leave it empty and choose it from the check at any point. Tap None only if this guest skips dessert. A second dessert is charged \u00E0 la carte (More dishes).</p>';
+      html+='<div class="pf-options">'+pfOptionRadiosHtml(c, ci, '')+'</div>';
       html+='</div>';
       return;
     }
@@ -10914,6 +10967,104 @@ function tableClearBtnHtml(tNum){
     'onpointerdown="event.stopPropagation()" onpointerup="event.stopPropagation()" ontouchstart="event.stopPropagation()" ontouchend="event.stopPropagation()" '+
     'onclick=\'event.stopPropagation();clearTableFromMap('+JSON.stringify(String(tNum))+')\'>\u00d7</button>';
 }
+function voidEnabled(){ return (STATE.serviceSettings||{}).managerVoid!==false; }
+function voidNeedsCode(){ return (STATE.serviceSettings||{}).voidNeedsCode!==false; }
+function tableCheckTotal(table){
+  var t=0;
+  tableCheckIds(table).forEach(function(id){ try { t+=checkItemsTotal(id); } catch(e){} });
+  return t;
+}
+function dropTableLocally(table){
+  table=String(table||'');
+  STATE.currentOrder=(STATE.currentOrder||[]).filter(function(i){ return String(i.table)!==table; });
+  STATE.activeTastingOrders=(STATE.activeTastingOrders||[]).filter(function(to){ return String(to.table)!==table; });
+  if (STATE.tableSessions) delete STATE.tableSessions[table];
+  if (STATE._paidShares) STATE._paidShares[table]=0;
+  if (STATE.activePositionCheck) { STATE.activePositionCheck=null; STATE.activePositionIdentity=null; }
+}
+function withdrawKitchenTickets(table){
+  table=String(table||'');
+  (STATE.orders||[]).filter(function(o){ return o && String(o.table)===table && o.status==='new' && o.id; }).forEach(function(o){
+    o.status='void';
+    if (fbReady) fbDb.collection('orders').doc(o.id).update({status:'void', voidedAt:Date.now()}).catch(function(){});
+  });
+  if (!fbReady) return;
+  var feed=fbDb.collection('boh_shared').doc('active_orders');
+  activeOrdersWrite=activeOrdersWrite.then(function(){
+    return feed.get().then(function(doc){
+      var data=doc.exists&&doc.data()||{};
+      var list=(Array.isArray(data.list)?data.list:[]).filter(function(i){ return !(i && String(i.table)===table); });
+      return feed.set({list:list, updatedAt:Date.now()});
+    });
+  }).catch(function(e){ console.warn('Withdraw tickets:', e); });
+}
+// A paid table goes back to "empty" so the next party can be seated. The paid check stays saved (collection "checks") for BOH.
+function releasePaidTable(table){
+  table=String(table||'');
+  if (!table) return;
+  tableCheckIds(table).forEach(function(id){ var ch=STATE.checks[id]; if (ch && ch.status==='open') { ch.status='paid'; ch.closedAt=ch.closedAt||Date.now(); persistCheck(ch); } });
+  dropTableLocally(table);
+  STATE._justReleased=table;
+}
+var VOID_REASONS={
+  void:['Entered by mistake','Guest left before ordering','Wrong table','Kitchen error','Test order','Other'],
+  comp:['Guest experience','Kitchen error','Manager decision','Special occasion','Staff meal','Other']
+};
+function openVoidSheet(mode){
+  mode=mode==='comp'?'comp':'void';
+  var t=String(STATE.selectedTable||'');
+  if (!t || tableServiceState(t)==='empty') { toast('Nothing to '+mode+' on this table'); return; }
+  if (!voidEnabled()) { toast('Management turned this off in BOH'); return; }
+  STATE._voidMode=mode; STATE._voidReason='';
+  var total=tableCheckTotal(t);
+  var chips=VOID_REASONS[mode].map(function(r){ return '<button type="button" class="void-chip" onclick=\'pickVoidReason(this,'+JSON.stringify(r)+')\'>'+esc(r)+'</button>'; }).join('');
+  openSheet('<h2>'+(mode==='comp'?'Comp':'Erase')+' table '+esc(t)+'</h2>'+
+    '<p class="sheet-sub">'+(mode==='comp'?'The guests are not charged. ':'Every order on this table is cancelled and the kitchen tickets are removed. ')+'Check total $'+total.toFixed(2)+'. '+(voidNeedsCode()?'A manager code is needed.':'')+'</p>'+
+    '<div class="void-chips">'+chips+'</div>'+
+    '<input class="search-box" id="void-other" placeholder="Note (optional)" style="margin:.5rem 0">'+
+    (voidNeedsCode()?'<input class="search-box" id="void-code" type="password" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="Manager code" style="margin:.2rem 0 .6rem">':'')+
+    '<button class="primary-btn" style="background:var(--danger);color:#fff" onclick="confirmVoid()">'+(mode==='comp'?'Comp this table':'Erase this table')+'</button>'+
+    '<button class="ghost-btn" onclick="closeSheet()">Cancel</button>');
+}
+function pickVoidReason(btn, r){
+  STATE._voidReason=r;
+  [].forEach.call(document.querySelectorAll('.void-chip'), function(b){ b.classList.toggle('on', b===btn); });
+}
+function confirmVoid(){
+  var mode=STATE._voidMode||'void', t=String(STATE.selectedTable||'');
+  if (!STATE._voidReason) { toast('Pick a reason'); return; }
+  var approver=STATE.currentServer||{name:'Unknown'};
+  if (voidNeedsCode()) {
+    var el=document.getElementById('void-code'), code=normalizePin(el?el.value:'');
+    var mgr=allStaffForLogin().filter(function(s){ return s.code===code && String(code)[0]==='5'; })[0];
+    if (!mgr) { toast('Manager code not recognized'); if (el) { el.value=''; el.focus(); } return; }
+    approver=mgr;
+  }
+  var note=(document.getElementById('void-other')||{}).value||'';
+  applyVoid(mode, STATE._voidReason+(note?' — '+note.trim():''), approver);
+}
+function applyVoid(mode, reason, approver){
+  var t=String(STATE.selectedTable||'');
+  if (!t) return;
+  var total=tableCheckTotal(t), now=Date.now();
+  var ids=tableCheckIds(t);
+  ids.forEach(function(id){
+    var ch=STATE.checks[id]; if (!ch) return;
+    try { persistCheck(ch); } catch(e){}
+    ch.status=mode==='comp'?'comp':'void';
+    ch.closedAt=now; ch.voidedAt=now; ch.voidReason=reason;
+    ch.voidedBy=approver&&approver.name||''; ch.voidApprovedBy=approver&&approver.name||'';
+    ch.voidedByServer=STATE.currentServer?STATE.currentServer.name:'';
+    ch.voidAmount=Math.round(total*100)/100; ch.table=t;
+    persistCheck(ch);
+  });
+  withdrawKitchenTickets(t);
+  dropTableLocally(t);
+  closeSheet();
+  STATE.selectedTable=null;
+  toast('Table '+t+(mode==='comp'?' comped':' erased')+' — saved in BOH');
+  try { switchTab('tables'); } catch(e) { try { renderTables(); } catch(e2){} }
+}
 function clearTableFromMap(tNum){
   tNum=String(tNum||'');
   if (!tNum || !tableNeverSent(tNum)) { toast('This table already sent an order'); return; }
@@ -11703,6 +11854,10 @@ function fireDiningCourse(to, quiet, idx){
     );
     return false;
   }
+  if (!isEntremetCourse(nextCourse) && !isFreeComplimentary(nextCourse) && hasDish && pfCourseKind(String(nextCourse.course||nextCourse.label||nextCourse.group||''))==='des') {
+    var ei=-1; courses.forEach(function(c,k){ if (ei<0 && k!==i && isEntremetCourse(c) && !c.fired && !c.skipped && !c.noneChoice && !c.headingOnly) ei=k; });
+    if (ei>=0) { if (!fireDiningCourse(to, true, ei)) { if (!quiet) toast('Pre-dessert first: check the allergy, then FIRE dessert again'); return false; } }
+  }
   nextCourse.fired=true;
   nextCourse.firedAt=Date.now();
   to.currentCourse=i;
@@ -12176,7 +12331,7 @@ function openDessertSelector(orderId){
   var html='<div class="pf-selector">';
   html+='<button type="button" class="pf-back" onclick="backToOrderScreen()">← Order</button>';
   html+='<h3>Dolce</h3>';
-  html+='<p class="pf-sel-sub">Dessert can be chosen at any point. Tap None if this guest skips dessert. Extra desserts go through Add items. Gelato is three scoops.</p>';
+  html+='<p class="pf-sel-sub">Dessert can be chosen at any point. Tap None if this guest skips dessert. A second dessert is charged \u00E0 la carte (More dishes). Gelato is three scoops.</p>';
   html+='<div class="pf-course-select"><label>Dessert — choose one</label><div class="pf-options">';
   html+=pfNoneRadioHtml('dessert-opt', !!(later && (later.noneChoice || /^none$/i.test(current))), 'toggleDessertScoops("none")');
   options.forEach(function(o,oi){
@@ -12385,6 +12540,7 @@ function markPaid(method, subtotal){
     });
     closeOpenCheck(table, 'paid');
     STATE._paidShares[table]=0;
+    releasePaidTable(table);
   }
   var html='<div class="payment-success"><div class="check-icon">✅</div><h3>Paid</h3>'+
     '<p>$'+a.total.toFixed(2)+' · '+(method==='cash'?'cash':'card terminal')+(allPaid?'':' · share '+STATE._paidShares[table]+' of '+(STATE.payEven||1))+'</p>'+
@@ -12477,7 +12633,7 @@ async function processPayment(subtotal) {
       }
     }
 
-    if ((STATE.payEven||1)<=1) closeOpenCheck(STATE.selectedTable, 'paid');
+    if ((STATE.payEven||1)<=1) { closeOpenCheck(STATE.selectedTable, 'paid'); releasePaidTable(STATE.selectedTable); }
 
     // Show success
     showPaymentSuccess(share + tip);
@@ -12503,6 +12659,10 @@ function showPaymentSuccess(total) {
 function closePayment() {
   document.getElementById('payment-overlay').classList.remove('show');
   if (squareCard) { squareCard.destroy().catch(()=>{}); squareCard=null; }
+  if (STATE._justReleased && String(STATE._justReleased)===String(STATE.selectedTable)) {
+    STATE._justReleased=null; STATE.selectedTable=null;
+    try { switchTab('tables'); return; } catch(e) {}
+  }
   if (STATE.hhMode==='check') renderCheck(); else renderOrder();
 }
 
