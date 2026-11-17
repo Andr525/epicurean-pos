@@ -113,7 +113,7 @@ try {
   assert.equal(e.warnNoGf, true);
   assert.equal(e.shellModified, false, 'already modified NO SHELLFISH: no second prompt');
   assert.equal(e.shellPlain, true, 'unmodified shellfish dish must still warn');
-  assert.ok(e.btns.length === 2 && /Make gluten-free|Ask kitchen/.test(e.btns[0]) && /Cancel/.test(e.btns[1]), 'buttons: ' + e.btns);
+  assert.ok(e.btns.length === 3 && /Make gluten-free|Ask kitchen/.test(e.btns[0]) && /Guest is OK/.test(e.btns[1]) && /Cancel/.test(e.btns[2]), 'buttons: ' + e.btns);
   console.log('PASS drink modify is text only; allergy prompt simplified');
 
 } catch (error) {

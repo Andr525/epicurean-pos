@@ -170,6 +170,7 @@ try {
   }
   assert.match(seen.kitchen, /Salmon/); assert.match(seen.bar, /Negroni/);
   assert.doesNotMatch(seen.kitchen, /Negroni/); assert.doesNotMatch(seen.bar, /Salmon/);
+  assert.match(seen.kitchen, /wants nothing/); assert.match(seen.kitchen, /ALLERGY/);
   console.log('PASS e2e: POS -> Firestore -> KDS kitchen & bar');
   ks.close();
 } finally { await browser.close(); server.close(); fake.close && fake.close(); }

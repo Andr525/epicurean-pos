@@ -2621,7 +2621,7 @@ function renderHandheldTop(){
     '<button class="hh-back" onclick="handheldBack()" aria-label="Back">←</button>'+
     '<div class="hh-title">#'+esc(String(STATE.selectedTable))+' · Table '+esc(String(STATE.selectedTable))+
       '<span><button type="button" class="hh-guests" onclick="openPartySheet()">'+sess.guestCount+' guests</button> · '+(STATE.currentServer?esc(STATE.currentServer.name):'')+
-      ' · <span id="hh-seated">'+seatedLabelFor(STATE.selectedTable)+'</span> · <span style="opacity:.6">build Nov11-a</span></span></div>'+
+      ' · <span id="hh-seated">'+seatedLabelFor(STATE.selectedTable)+'</span> · <span style="opacity:.6">build Nov17-a</span></span></div>'+
     '<button class="hh-more" onclick="printCheck()" aria-label="Print">⎙</button>'+
     '<button class="hh-more" onclick="openSwitchUser()" aria-label="Switch user">⇄</button>'+
     '<button class="hh-more" onclick="logout()" aria-label="Sign out">Out</button>'+
@@ -6384,6 +6384,7 @@ function workingCheckHtml(){
       '<div class="ts-qty">'+qty+'</div>'+
       '<div class="ts-name" '+nameClick+'>'+esc(g.opName)+
       (g.notes&&g.notes.length?'<div class="ts-mod">'+esc(g.notes.join(' · '))+'</div>':'')+
+      seatAllergyLineHtml(g.seat!=null?g.seat:(first&&first.seat))+
       spiritPourHtml(first)+
       '</div>'+
       '<div class="ts-tokens">'+workingTokensHtml(plates)+'</div>'+
@@ -9428,7 +9429,7 @@ function courseNeedsDessertPick(c){
 }
 function diningCourseTitle(to, c){
   if (!c) return 'Course';
-  if (c.noneChoice) return (c.course||c.name||'Course')+' — not selected';
+  if (c.noneChoice) return 'Wants nothing — '+(c.course||c.name||'Course');
   if (to && to.type==='tasting') return c.name || c.choice || 'Course';
   if (c.choice && !/take after/i.test(c.choice)) return c.choice;
   if (c.later || c.mode==='later' || /take after/i.test(c.choice||'')) return (c.course||'Dolce')+' — choose later';
@@ -9490,6 +9491,29 @@ function exactPositionAllergyContext(identity, table){
   if(identity==='table') own=Array.from(new Set(Object.keys(sess.allergies||{}).filter(function(k){return k!=='table';}).flatMap(function(k){return asList(sess.allergies[k]);})));
   return {position:identity,table:String(table),allergens:own,tableAllergies:shared,effectiveAllergens:Array.from(new Set(shared.concat(own)))};
 }
+function seatAllergyLineHtml(seat, table){
+  var l=seatAllergyList(seat, table==null?STATE.selectedTable:table);
+  if (!l.length) return '';
+  return '<div class="seat-al" style="color:#c62828;font-size:.62rem;font-weight:700;letter-spacing:.02em">\u25B2 '+esc(l.join(', ').toUpperCase())+' ALLERGY</div>';
+}
+function seatAllergyList(seat, table){
+  try { return exactPositionAllergyContext(seat==null||seat===''?'table':seat, table).effectiveAllergens.slice(); } catch (e) { return []; }
+}
+function postDeclinedNotice(to, c){
+  if (!to || !to._overviewSent || !c) return;
+  var check=STATE.checks[activeCheckId()]; if (!check) return;
+  var ident=orderPositionIdentity(to);
+  var order={table:to.table||STATE.selectedTable,checkId:check.id,server:STATE.currentServer?STATE.currentServer.name:'Unknown',
+    guestCount:STATE.guestCount||sessionOf(STATE.selectedTable).guestCount||2,
+    items:[{id:'dcl_'+to.id+'_'+Date.now(),name:'WANTS NOTHING',station:'Expo',cookTime:0,modifiers:[],selectedMod:null,notes:'',seat:ident,
+      course:null,allergens:[],qty:1,preview:true,declined:true,courseLabel:diningCourseLabel(c)||c.course||c.name||'Course'}],
+    status:'new',sentAt:Date.now(),clearedAt:null,overview:true};
+  var local=Object.assign({id:genId()},order);
+  STATE.orders.push(local);
+  if(!STATE._localOrders) STATE._localOrders=[];
+  STATE._localOrders.push(local);
+  postKitchenTicket(order,'orders',local);
+}
 function courseAllergyKitchenNote(c, identity, table){
   var flags=identity==null?flaggedAllergies():exactPositionAllergyContext(identity,table).effectiveAllergens;
   var name=String((c&&(c.choice||c.name||c.course))||'').toLowerCase();
@@ -9500,6 +9524,13 @@ function courseAllergyKitchenNote(c, identity, table){
   if (has('gluten') && /zucchini/.test(name)) notes.push('ALLERGY GLUTEN — replace breaded zucchini.');
   if (has('shellfish') && /shrimp/.test(name)) notes.push('ALLERGY SHELLFISH — replace shrimp.');
   if ((has('tree nut')||has('nuts')) && /coconut|sorbet|entremet/.test(name)) notes.push('ALLERGY NUTS — no nut garnish.');
+  // Any other allergen in the dish that this seat cannot have: say so, so the kitchen can substitute.
+  var dishAl=asList(c&&c.allergens);
+  var covered=(notes.join(' ')+' '+String((c&&c.modNote)||'')).toUpperCase();
+  var extra=dishAl.filter(function(a){ return has(a) && covered.indexOf(String(a).toUpperCase())<0 && !(/nut/i.test(a) && /NUT/.test(covered)); });
+  if (extra.length) notes.push('ALLERGY '+extra.join(', ').toUpperCase()+' \u2014 dish contains it, chef to substitute.');
+  // Pre-dessert / entremet: always list what is in it when the seat has an allergy, so a substitute can be offered.
+  if (flags.length && c && isEntremetCourse(c) && dishAl.length && !extra.length) notes.push('CONTAINS '+dishAl.join(', ').toUpperCase()+' \u2014 substitute available if needed.');
   return notes.length ? (identity==null?'':'Position '+identity+' — ')+notes.join(' ') : '';
 }
 function dessertHasBeenChosen(to){
@@ -9981,16 +10012,16 @@ function manualMenuAllergyWarning(courses, identity, table){
   if(!conflicts.length) return false;
   var ackKey=String(identity)+'|'+conflicts.map(function(c){return c.name+':'+c.hits.join(',');}).join(';');
   if (STATE._allergyAck && STATE._allergyAck.key===ackKey && Date.now()-STATE._allergyAck.at<60000) {
-    var askFlag=!!STATE._allergyAck.ask;
+    var askFlag=!!STATE._allergyAck.ask, okFlag=!!STATE._allergyAck.ok;
     STATE._allergyAck=null;
-    try { sendAllergyOverrideAlert(identity, conflicts, askFlag); } catch (e) { console.warn('Allergy alert:', e); }
+    try { if (!okFlag) sendAllergyOverrideAlert(identity, conflicts, askFlag); } catch (e) { console.warn('Allergy alert:', e); }
     (courses||[]).forEach(function(c){ if (c && conflicts.some(function(x){ return x.name===String(c.choice||c.name||c.course); })) c._allergyAcked=true; });
     return false;
   }
   STATE._allergyLast={key:ackKey, identity:identity, conflicts:conflicts};
   var gfOnly=conflicts.every(function(c){return canMakeGfPasta(c.name)&&c.hits.every(isGlutenHit);});
   var stuck=conflicts.some(cannotBeGlutenFree);
-  var html='<div class="manual-preadd-warning allergy-warn" role="alert"><b>\u26A0 Seat '+esc(identity)+': '+conflicts.map(function(c){return esc(c.name)+' has '+esc(c.hits.join(', '));}).join(' \u00B7 ')+'</b>'+(stuck?'<div style="margin-top:.3rem;font-weight:600">'+esc(conflicts.filter(cannotBeGlutenFree).map(function(c){return c.name;}).join(', '))+' is filled pasta \u2014 it is made with gluten and cannot be made without it. Suggest another dish.</div>':'')+'<div class="allergy-choice">'+(gfOnly?'<button type="button" class="gf-btn" onclick="allergyGlutenFree()">Make gluten-free</button>':(stuck?'':'<button type="button" class="ask-btn" onclick="allergyAskKitchen()">Ask kitchen: make without '+esc(conflictAllergenText(conflicts))+'</button>'))+'<button type="button" class="ghost-btn" onclick="allergyCancel()">Cancel</button></div></div>';
+  var html='<div class="manual-preadd-warning allergy-warn" role="alert"><b>\u26A0 Seat '+esc(identity)+': '+conflicts.map(function(c){return esc(c.name)+' has '+esc(c.hits.join(', '));}).join(' \u00B7 ')+'</b>'+(stuck?'<div style="margin-top:.3rem;font-weight:600">'+esc(conflicts.filter(cannotBeGlutenFree).map(function(c){return c.name;}).join(', '))+' is filled pasta \u2014 it is made with gluten and cannot be made without it. Suggest another dish.</div>':'')+'<div class="allergy-choice">'+(gfOnly?'<button type="button" class="gf-btn" onclick="allergyGlutenFree()">Make gluten-free</button>':(stuck?'':'<button type="button" class="ask-btn" onclick="allergyAskKitchen()">Ask kitchen: make without '+esc(conflictAllergenText(conflicts))+'</button>'))+'<button type="button" class="gf-btn" style="background:#2f7d4f;color:#fff" onclick="allergyGuestOk()">\u2713 Guest is OK \u2014 add it</button><button type="button" class="ghost-btn" onclick="allergyCancel()">Cancel</button></div></div>';
   var target=document.querySelector('#pf-overlay.show .pf-selector')||document.querySelector('#sheet-overlay.show .sheet');
   if(target){var old=target.querySelector('[data-manual-allergy-block]');if(old)old.remove();var box=document.createElement('section');box.setAttribute('data-manual-allergy-block','1');box.innerHTML=html;target.prepend(box);if(box.scrollIntoView)box.scrollIntoView({block:'start'});}else {openSheet('<h2>Allergy warning</h2>'+html+'<button class="ghost-btn" onclick="closeSheet()">Back</button>');STATE.manualOrderingPosition=identity;}
   return true;
@@ -10016,6 +10047,18 @@ function allergyAddAnyway(){
   if (document.querySelector('#pf-overlay.show') && STATE.manualSelectingPfId) confirmPrixFixe(STATE.manualSelectingPfId);
   else if (STATE.pendingItem) commitPendingItem();
   STATE._allergyAck=null;
+}
+function allergyGuestOk(){
+  var last=STATE._allergyLast;
+  if (!last) return;
+  STATE._allergyAck={key:last.key, at:Date.now(), ok:true};
+  STATE._askNames=last.conflicts.map(function(c){ return String(c.name).split(' \u00B7 ')[0]; });
+  STATE._askTag='ALLERGY '+conflictAllergenText(last.conflicts).toUpperCase()+' \u2014 GUEST IS OK';
+  STATE._askOk=true;
+  try {
+    if (document.querySelector('#pf-overlay.show') && STATE.manualSelectingPfId) confirmPrixFixe(STATE.manualSelectingPfId);
+    else if (STATE.pendingItem) commitPendingItem();
+  } finally { STATE._allergyAck=null; STATE._askTag=null; STATE._askNames=null; STATE._askOk=false; }
 }
 function conflictAllergenText(conflicts){
   var seen={},out=[];
@@ -10067,7 +10110,7 @@ function confirmPrixFixe(pfId) {
   if (!pf) return;
   var picked={};
   var temps={};
-  var scoops={};
+  var scoops={}, scoopAl={};
   var missingTemp='';
   var missingScoops='';
   (pf.courses||[]).forEach(function(c,ci){
@@ -10095,17 +10138,21 @@ function confirmPrixFixe(pfId) {
         if (el && el.value) names.push(el.value);
       }
       if (names.length!==opt.chooseCount) missingScoops=opt.name;
-      else scoops[ci]=names.join(', ');
+      else { scoops[ci]=names.join(', '); (scoopAl[ci]=[]); (opt.scoops||[]).forEach(function(sc){ if (names.indexOf(sc.name)>-1) (sc.allergens||[]).forEach(function(a){ if (scoopAl[ci].indexOf(a)<0) scoopAl[ci].push(a); }); }); }
     }
   });
   if (missingTemp) { toast('Choose temperature for '+missingTemp); return; }
   if (missingScoops) { toast('Choose scoops for '+missingScoops); return; }
   if (STATE._pfAam && STATE._pfAam.gf) { var gfn=String(STATE._pfAam.name||''); (STATE._gfPasta=STATE._gfPasta||[]).push(gfn, gfn+' (main size)', gfn+' (appetizer size)'); }
   var selections=buildPrixFixeSelections(pf, picked);
+  // Scoop dishes (sorbetti/gelato): only the scoops actually chosen count, not every flavour on the list.
+  selections.forEach(function(s){
+    (pf.courses||[]).forEach(function(c,i){ if (scoopAl[i] && pfGuestChoiceMode(c) && (c.label===s.course || c.name===s.course) && !s.noneChoice) s.allergens=scoopAl[i].slice(); });
+  });
   if(manualMenuAllergyWarning(selections,selectedPositionIdentity())) return;
   selections.forEach(function(sel){ applyGfPastaTo(sel); });
   STATE._gfPasta=null;
-  if (STATE._askTag) selections.forEach(function(s){ var nm=String(s.choice||'').split(' \u00B7 ')[0]; if (!s.noneChoice && (STATE._askNames||[]).indexOf(nm)>=0) { s.modNote=s.modNote?(s.modNote+' \u00B7 '+STATE._askTag):STATE._askTag; s.askKitchen=true; } });
+  if (STATE._askTag) selections.forEach(function(s){ var nm=String(s.choice||'').split(' \u00B7 ')[0]; if (!s.noneChoice && (STATE._askNames||[]).indexOf(nm)>=0) { s.modNote=s.modNote?(s.modNote+' \u00B7 '+STATE._askTag):STATE._askTag; if(!STATE._askOk) s.askKitchen=true; else s.guestOk=true; } });
   try { var fl=freeItemAllergyFlags(selections,selectedPositionIdentity()); if(fl.length){ STATE._freeFlags=fl; setTimeout(function(){toast('\u26A0 Seat '+selectedPositionIdentity()+': free '+fl.map(function(f){return f.name+' ('+f.hits.join(', ')+')';}).join(', ')+' \u2014 tap Modify to swap or KC');},400); } } catch(e){}
   selections.forEach(function(s,si){
     var ci=-1;
@@ -10520,7 +10567,7 @@ function commitPendingItem(){
   if(!pendingPositionValid(p)){toast('Invalid exact position or check; no item added');return;}
   if(orderLineAllergyWarning(p)) return;
   applyGfPastaTo(p); if(p.glutenFreePasta&&String(p.name).indexOf('GF pasta')<0) p.name=p.name+' (GF pasta)'; STATE._gfPasta=null;
-  if (STATE._askTag && (STATE._askNames||[]).indexOf(String(p.name||'').split(' \u00B7 ')[0])>=0) { p.notes=p.notes?(p.notes+' \u00B7 '+STATE._askTag):STATE._askTag; p.askKitchen=true; }
+  if (STATE._askTag && (STATE._askNames||[]).indexOf(String(p.name||'').split(' \u00B7 ')[0])>=0) { p.notes=p.notes?(p.notes+' \u00B7 '+STATE._askTag):STATE._askTag; if(!STATE._askOk) p.askKitchen=true; else p.guestOk=true; }
   if (!modifiersReady(p)) { toast('Choose required modifiers'); return; }
   attachOrderGuestSafety(p);
   if (p.fillMainSlot && fillEmptyMainSlot(p)) return;
@@ -11595,7 +11642,7 @@ function kitchenItemsFrom(lines){
         id:i.id, name:i.name, station:i.station, cookTime:i.cookTime||0,
         modifiers:i.modifiers||[], selectedMod:i.selectedMod||null,
         seat:i.seat||'table', seatPriority:i.seatPriority!=null?!!i.seatPriority:null, course:course, notes:i.notes||'',
-        qty:1, allergens:i.allergens||[], price:Number(i.price)||0,
+        qty:1, allergens:i.allergens||[], price:Number(i.price)||0, seatAllergies:seatAllergyList(i.seat,i.table||STATE.selectedTable),
         lineId:i.lineId, checkId:i.checkId||cid,
         extraPlate:!!i.extraPlate, pfExtra:!!i.pfExtra, pfCourseKind:i.pfCourseKind||null,
         ticketPos:i.ticketPos!=null?Number(i.ticketPos):null,
@@ -11708,15 +11755,21 @@ function postDiningOverviewTicket(dn, check){
   var ident=orderPositionIdentity(dn);
   var items=[];
   diningCourses(dn).forEach(function(c,i){
+    if (c && c.noneChoice && !c.headingOnly) {
+      items.push({id:'ovw_'+dn.id+'_'+i,name:'WANTS NOTHING',station:'Expo',cookTime:0,modifiers:[],selectedMod:null,notes:'',seat:ident,
+        course:null,allergens:[],qty:1,preview:true,declined:true,courseLabel:diningCourseLabel(c)||c.course||c.name||'Course'});
+      return;
+    }
     if (!c||c.noneChoice||c.headingOnly||c.pending) return;
     var t=String(c.choice||c.name||'').trim();
     if (!t||/take after/i.test(t)) return;
     var notes=[];
     if (c.modNote) notes.push(c.modNote);
     var sub=diningPositionSubNote(dn,c); if (sub&&notes.join(' ').indexOf(sub)<0) notes.push(sub);
+    var an=courseAllergyKitchenNote(c,ident,dn.table); if (an&&notes.join(' ').indexOf(an)<0) notes.push(an);
     items.push({id:'ovw_'+dn.id+'_'+i,name:t,station:c.station||'Expo',cookTime:0,modifiers:[],selectedMod:null,
       notes:notes.join(' \u00B7 '),seat:ident,course:c.serviceCourse!=null?Number(c.serviceCourse):null,
-      allergens:c.allergens||[],qty:1,preview:true,courseLabel:diningCourseLabel(c),mods:notes.slice()});
+      allergens:c.allergens||[],seatAllergies:seatAllergyList(ident,dn.table),qty:1,preview:true,courseLabel:diningCourseLabel(c),mods:notes.slice()});
   });
   if(!items.length) return;
   var order={table:STATE.selectedTable,checkId:check.id,server:STATE.currentServer?STATE.currentServer.name:'Unknown',
@@ -11893,6 +11946,7 @@ function fireDiningCourse(to, quiet, idx){
       type:isPf?'prix_fixe':'tasting',
       position:orderPositionIdentity(to),
       allergyContext:exactPositionAllergyContext(orderPositionIdentity(to),to.table),
+      seatAllergies:seatAllergyList(orderPositionIdentity(to),to.table),
       menuName:menuName,
       courseNum:i+1,
       totalCourses:courses.length,
@@ -12036,7 +12090,7 @@ function extraInvoiceLineHtml(ex){
   var pos=extraTicketPos(ex.src||ex);
   return '<div class="ts-line lc-line extra-line '+ex.status+(picked?' picked':'')+'" data-extra-line="'+esc(ex.lineId)+'" data-drop-kind="'+esc(kind)+'" data-drop-pos="'+pos+'" onpointerdown="extraDragStart(event,'+JSON.stringify(String(ex.lineId))+')">'+
     '<div><div class="ts-name">'+esc(ex.name)+'</div>'+
-    mods.map(function(m){ return '<div class="ts-mod">'+esc(m)+'</div>'; }).join('')+
+    mods.map(function(m){ return '<div class="ts-mod">'+esc(m)+'</div>'; }).join('')+seatAllergyLineHtml(ex.seat)+
     '<div class="ts-meta lc-meta">'+seatName(ex.seat)+' · '+String(ex.status||'').toUpperCase()+'</div></div>'+
     '<div class="ts-qty">'+qty+'</div>'+
     '<div class="ts-money">'+(each?posLineMoney(each):'')+'</div>'+
@@ -12054,7 +12108,7 @@ function diningCourseLineHtml(to, c, i){
   if (c.selectedTemp) mods.push(c.selectedTemp);
   if (c.modNote) mods.push(c.modNote);
   if (c.scoopChoice) mods.push(c.scoopChoice);
-  if (c.noneChoice) mods.push('no prix-fixe dish');
+  if (c.noneChoice) mods.push('WANTS NOTHING');
   if (c.upcharge) mods.push('+$'+Number(c.upcharge).toFixed(0));
   var hits=guestAllergyHits(c.allergens);
   if (hits.length) mods.push('⚠ '+hits.join(', '));
@@ -12064,7 +12118,7 @@ function diningCourseLineHtml(to, c, i){
   var pos=diningCourseTicketPos(c, i);
   return '<div class="ts-line lc-line dining-line '+(c.fired?'sent':(c.skipped||c.noneChoice)?'held':'unsent')+(picked?' picked':'')+'" data-drop-kind="'+esc(kind)+'" data-drop-pos="'+pos+'" onclick=\'toggleLineSelect('+JSON.stringify(dKey)+')\'>'+
     '<div><div class="ts-name">'+esc(title)+'</div>'+
-    (mods.length?'<div class="ts-mod">'+esc(mods.join(' · '))+'</div>':'')+
+    (mods.length?'<div class="ts-mod">'+esc(mods.join(' · '))+'</div>':'')+(c.noneChoice?'':seatAllergyLineHtml(orderPositionIdentity(to),to.table))+
     '<div class="ts-meta lc-meta">'+st.toUpperCase()+'</div></div>'+
     (c.fired || (c.skipped && !c.noneChoice) ? '<div class="fired-pill">'+(c.skipped?'SKIPPED':'FIRED')+'</div>' : lineKebabBtn({ type:'dining', toId:to.id, idx:i }))+
     '</div>';
@@ -12254,6 +12308,7 @@ function confirmDiningCourseEdit(toId, idx){
   radios.forEach(function(r){ if(r.checked) sel=r.value; });
   if (isPfNonePick(sel)) {
     applyNoneToDiningCourse(c);
+    try { postDeclinedNotice(to,c); } catch (e) {}
     var line=(STATE.currentOrder||[]).filter(function(i){ return i.diningOrderId===to.id || i.lineId===to._boundLine; })[0];
     if (line && line.selections && line.selections[idx]) line.selections[idx]=Object.assign({}, c);
     closePfSelector();
@@ -12377,7 +12432,7 @@ function confirmDessert(orderId){
     if(manualMenuAllergyWarning(diningCourses(to).filter(isEntremetCourse),orderPositionIdentity(to),to.table)) return;
     diningCourses(to).forEach(function(c){
       if (c.entremets || c.mode==='entremets') c.pending=false;
-      if (c.later || c.mode==='later') applyNoneToDiningCourse(c,{later:true});
+      if (c.later || c.mode==='later') { applyNoneToDiningCourse(c,{later:true}); try { postDeclinedNotice(to,c); } catch (e) {} }
     });
     to.dessertChosen=true;
     closePfSelector();
@@ -12401,7 +12456,7 @@ function confirmDessert(orderId){
   (opt.scoops||[]).forEach(function(sc){
     if (scoopNames.indexOf(sc.name)>-1) (sc.allergens||[]).forEach(function(a){ if(scoopAllergens.indexOf(a)<0) scoopAllergens.push(a); });
   });
-  var dessertAllergens=(opt.allergens||[]).slice();
+  var dessertAllergens=opt.chooseCount?[]:(opt.allergens||[]).slice();
   scoopAllergens.forEach(function(a){ if(dessertAllergens.indexOf(a)<0) dessertAllergens.push(a); });
   if(manualMenuAllergyWarning([{name:opt.name,allergens:dessertAllergens}].concat(diningCourses(to).filter(isEntremetCourse)),orderPositionIdentity(to),to.table)) return;
   diningCourses(to).forEach(function(c){
